@@ -5,9 +5,17 @@
 ## .NET
 
 - `global.json` (trước Phase 0): .NET SDK `8.0.0` `latestMinor`, `allowPrerelease=false`
-- `global.json` (sau P0-19): **.NET SDK `9.0.100` `latestMinor`** (Phase 0 update)
-- Module Directory.Build.props: `<TargetFramework>net8.0</TargetFramework>` (sẽ đổi net9.0 ở Phase 2)
-- WebHost csproj: `net8.0`
+- `global.json` (sau P0-19): **.NET SDK `9.0.100` `latestMinor`** (Phase 0 update); runtime thực tế `9.0.313`
+- Module Directory.Build.props: `<TargetFramework>net9.0</TargetFramework>` (bumped Phase 1 — DECISION-008)
+- WebHost csproj: `net9.0` (bumped Phase 1)
+- Infrastructure + test projects: `net9.0` (bumped Phase 1)
+
+## Aspire
+
+- **Chốt thực tế:** `13.2.2` (Microsoft semver độc lập — DECISION-006)
+- AppHost SDK: `Aspire.AppHost.Sdk 13.2.2`
+- Hosting packages: `Aspire.Hosting.AppHost`, `Aspire.Hosting.SqlServer`, `Aspire.Hosting.Redis`, `Aspire.Hosting.Azure.Storage`, `Aspire.Hosting.Seq` — tất cả 13.2.2
+- CommunityToolkit: `CommunityToolkit.Aspire.Hosting.MailPit 13.1.1` (MailDev không có official package — DECISION-007)
 
 ## WebHost package references
 

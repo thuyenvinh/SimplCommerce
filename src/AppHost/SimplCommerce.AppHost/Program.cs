@@ -12,7 +12,7 @@ var redis = builder.AddRedis("redis")
 var storage = builder.AddAzureStorage("storage").RunAsEmulator();
 var blobs = storage.AddBlobs("blobs");
 
-var mail = builder.AddMailDev("maildev");
+var mail = builder.AddMailPit("mail");
 
 var seq = builder.AddSeq("seq")
     .WithDataVolume()

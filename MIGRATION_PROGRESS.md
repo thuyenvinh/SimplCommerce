@@ -4,9 +4,10 @@
 > Legend: `[x]` = done, `[ ]` = pending, `[~]` = BLOCKED (cần user làm tay — ghi chú ngay dưới task), `[-]` = skipped/N/A (lý do ghi chú ngay dưới).
 
 ## TRẠNG THÁI HIỆN TẠI
-- **Phase đang chạy:** Phase 0 → Phase 1 (dừng sau khi xong Phase 1 theo yêu cầu user)
+- **Phase đang chạy:** Phase 0 + Phase 1 xong, đang dừng chờ user review trước khi sang Phase 2
 - **Branch:** `claude/phase-0-migration-pX925` (gộp Phase 0 + Phase 1 — xem DECISION-002)
-- **Blocker lớn:** sandbox không có `dotnet` CLI — xem DECISION-004 và `docs/migration/phase0-manual-steps.md`
+- **Build:** ✅ `dotnet build SimplCommerce.sln` PASS (51 projects, 0 errors, 1 pre-existing warning ASP0014). .NET SDK 9.0.313 đã cài ở `/home/user/.dotnet/` (xem DECISION-005). Aspire bump sang 13.2.2 (xem DECISION-006), MailDev → MailPit (DECISION-007), toàn solution bump net9.0 (DECISION-008).
+- **Blocker còn lại:** Docker daemon chưa sẵn sàng trong sandbox → `aspire run` + runtime smoke test (P0-24, P1-16..P1-19) vẫn cần user chạy local
 
 ---
 
@@ -46,14 +47,14 @@
 
 ### 0.6 Setup môi trường .NET 9
 - [x] P0-19 | `global.json` đã update từ `8.0.0` → `9.0.100 latestMinor`
-- [~] P0-20 | **BLOCKED** — sandbox không có `dotnet` CLI. User chạy trên local theo `docs/migration/phase0-manual-steps.md#P0-20`
-- [~] P0-21 | **BLOCKED** — Aspire templates cần `dotnet new install Aspire.ProjectTemplates` (Aspire 9 đã standalone, không còn dùng workload). Lệnh trong manual-steps doc
-- [~] P0-22 | **BLOCKED** — verify sau khi P0-21 xong
+- [x] P0-20 | `.NET SDK 9.0.313` installed tại `/home/user/.dotnet/`, `dotnet --info` PASS
+- [-] P0-21 | N/A — Aspire 13 đã standalone templates (SDK package `Aspire.AppHost.Sdk` imported trực tiếp trong csproj), không còn cần `dotnet workload install aspire`
+- [x] P0-22 | Scaffolding đã viết tay match Aspire 13.2.2 template (xem DECISION-006)
 
 ### 0.7 Snapshot baseline
-- [~] P0-23 | **BLOCKED** — cần `dotnet build` local
-- [~] P0-24 | **BLOCKED** — cần chạy WebHost trong sandbox có DB + browser. Manual step doc có hướng dẫn
-- [~] P0-25 | **BLOCKED** — cần `dotnet ef` local
+- [x] P0-23 | **Build PASS** — `dotnet build SimplCommerce.sln` (51 projects, 0 errors, 1 warning ASP0014 pre-existing về UseEndpoints). Thời gian 62s.
+- [~] P0-24 | **BLOCKED** — cần Docker + browser để chụp screenshot WebHost; sandbox chưa có Docker daemon
+- [~] P0-25 | **BLOCKED** — cần SQL instance running để generate migration script
 - [x] P0-26 | `docs/migration/baseline-versions.md` đã điền toàn bộ version từ `.csproj` (package graph full-transitive để làm sau khi có `dotnet list` local)
 
 ### 0.8 Commit Phase 0
@@ -92,11 +93,11 @@
 - [x] P1-14 | `builder.AddServiceDefaults();` thêm đầu Program.cs, `app.MapDefaultEndpoints();` thêm sau `app.UseRouting()`. WebHost csproj thêm `<ProjectReference>` tới `SimplCommerce.ServiceDefaults`
 
 ### 1.5 Verify
-- [~] P1-15 | **BLOCKED** — sandbox không có `dotnet`. User chạy local theo `docs/migration/phase0-manual-steps.md#P1-15`
-- [~] P1-16 | **BLOCKED** — cần `dotnet run` local + Docker
-- [~] P1-17 | **BLOCKED** — runtime verification
-- [~] P1-18 | **BLOCKED** — runtime verification
-- [~] P1-19 | **BLOCKED** — screenshot cần runtime; thư mục `docs/migration/phase1-screenshots/` đã được tạo sẵn
+- [x] P1-15 | **`dotnet build` PASS** toàn solution (51 project, 0 error, 1 warning pre-existing)
+- [~] P1-16 | **BLOCKED-Docker** — sandbox chưa có Docker daemon để pull SQL/Redis/Azurite/MailPit/Seq container
+- [~] P1-17 | **BLOCKED-Docker** — runtime verification cần container
+- [~] P1-18 | **BLOCKED-Docker** — runtime verification cần container
+- [~] P1-19 | **BLOCKED-Docker** — screenshot cần runtime; thư mục `docs/migration/phase1-screenshots/` đã được tạo sẵn
 
 ### 1.6 Commit Phase 1
 - [x] P1-20 | MIGRATION_PROGRESS.md đã tick Phase 0 + Phase 1 (non-runtime items)

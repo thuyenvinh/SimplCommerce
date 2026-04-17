@@ -67,3 +67,48 @@
   - Cần user chạy runtime verification trên máy local trước khi coi Phase 1 là thực sự "green".
   - Các task BLOCKED được đánh dấu rõ trong MIGRATION_PROGRESS.md, KHÔNG tick là completed.
   - Báo cáo cuối phase phải nêu rõ trạng thái này.
+
+## DECISION-005: SDK installed tại `/home/user/.dotnet` — build xanh
+- **Date:** 2026-04-17
+- **Phase:** 0, 1
+- **Context:** User yêu cầu cài SDK và build. Script `dot.net/v1/dotnet-install.sh` accessible từ sandbox → đã cài `.NET SDK 9.0.313` (latest patch của kênh 9.0). `global.json` pin `9.0.100 latestMinor` ⇒ 9.0.313 được roll-forward chấp nhận.
+- **Decision:** Coi DECISION-004 là partial-resolved: build task không còn blocked. Các task runtime cần Docker (aspire run + SQL container) vẫn BLOCKED vì sandbox không có Docker daemon.
+- **Consequences:** Phase 0 P0-20, P0-23 ✅; P1-15 ✅. P0-24..P0-25 + P1-16..P1-19 vẫn cần Docker → user chạy local.
+
+## DECISION-006: Aspire version 13.x, không phải 9.x
+- **Date:** 2026-04-17
+- **Phase:** 1
+- **Context:** Prompt CLAUDE_CODE_PROMPT.md viết "Aspire 9.x (latest stable)", nhưng restore thực tế nuget.org cho thấy tất cả package `Aspire.Hosting.*` hiện đã ở version **13.2.2** (Microsoft chuyển Aspire sang semver độc lập sau GA — version number không đi cùng .NET version nữa). Version 9.0.0 chỉ có trên SDK 9.0 manifest đầu năm 2025.
+- **Decision:** Dùng `Aspire.AppHost.Sdk 13.2.2` + `Aspire.Hosting.AppHost 13.2.2` + tất cả `Aspire.Hosting.*` ở 13.2.2. `CommunityToolkit.Aspire.Hosting.MailPit 13.1.1` match ecosystem.
+- **Alternatives considered:** Giữ 9.0.0 pinning → restore fail hẳn. Không khả thi.
+- **Consequences:** `MIGRATION_INVENTORY.md` §5 ghi Aspire 9.x → đã lỗi thời, cần update. Không ảnh hưởng code logic — API Aspire 9 → 13 backward compatible ở mức builder.Add*().
+
+## DECISION-007: MailDev → MailPit
+- **Date:** 2026-04-17
+- **Phase:** 1
+- **Context:** Prompt chỉ định MailDev nhưng Microsoft/CommunityToolkit **không có** package `CommunityToolkit.Aspire.Hosting.MailDev` (chỉ có các variant community non-official: `WeChooz`, `Berrevoets`, `PommaLabs`, `BCat`). Package chính thức của CommunityToolkit cho test SMTP là `CommunityToolkit.Aspire.Hosting.MailPit`.
+- **Decision:** Thay MailDev → **MailPit** (https://mailpit.axllent.org/). Cùng chức năng: SMTP server + web UI để inspect email gửi ra trong dev; chỉ khác container image.
+- **Alternatives considered:**
+  - `WeChooz.Aspire.Hosting.MailDev 2.0.0` — maintainer chưa ổn định, chỉ 8k downloads.
+  - Tự viết `AddContainer("maildev", "maildev/maildev:...")` + binding SMTP port — dài dòng hơn MailPit.
+- **Consequences:**
+  - Code AppHost đổi `AddMailDev("maildev")` → `AddMailPit("mail")` (tên resource ngắn hơn).
+  - Khi WebHost/ApiService gọi SMTP trong dev → dùng connection string Aspire inject, protocol không đổi.
+  - Nếu user insist phải MailDev → swap lại sau bằng `WeChooz` variant.
+
+## DECISION-008: Bump toàn bộ solution sang net9.0 (không chỉ AppHost/ServiceDefaults)
+- **Date:** 2026-04-17
+- **Phase:** 1
+- **Context:** ServiceDefaults chỉ target net9.0 (yêu cầu bởi `Microsoft.Extensions.Http.Resilience 9.0`). WebHost đang net8.0 → `error NU1201: Project SimplCommerce.ServiceDefaults is not compatible with net8.0`. Prompt Phase 1 nguyên bản muốn "WebHost chạy nguyên trạng"; prompt Phase 2 mới bump framework. Nhưng ServiceDefaults reference KHÔNG thể avoid nếu Phase 1 phải gọi `AddServiceDefaults()` (P1-14).
+- **Decision:** Bump **toàn bộ** csproj sang `net9.0` ngay trong Phase 1:
+  - `src/Modules/Directory.Build.props`: net8.0 → net9.0 (ảnh hưởng 41 modules)
+  - `src/SimplCommerce.WebHost/SimplCommerce.WebHost.csproj`
+  - `src/SimplCommerce.Infrastructure/SimplCommerce.Infrastructure.csproj`
+  - Tất cả 7 project test
+- **Alternatives considered:**
+  - Multi-target ServiceDefaults `net8.0;net9.0` — phải simplify OpenTelemetry registrations, code branching cho 2 TFM, chi phí cao hơn việc bump toàn solution.
+  - Hoãn `AddServiceDefaults()` tới Phase 2 — vi phạm task P1-14.
+- **Consequences:**
+  - Phase 2 scope giảm (không còn việc bump TFM).
+  - Tất cả package NuGet 8.0.x transitively nâng lên 9.0 — runtime binding redirect không cần vì .NET 9 SDK tự chọn.
+  - Test projects vẫn chạy với xunit hiện tại; nếu package xunit có issue trên net9.0, sẽ bump trong commit riêng.
