@@ -137,6 +137,7 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SimplCommerce.Module.Checkouts", "src\Modules\SimplCommerce.Module.Checkouts\SimplCommerce.Module.Checkouts.csproj", "{4473538D-2BFA-4C53-B642-0D0DC4F16863}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimplCommerce.Module.ProductComparison.Tests", "test\SimplCommerce.Module.ProductComparison.Tests\SimplCommerce.Module.ProductComparison.Tests.csproj", "{EEC02E89-E89A-4871-8C3E-4BABA1E56CA7}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimplCommerce.Module.ShippingFree.Tests", "test\SimplCommerce.Module.ShippingFree.Tests\SimplCommerce.Module.ShippingFree.Tests.csproj", "{16BB6B44-3300-4C22-A37B-D9CD7A4EA300}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "00-Aspire", "00-Aspire", "{AA000000-0000-0000-0000-000000000001}"
@@ -144,6 +145,10 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SimplCommerce.AppHost", "src\AppHost\SimplCommerce.AppHost\SimplCommerce.AppHost.csproj", "{AA000000-0000-0000-0000-00000000A001}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SimplCommerce.ServiceDefaults", "src\ServiceDefaults\SimplCommerce.ServiceDefaults\SimplCommerce.ServiceDefaults.csproj", "{AA000000-0000-0000-0000-00000000A002}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "00-Aspire", "00-Aspire", "{0A0CD554-1C99-CE8A-5560-BB4017784C2D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimplCommerce.Migrations", "src\Migrations\SimplCommerce.Migrations\SimplCommerce.Migrations.csproj", "{F989C703-C554-4811-938C-1E3AB824D17E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -767,6 +772,18 @@ Global
 		{AA000000-0000-0000-0000-00000000A002}.Release|x64.Build.0 = Release|Any CPU
 		{AA000000-0000-0000-0000-00000000A002}.Release|x86.ActiveCfg = Release|Any CPU
 		{AA000000-0000-0000-0000-00000000A002}.Release|x86.Build.0 = Release|Any CPU
+		{F989C703-C554-4811-938C-1E3AB824D17E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F989C703-C554-4811-938C-1E3AB824D17E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F989C703-C554-4811-938C-1E3AB824D17E}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F989C703-C554-4811-938C-1E3AB824D17E}.Debug|x64.Build.0 = Debug|Any CPU
+		{F989C703-C554-4811-938C-1E3AB824D17E}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F989C703-C554-4811-938C-1E3AB824D17E}.Debug|x86.Build.0 = Debug|Any CPU
+		{F989C703-C554-4811-938C-1E3AB824D17E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F989C703-C554-4811-938C-1E3AB824D17E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F989C703-C554-4811-938C-1E3AB824D17E}.Release|x64.ActiveCfg = Release|Any CPU
+		{F989C703-C554-4811-938C-1E3AB824D17E}.Release|x64.Build.0 = Release|Any CPU
+		{F989C703-C554-4811-938C-1E3AB824D17E}.Release|x86.ActiveCfg = Release|Any CPU
+		{F989C703-C554-4811-938C-1E3AB824D17E}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -827,6 +844,7 @@ Global
 		{AA000000-0000-0000-0000-000000000001} = {C9BFDDC4-5671-47A3-B57D-197C2A51FA8A}
 		{AA000000-0000-0000-0000-00000000A001} = {AA000000-0000-0000-0000-000000000001}
 		{AA000000-0000-0000-0000-00000000A002} = {AA000000-0000-0000-0000-000000000001}
+		{F989C703-C554-4811-938C-1E3AB824D17E} = {0A0CD554-1C99-CE8A-5560-BB4017784C2D}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {B9D0D8F0-1AB9-44DD-839F-ED8CEE7DDB10}

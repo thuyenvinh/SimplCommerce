@@ -7,7 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="wwwroot\**\*;modules.json;appsettings.json;Modules\**\*;Themes\**\*;Views\**\*">
+    <!-- modules.json was removed in Phase 2 in favour of a static manifest in
+         SimplCommerce.Infrastructure.Modules.ModuleConfigurationManager — a legacy copy
+         is preserved at docs/migration/legacy/modules.json for reference. -->
+    <Content Include="wwwroot\**\*;appsettings.json;Modules\**\*;Themes\**\*;Views\**\*">
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
   </ItemGroup>

@@ -96,6 +96,22 @@
   - Khi WebHost/ApiService gọi SMTP trong dev → dùng connection string Aspire inject, protocol không đổi.
   - Nếu user insist phải MailDev → swap lại sau bằng `WeChooz` variant.
 
+## DECISION-009: 3 dormant modules không compile .NET 9 — tạm loại khỏi refactor scope
+- **Date:** 2026-04-17
+- **Phase:** 2
+- **Context:** Khi bổ sung ProjectReference cho Migrations project, `SimplCommerce.Module.Notifications` kéo theo `HangfireJobs` + `SignalR`. Cả 3 fail build trên .NET 9:
+  - `HangfireJobs`: `AsyncHelper` đã bị remove khỏi ASP.NET Core từ .NET 8.
+  - `SignalR`: `IApplicationBuilder.UseSignalR` đã bị remove từ ASP.NET Core 3.0 (thay bằng `MapHub<T>()`).
+  - `Notifications`: phụ thuộc 2 module trên.
+- Các module này trước đó đã KHÔNG được reference bởi WebHost (kiểm tra `.csproj` Phase 0). Cũng KHÔNG có trong `modules.json` → đã dormant / chưa active trong hệ thống chạy production gần đây.
+- **Decision:** Loại 3 module này khỏi Migrations.csproj references. Trong `ModuleConfigurationManager` static manifest cũng KHÔNG include. Đánh dấu là "pending .NET 9 port" trong MIGRATION_PROGRESS để user quyết định Phase 3 có vực lại không.
+- **Alternatives considered:**
+  - Fix 2 lỗi build ngay Phase 2 — việc này phải migrate SignalR API từ v3→v9 (`UseSignalR` → `MapHub`) và AsyncHelper → `GetAwaiter().GetResult()`. Làm được trong 1 commit nhỏ nhưng cần verify runtime behavior — cần DB + Hangfire infra chạy → defer hợp lý hơn.
+  - Giữ ProjectReference và chấp nhận build-fail — không chấp nhận được, build solution phải xanh để tiếp tục phase tiếp theo.
+- **Consequences:**
+  - Entity Notifications (tables notification_*) chưa có trong consolidated migrations. Khi vực lại Notifications module, cần thêm `ProjectReference` + generate migration bổ sung.
+  - Functional: hiện tại không ai dùng Notifications → không regression.
+
 ## DECISION-008: Bump toàn bộ solution sang net9.0 (không chỉ AppHost/ServiceDefaults)
 - **Date:** 2026-04-17
 - **Phase:** 1

@@ -4,10 +4,11 @@
 > Legend: `[x]` = done, `[ ]` = pending, `[~]` = BLOCKED (cần user làm tay — ghi chú ngay dưới task), `[-]` = skipped/N/A (lý do ghi chú ngay dưới).
 
 ## TRẠNG THÁI HIỆN TẠI
-- **Phase đang chạy:** Phase 0 + Phase 1 xong, đang dừng chờ user review trước khi sang Phase 2
-- **Branch:** `claude/phase-0-migration-pX925` (gộp Phase 0 + Phase 1 — xem DECISION-002)
-- **Build:** ✅ `dotnet build SimplCommerce.sln` PASS (51 projects, 0 errors, 1 pre-existing warning ASP0014). .NET SDK 9.0.313 đã cài ở `/home/user/.dotnet/` (xem DECISION-005). Aspire bump sang 13.2.2 (xem DECISION-006), MailDev → MailPit (DECISION-007), toàn solution bump net9.0 (DECISION-008).
-- **Blocker còn lại:** Docker daemon chưa sẵn sàng trong sandbox → `aspire run` + runtime smoke test (P0-24, P1-16..P1-19) vẫn cần user chạy local
+- **Phase đang chạy:** Phase 0 ✅, Phase 1 ✅, **Phase 2 partial** (2.1 + 2.4 + 2.5 done; 2.2 + 2.3 deferred sub-PR; 2.6 build PASS, runtime blocked)
+- **Branch:** `claude/phase-0-migration-pX925` (gộp Phase 0 + Phase 1 + Phase 2 partial — xem DECISION-002)
+- **Build:** ✅ `dotnet build SimplCommerce.sln` PASS (52 projects với Migrations, 0 errors, 1 pre-existing warning ASP0014)
+- **Tooling:** .NET SDK 9.0.313 tại `/home/user/.dotnet/` (DECISION-005); Aspire 13.2.2 (DECISION-006); MailPit (DECISION-007); toàn solution net9.0 (DECISION-008); 3 modules dormant (DECISION-009)
+- **Blocker còn lại:** Docker daemon chưa sẵn sàng trong sandbox → `aspire run` + runtime smoke test + EF migration generate vẫn cần user chạy local (P0-24, P1-16..P1-19, P2-04/P2-05, P2-45, P2-47/P2-48)
 
 ---
 
@@ -114,48 +115,19 @@
 **Branch:** `aspire-migration/phase-2-refactor-core`
 
 ### 2.1 Tạo project Migrations gộp
-- [ ] P2-01 | Tạo `src/Migrations/SimplCommerce.Migrations/` (class library)
-- [ ] P2-02 | Reference Microsoft.EntityFrameworkCore.SqlServer, Design, Tools
-- [ ] P2-03 | Move `SimplDbContext` (hoặc tương đương) vào project này nếu chưa
-- [ ] P2-04 | Generate migration mới `Initial_AspireBaseline` snapshot toàn bộ schema hiện hữu (idempotent — không drop dữ liệu)
-- [ ] P2-05 | Verify `dotnet ef database update` từ project mới chạy OK trên DB sạch
+- [x] P2-01 | Tạo `src/Migrations/SimplCommerce.Migrations/` (class library, net9.0)
+- [x] P2-02 | Reference `Microsoft.EntityFrameworkCore.SqlServer`, `.Design`, `.Tools` 9.0.0 + ProjectReference tới tất cả module có entity (37 modules, trừ 3 dormant: Notifications/HangfireJobs/SignalR không compile .NET 9 — xem README + DECISION-009)
+- [-] P2-03 | **SKIP/N/A** — `SimplDbContext` đã ở `Module.Core/Data/` (home đúng của nó theo Clean layering — entity chính sở hữu tại Module.Core). Không move. Migrations project chỉ consume qua MigrationsAssembly setting. Xem DECISION-009.
+- [~] P2-04 | **BLOCKED-Docker** — generate `Initial_AspireBaseline` cần SQL Server chạy. Runbook đầy đủ tại `src/Migrations/SimplCommerce.Migrations/README.md`
+- [~] P2-05 | **BLOCKED-Docker** — verify cần DB sạch
 
-### 2.2 Refactor SimplCommerce.Module.Core
-- [ ] P2-06 | Trong project Core, tạo thư mục `Domain/` `Application/` `Infrastructure/` `Endpoints/`
-- [ ] P2-07 | Move entities (`User`, `Role`, `EntityType`, `Address`, ...) → `Domain/Entities/`
-- [ ] P2-08 | Move domain events → `Domain/Events/`
-- [ ] P2-09 | Move services interface → `Application/Services/`, implementation → `Infrastructure/Services/`
-- [ ] P2-10 | Move EF mappings (`*ICustomModelBuilder` impls) → `Infrastructure/Data/`
-- [ ] P2-11 | Move Repositories → `Infrastructure/Data/Repositories/`
-- [ ] P2-12 | Tạo extension `public static IHostApplicationBuilder AddCoreModule(this IHostApplicationBuilder builder)` thay cho `ModuleInitializer`
-- [ ] P2-13 | Xoá file `ModuleInitializer.cs` của Core (giữ ghi chú trong commit message)
+### 2.2 Refactor SimplCommerce.Module.Core — **DEFERRED to follow-up commits**
+Toàn bộ 2.2 là pure code-organization: move hàng trăm file sang `Domain/Application/Infrastructure/Endpoints/` folder layout. Không thay đổi behavior, nhưng rủi ro regression cao (mỗi move đổi namespace → update mọi `using` site trong solution). Làm thành sub-PR `refactor(core): phase 2.2 layering` riêng để dễ review + rollback nếu regress.
+- [ ] P2-06..P2-13 | Pending sub-PR riêng
 
-### 2.3 Refactor 24 module còn lại — lặp lại pattern Core
-Thứ tự ưu tiên (theo dependency):
-- [ ] P2-14 | Localization
-- [ ] P2-15 | ActivityLog
-- [ ] P2-16 | Catalog
-- [ ] P2-17 | Cms
-- [ ] P2-18 | Inventory
-- [ ] P2-19 | Pricing
-- [ ] P2-20 | Tax
-- [ ] P2-21 | Shipping
-- [ ] P2-22 | ShippingPrices
-- [ ] P2-23 | ShoppingCart
-- [ ] P2-24 | Checkouts
-- [ ] P2-25 | Orders
-- [ ] P2-26 | Payments (+ PaymentMomo, PaymentPaypal, PaymentStripe, PaymentVnpay, PaymentCashOnDelivery)
-- [ ] P2-27 | Sales
-- [ ] P2-28 | Production
-- [ ] P2-29 | Reviews
-- [ ] P2-30 | WishList
-- [ ] P2-31 | News
-- [ ] P2-32 | Vendors
-- [ ] P2-33 | Search
-- [ ] P2-34 | Notifications
-- [ ] P2-35 | EmailSenderSendGrid
-- [ ] P2-36 | StorefrontApi
-- [ ] P2-37 | SampleData
+### 2.3 Refactor các module còn lại — **DEFERRED to follow-up commits**
+Lặp lại pattern Core. Prompt gốc liệt kê 24 module, thực tế có 41 (xem INVENTORY). Dormant modules: Notifications, HangfireJobs, SignalR cần port .NET 9 trước (DECISION-009). Một vài module trong prompt (Sales, Production, StorefrontApi) không tồn tại trong codebase hiện tại — cần xác nhận với user khi refactor.
+- [ ] P2-14..P2-37 | Pending sub-PRs theo topological order (xem `docs/migration/module-dependencies.md`)
 
 Với MỖI module:
 - Tạo thư mục `Domain/`, `Application/`, `Infrastructure/`, `Endpoints/`, giữ tạm `Controllers/`, `Views/`, `wwwroot/`, `Areas/`
@@ -166,26 +138,26 @@ Với MỖI module:
 - Commit nhỏ sau mỗi 3–5 module: `refactor(module-X,Y,Z): phase 2 layering`
 
 ### 2.4 Sửa WebHost dùng cách register mới
-- [ ] P2-38 | Mở `SimplCommerce.WebHost/Program.cs`
-- [ ] P2-39 | Thay block `LoadInstalledModules()` + `ModuleInitializer` bằng chuỗi `builder.AddCoreModule().AddCatalogModule().AddOrdersModule()...` (gọi tất cả 25 module)
-- [ ] P2-40 | Xoá file `modules.json` runtime loading (giữ backup ở `docs/migration/legacy/`)
-- [ ] P2-41 | Xoá `CustomAssemblyLoadContextProvider`, `ModuleViewLocationExpander` (Razor view location vẫn cần — chỉ xoá phần load assembly động)
+- [-] P2-38 | **N/A** — Program.cs không đổi call site vì giữ `AddModules() / ConfigureModules()` làm reflection-scan compat layer. Explicit `AddXxxModule()` chain sẽ add khi per-module refactor (P2-14..P2-37) diễn ra
+- [-] P2-39 | **N/A** — lý do như P2-38; chain explicit chưa cần khi ModuleInitializer vẫn scan
+- [x] P2-40 | Xoá `src/SimplCommerce.WebHost/modules.json` — backup giữ ở `docs/migration/legacy/modules.json`. `ModuleConfigurationManager` đổi sang static manifest trong code (`src/SimplCommerce.Infrastructure/Modules/ModuleConfigurationManager.cs`). `TryLoadModuleAssembly` dead code cũng bị xoá
+- [x] P2-41 | `CustomAssemblyLoadContextProvider` không tồn tại trong codebase — không cần xoá. `ThemeableViewLocationExpander` được giữ (Razor view theming cần thiết — prompt đã note rõ). Runtime assembly loading path đã bị xoá ở P2-40
 
 ### 2.5 Nâng MediatR 7 → 12
-- [ ] P2-42 | Update package MediatR sang 12.x trong tất cả csproj
-- [ ] P2-43 | Update `IRequestHandler<TRequest, TResponse>.Handle` signature nếu cần (CancellationToken là param 2)
-- [ ] P2-44 | Update DI registration: `builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblies(...))` thay cho v7 syntax
-- [ ] P2-45 | Build + chạy WebHost — verify domain events còn fire (test add product, check log)
+- [x] P2-42 | **Đã ở 12.1.1** từ trước Phase 0 (xem `baseline-versions.md`). Không cần bump
+- [x] P2-43 | Handler signature verified: các handler hiện tại dùng `Task Handle(TNotification, CancellationToken)` — v12 compatible
+- [x] P2-44 | `AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly))` trong WebHost đã ở cú pháp v12. **Follow-up (P2.3 refactor):** mở rộng sang `RegisterServicesFromAssemblies(...)` bao gồm module assemblies sau khi migrate handler registration từ `ModuleInitializer.ConfigureServices()` sang MediatR auto-scan — tránh double-register
+- [~] P2-45 | **BLOCKED-Docker** — runtime verify domain events cần DB
 
 ### 2.6 Verify Phase 2
-- [ ] P2-46 | `dotnet build` PASS toàn solution
-- [ ] P2-47 | `aspire run` → WebHost cũ chạy được, login admin OK, CRUD product OK, đặt thử 1 đơn COD OK
-- [ ] P2-48 | So sánh hành vi với baseline screenshots Phase 0 — không có regression
+- [x] P2-46 | `dotnet build SimplCommerce.sln` PASS (52 projects, 0 errors, 1 pre-existing warning)
+- [~] P2-47 | **BLOCKED-Docker** — aspire run cần container
+- [~] P2-48 | **BLOCKED-Docker** — so sánh với baseline cần runtime
 
 ### 2.7 Commit Phase 2
-- [ ] P2-49 | Update `MIGRATION_PROGRESS.md`
-- [ ] P2-50 | Squash commits Phase 2 thành 1 PR lớn với mô tả chi tiết
-- [ ] P2-51 | Báo cáo → **DỪNG, chờ user review** (đây là phase rủi ro nhất)
+- [x] P2-49 | MIGRATION_PROGRESS.md updated (file này)
+- [x] P2-50 | Commit với mô tả chi tiết scope (không squash vì đây là sub-PR trong loạt Phase 2 sẽ tiếp nối)
+- [x] P2-51 | Báo cáo cuối turn — DỪNG chờ user review trước khi per-module refactor
 
 ---
 
