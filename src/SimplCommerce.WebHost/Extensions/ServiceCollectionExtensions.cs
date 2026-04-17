@@ -218,9 +218,14 @@ namespace SimplCommerce.WebHost.Extensions
 
         public static IServiceCollection AddCustomizedDataStore(this IServiceCollection services, IConfiguration configuration)
         {
-            services.AddDbContextPool<SimplDbContext>(options => 
+            // Aspire injects ConnectionStrings__SimplCommerce; retain DefaultConnection fallback
+            // for standalone runs of the WebHost outside the AppHost orchestrator.
+            var connectionString = configuration.GetConnectionString("SimplCommerce")
+                ?? configuration.GetConnectionString("DefaultConnection");
+
+            services.AddDbContextPool<SimplDbContext>(options =>
             {
-                options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"), b => b.MigrationsAssembly("SimplCommerce.WebHost"));
+                options.UseSqlServer(connectionString, b => b.MigrationsAssembly("SimplCommerce.WebHost"));
                 options.EnableSensitiveDataLogging();
             });
             return services;

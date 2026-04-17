@@ -49,6 +49,7 @@
     <ProjectReference Include="..\SimplCommerce.Infrastructure\SimplCommerce.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\SimplCommerce.Module.Core\SimplCommerce.Module.Core.csproj" />
     <ProjectReference Include="..\Modules\SimplCommerce.Module.Localization\SimplCommerce.Module.Localization.csproj" />
+    <ProjectReference Include="..\ServiceDefaults\SimplCommerce.ServiceDefaults\SimplCommerce.ServiceDefaults.csproj" />
 
     <ProjectReference Include="..\Modules\SimplCommerce.Module.EmailSenderSmtp\SimplCommerce.Module.EmailSenderSmtp.csproj" />
     <ProjectReference Include="..\Modules\SimplCommerce.Module.StorageLocal\SimplCommerce.Module.StorageLocal.csproj" />

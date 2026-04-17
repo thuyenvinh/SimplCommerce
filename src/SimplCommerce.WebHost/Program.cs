@@ -22,14 +22,18 @@ using SimplCommerce.Module.Localization.TagHelpers;
 using SimplCommerce.WebHost.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddServiceDefaults();
 ConfigureService();
 var app = builder.Build();
 Configure();
 app.Run();
 
-void ConfigureService() 
+void ConfigureService()
 {
-    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    // Phase 1: Aspire injects ConnectionStrings__SimplCommerce; fall back to the legacy
+    // "DefaultConnection" key so the WebHost still runs standalone without AppHost.
+    var connectionString = builder.Configuration.GetConnectionString("SimplCommerce")
+        ?? builder.Configuration.GetConnectionString("DefaultConnection");
     builder.Configuration.AddEntityFrameworkConfig(options =>
     {
         options.UseSqlServer(connectionString);
@@ -92,6 +96,7 @@ void Configure()
     app.UseHttpsRedirection();
     app.UseCustomizedStaticFiles(builder.Environment);
     app.UseRouting();
+    app.MapDefaultEndpoints();
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
