@@ -105,16 +105,13 @@ void Configure()
     app.UseCookiePolicy();
     app.UseCustomizedIdentity();
     app.UseCustomizedRequestLocalization();
-    app.UseEndpoints(endpoints =>
-    {
-        endpoints.MapDynamicControllerRoute<SlugRouteValueTransformer>("/{**slug}");
-        endpoints.MapControllerRoute(
-            name: "areas",
-            pattern: "{area:exists}/{controller=Home}/{action=Index}/{id?}");
-        endpoints.MapControllerRoute(
-            name: "default",
-            pattern: "{controller=Home}/{action=Index}/{id?}");
-    });
+    app.MapDynamicControllerRoute<SlugRouteValueTransformer>("/{**slug}");
+    app.MapControllerRoute(
+        name: "areas",
+        pattern: "{area:exists}/{controller=Home}/{action=Index}/{id?}");
+    app.MapControllerRoute(
+        name: "default",
+        pattern: "{controller=Home}/{action=Index}/{id?}");
 
     var moduleInitializers = app.Services.GetServices<IModuleInitializer>();
     foreach (var moduleInitializer in moduleInitializers)
