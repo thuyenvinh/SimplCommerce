@@ -121,9 +121,16 @@
 - [~] P2-04 | **BLOCKED-Docker** — generate `Initial_AspireBaseline` cần SQL Server chạy. Runbook đầy đủ tại `src/Migrations/SimplCommerce.Migrations/README.md`
 - [~] P2-05 | **BLOCKED-Docker** — verify cần DB sạch
 
-### 2.2 Refactor SimplCommerce.Module.Core — **DEFERRED to follow-up commits**
-Toàn bộ 2.2 là pure code-organization: move hàng trăm file sang `Domain/Application/Infrastructure/Endpoints/` folder layout. Không thay đổi behavior, nhưng rủi ro regression cao (mỗi move đổi namespace → update mọi `using` site trong solution). Làm thành sub-PR `refactor(core): phase 2.2 layering` riêng để dễ review + rollback nếu regress.
-- [ ] P2-06..P2-13 | Pending sub-PR riêng
+### 2.2 Refactor SimplCommerce.Module.Core
+- [x] P2-06 | `Domain/`, `Application/`, `Infrastructure/`, `Endpoints/` đã tạo trong Module.Core
+- [x] P2-07 | 19 entity classes moved `Models/` → `Domain/Entities/`; 2 enums → `Domain/Enums/`; 2 constants → `Domain/Constants/`; 1 VO (`ThemeManifest`) → `Domain/ValueObjects/`
+- [x] P2-08 | 4 domain events moved `Events/` → `Domain/Events/`
+- [x] P2-09 | 11 service interfaces moved `Services/` → `Application/Services/`; 7 impl moved `Services/` → `Infrastructure/Services/`
+- [x] P2-10 | EF mappings + DbContext + seed moved `Data/` → `Infrastructure/Data/`
+- [x] P2-11 | Repositories moved `Data/` → `Infrastructure/Data/Repositories/`. Plus: 3 Identity stores (`SimplRoleStore`, `SimplSignInManager`, `SimplUserStore`) → `Infrastructure/Identity/`; 4 EF-config classes → `Infrastructure/Configuration/`; web utilities (`SlugRouteValueTransformer`, `WorkContext`/`IWorkContext`) → `Infrastructure/Web/`; setting helpers → `Infrastructure/Settings/`; tag helpers → `Infrastructure/TagHelpers/`; `LocalizedStringExtensions` → `Infrastructure/Localization/`
+- [x] P2-12 | `CoreModuleExtensions.AddCoreModule(IServiceCollection)` extension created at module root — central registration source of truth
+- [-] P2-13 | **MODIFIED** — `ModuleInitializer.cs` KEPT but converted to thin shim that calls `AddCoreModule()`, marked `[Obsolete]`. Full removal blocked until WebHost stops doing reflection-driven `ConfigureModules()` (P2-39 follow-up). Avoids breaking ApiService/WebHost during transition.
+- **Important note about file moves:** `namespace` declarations inside files were KEPT unchanged (`SimplCommerce.Module.Core.Models`, `.Services`, `.Extensions`, etc.) — C# decouples folder location from namespace, so all 100+ `using SimplCommerce.Module.Core.Models;` etc. across the solution still resolve. Renaming namespaces to match new folders is a separate, mechanical follow-up that touches caller sites — out of scope this commit.
 
 ### 2.3 Refactor các module còn lại — **DEFERRED to follow-up commits**
 Lặp lại pattern Core. Prompt gốc liệt kê 24 module, thực tế có 41 (xem INVENTORY). Dormant modules: Notifications, HangfireJobs, SignalR cần port .NET 9 trước (DECISION-009). Một vài module trong prompt (Sales, Production, StorefrontApi) không tồn tại trong codebase hiện tại — cần xác nhận với user khi refactor.
