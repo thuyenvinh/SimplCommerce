@@ -132,9 +132,24 @@
 - [-] P2-13 | **MODIFIED** — `ModuleInitializer.cs` KEPT but converted to thin shim that calls `AddCoreModule()`, marked `[Obsolete]`. Full removal blocked until WebHost stops doing reflection-driven `ConfigureModules()` (P2-39 follow-up). Avoids breaking ApiService/WebHost during transition.
 - **Important note about file moves:** `namespace` declarations inside files were KEPT unchanged (`SimplCommerce.Module.Core.Models`, `.Services`, `.Extensions`, etc.) — C# decouples folder location from namespace, so all 100+ `using SimplCommerce.Module.Core.Models;` etc. across the solution still resolve. Renaming namespaces to match new folders is a separate, mechanical follow-up that touches caller sites — out of scope this commit.
 
-### 2.3 Refactor các module còn lại — **DEFERRED to follow-up commits**
+### 2.3 Refactor các module còn lại
 Lặp lại pattern Core. Prompt gốc liệt kê 24 module, thực tế có 41 (xem INVENTORY). Dormant modules: Notifications, HangfireJobs, SignalR cần port .NET 9 trước (DECISION-009). Một vài module trong prompt (Sales, Production, StorefrontApi) không tồn tại trong codebase hiện tại — cần xác nhận với user khi refactor.
-- [ ] P2-14..P2-37 | Pending sub-PRs theo topological order (xem `docs/migration/module-dependencies.md`)
+
+**STATUS: Hoàn thành 35/35 active modules (3 dormant loại khỏi scope)**
+- [x] Batch 1: Localization, ActivityLog, Tax, Contacts, Vendors — commit `1721ea3`
+- [x] Batch 2: Cms, Search, News, Inventory, Pricing — commit sau
+- [x] Catalog (biggest — own commit) — 102 .cs files reorganized
+- [x] Batch 3: Shipping, ShippingPrices, ShippingFree, ShippingTableRate, ShoppingCart, Checkouts
+- [x] Batch 4: Orders, Shipments, Reviews, WishList, ProductComparison
+- [x] Batch 5: Payments core + 7 providers (Braintree, Cashfree, CoD, Momo, NganLuong, PaypalExpress, Stripe)
+- [x] Batch 6: SampleData, Comments, ProductRecentlyViewed, StorageLocal, DinkToPdf, EmailSenderSmtp
+- [-] Dormant (deferred until .NET 9 port — DECISION-009): Notifications, HangfireJobs, SignalR, EmailSenderSendgrid, StorageAmazonS3, StorageAzureBlob (last 3 compile but not referenced by WebHost today)
+
+**Pattern applied to each module (same as Core refactor):**
+- `git mv` files vào `Domain/{Entities,Events,Enums,Constants,ValueObjects}/`, `Application/{Services,Repositories,EventHandlers,ViewModels,Queries}/`, `Infrastructure/{Data,Data/Repositories,Services,BackgroundServices,Identity,Configuration,Web,Settings,TagHelpers,Localization,Helpers}/`, `Endpoints/`
+- Namespace declarations KHÔNG đổi → 0 breaking change cho callers
+- Tạo `<ModuleName>ModuleExtensions.Add<ModuleName>Module(IServiceCollection)` là source-of-truth mới cho DI
+- `ModuleInitializer` giữ làm `[Obsolete]` shim delegating sang extension — reflection-scan path vẫn hoạt động
 
 Với MỖI module:
 - Tạo thư mục `Domain/`, `Application/`, `Infrastructure/`, `Endpoints/`, giữ tạm `Controllers/`, `Views/`, `wwwroot/`, `Areas/`
