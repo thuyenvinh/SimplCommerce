@@ -271,7 +271,7 @@ Storefront endpoint groups đã tạo (9 groups):
 - [x] P3-54 | `POST /api/webhooks/paypal` — stub tương tự
 - [x] P3-55 | `POST /api/webhooks/momo` — stub tương tự
 - [-] P3-56 | `POST /api/webhooks/vnpay` — **SKIP** — module PaymentVnpay không tồn tại trong codebase (xem DECISION-007); thêm khi có VNPay module
-- [~] P3-57 | **Pending** — signature verification per provider (Stripe-Signature HMAC, PayPal IPN round-trip, MoMo HMAC-SHA256). Mỗi provider cần sandbox credentials để test → sub-PR per provider khi có
+- [x] P3-57 | Webhook signature verification implemented for Stripe (HMAC-SHA256 over `t=.&lt;body&gt;`, 5-min tolerance, rotating `v1=` list), MoMo (ordered-field HMAC-SHA256 per v3 spec), PayPal v2 (REST roundtrip to `/v1/notifications/verify-webhook-signature` with OAuth basic → bearer flow). `WebhookSignatureVerifier` pure-HMAC impls unit-tested with 11 canonical vectors (rotation, tampered body, replay window, malformed JSON, missing config). Endpoints return 401 on bad sig, 503 when not configured, 202 on verified. PayPal uses HttpClient behind `IPayPalWebhookVerifier` so integration tests can stub
 
 ### 3.8 Test integration — scaffold only
 - [x] P3-58 | `tests/SimplCommerce.ApiService.IntegrationTests/` project created (net9.0, xunit 2.9, FluentAssertions, Microsoft.AspNetCore.Mvc.Testing 9.0)

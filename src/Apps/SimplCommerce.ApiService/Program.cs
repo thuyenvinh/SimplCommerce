@@ -130,6 +130,8 @@ builder.Services
 
 builder.Services.AddScoped<JwtTokenService>();
 
+builder.Services.AddWebhookVerifiers(builder.Configuration);
+
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy("AdminOnly", p => p.RequireRole("admin"))
     .AddPolicy("AdminOrVendor", p => p.RequireRole("admin", "vendor"))
