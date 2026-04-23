@@ -13,6 +13,7 @@ using SimplCommerce.ApiService.Media;
 using SimplCommerce.ApiService.Webhooks;
 using SimplCommerce.Infrastructure;
 using SimplCommerce.Infrastructure.Data;
+using SimplCommerce.Infrastructure.Modules;
 using SimplCommerce.Module.ActivityLog.Endpoints;
 using SimplCommerce.Module.Catalog.Endpoints;
 using SimplCommerce.Module.Cms.Endpoints;
@@ -74,6 +75,10 @@ using SimplCommerce.Module.Vendors;
 using SimplCommerce.Module.WishList;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// SimplDbContext.OnModelCreating walks GlobalConfiguration.Modules to discover entities via
+// reflection across every bundled module. Seed the manifest before the DbContext is resolved.
+ModuleManifestLoader.LoadAllBundled();
 
 builder.AddServiceDefaults();
 

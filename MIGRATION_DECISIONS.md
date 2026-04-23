@@ -140,3 +140,16 @@
 - **Consequences:**
   - API surface MailKit tương thích ngược trong minor/patch 4.x — code gọi `ISmtpClient` / `MimeMessage` không cần thay đổi.
   - MimeKit transitively bump từ 4.2.0 → 4.16.0 → closes GHSA-g7hc-96xr-gvvx.
+
+## DECISION-011: Design-time factory unblocks migration generation without Docker
+- **Date:** 2026-04-23
+- **Phase:** 2 (retroactive unblock)
+- **Context:** `P2-04` was BLOCKED-Docker because the runbook assumed Aspire + SQL needed to be running before `dotnet ef migrations add` would work. In reality `migrations add` only needs a valid `DbContextOptions` and the model — no live connection. The blocker was that `SimplDbContext.OnModelCreating` walks `GlobalConfiguration.Modules` for entity discovery, and that static list was only populated by the legacy WebHost's `AddModules()` call — never at design time.
+- **Decision:** Add a tiny reusable helper `SimplCommerce.Infrastructure.Modules.ModuleManifestLoader.LoadAllBundled()` that enumerates `ModuleConfigurationManager` and `Assembly.Load`s each module, then use it from both `ApiService.Program.cs` (fixes a latent runtime bug where ApiService would have had an empty model) and a new `DesignTimeDbContextFactory` in `SimplCommerce.Migrations`. Placeholder connection string in the factory — EF never opens it.
+- **Alternatives considered:**
+  - Keep runbook as-is and wait for user to run Aspire — slow, no value, and hid a runtime bug in ApiService.
+  - Duplicate the bootstrap inline in the factory — would drift against WebHost's `AddModules()` over time.
+- **Consequences:**
+  - `Initial_AspireBaseline` generated offline: 85 tables covering all 23 entity-owning modules.
+  - ApiService now wires `GlobalConfiguration.Modules` — entity discovery works at runtime as well. Previously ApiService would have started up fine but `SimplDbContext.OnModelCreating` would register zero entities → every query would fail. Untested because BLOCKED-Docker; this fix preempts the failure.
+  - Three project references added to `SimplCommerce.Migrations.csproj` (DinkToPdf, EmailSenderSmtp, StorageLocal) so Assembly.Load finds every manifest entry.

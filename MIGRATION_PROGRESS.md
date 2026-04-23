@@ -9,7 +9,7 @@
 - **Build:** ✅ `dotnet build SimplCommerce.sln` PASS (59 projects, 0 errors, 0 warnings — clean + incremental)
 - **Tests:** ✅ **42/42 pass** (7 unit + 1 ApiService integration scaffold)
 - **Tooling:** .NET SDK 9.0.313 tại `/home/user/.dotnet/` (DECISION-005); Aspire 13.2.2 (DECISION-006); MailPit (DECISION-007); toàn solution net9.0 (DECISION-008)
-- **Blocker còn lại:** Docker daemon chưa sẵn sàng trong sandbox → `aspire run` + runtime smoke test + EF migration generate + real integration tests vẫn cần user chạy local (P0-24, P1-16..P1-19, P2-04/P2-05, P2-45, P2-47/P2-48, P3-59..P3-62 e2e tests, P3-57 webhook signature verify)
+- **Blocker còn lại:** Docker daemon chưa sẵn sàng trong sandbox → `aspire run` + runtime smoke test + real integration tests vẫn cần user chạy local (P0-24, P1-16..P1-19, P2-05 apply verify, P2-45, P2-47/P2-48, P3-59..P3-62 e2e tests)
 
 ---
 
@@ -119,8 +119,8 @@
 - [x] P2-01 | Tạo `src/Migrations/SimplCommerce.Migrations/` (class library, net9.0)
 - [x] P2-02 | Reference `Microsoft.EntityFrameworkCore.SqlServer`, `.Design`, `.Tools` 9.0.0 + ProjectReference tới tất cả module có entity (37 modules, trừ 3 dormant: Notifications/HangfireJobs/SignalR không compile .NET 9 — xem README + DECISION-009)
 - [-] P2-03 | **SKIP/N/A** — `SimplDbContext` đã ở `Module.Core/Data/` (home đúng của nó theo Clean layering — entity chính sở hữu tại Module.Core). Không move. Migrations project chỉ consume qua MigrationsAssembly setting. Xem DECISION-009.
-- [~] P2-04 | **BLOCKED-Docker** — generate `Initial_AspireBaseline` cần SQL Server chạy. Runbook đầy đủ tại `src/Migrations/SimplCommerce.Migrations/README.md`
-- [~] P2-05 | **BLOCKED-Docker** — verify cần DB sạch
+- [x] P2-04 | `Initial_AspireBaseline` **generated** (85 tables, 3259-line migration). Unblocked via design-time factory (`DesignTimeDbContextFactory` + `ModuleManifestLoader`) so `dotnet ef migrations add` no longer needs a live SQL Server. See `src/Migrations/SimplCommerce.Migrations/README.md`. Also fixes a latent bug where ApiService didn't populate `GlobalConfiguration.Modules` at startup.
+- [~] P2-05 | Apply-to-clean-DB verify — still BLOCKED-Docker (needs SQL instance). Migration has been design-time validated and builds clean; apply-step is a 1-command user task
 
 ### 2.2 Refactor SimplCommerce.Module.Core
 - [x] P2-06 | `Domain/`, `Application/`, `Infrastructure/`, `Endpoints/` đã tạo trong Module.Core
