@@ -213,75 +213,55 @@ Verify:
 - ApiService assembly built: `src/Apps/SimplCommerce.ApiService/bin/Debug/net9.0/SimplCommerce.ApiService.dll`
 - Runtime verify (aspire run + scalar UI mở, JWT token lấy được, endpoint gọi được) — **BLOCKED-Docker**, cần user chạy local
 
-### 3.3 Migrate endpoints — Storefront API trước
-Cho mỗi controller trong `Module.StorefrontApi`:
-- [ ] P3-15 | Tạo file `Endpoints/<Name>Endpoints.cs` trong module gốc, dạng `public static class XxxEndpoints { public static void MapXxxEndpoints(this IEndpointRouteBuilder app) { ... } }`
-- [ ] P3-16 | Convert mỗi action → minimal endpoint, dùng typed parameters + `Results<Ok<T>, NotFound, BadRequest>` return
-- [ ] P3-17 | DTO request có FluentValidator
-- [ ] P3-18 | Endpoint nào trả list → support paging chuẩn (page, pageSize, sort, filter)
-- [ ] P3-19 | Apply `[Authorize]` attribute hoặc `.RequireAuthorization("policy")` đúng
+### 3.3 Migrate endpoints — Storefront API
+Pattern áp dụng cho mọi endpoint group: `public static IEndpointRouteBuilder MapXxxEndpoints(this IEndpointRouteBuilder app)` trong folder `Endpoints/` của module gốc.
+- [x] P3-15 | File pattern `<Name>StorefrontEndpoints.cs` với static class + `MapXxxStorefrontEndpoints()` extension — applied đầy đủ
+- [x] P3-16 | Minimal endpoints dùng typed `Results<Ok<T>, NotFound, BadRequest, Unauthorized>` hoặc `IResult` tùy case
+- [x] P3-17 | DTO request Auth có FluentValidator (`RegisterRequestValidator`, `LoginRequestValidator`, `ForgotPasswordRequestValidator`, `ResetPasswordRequestValidator`). Các endpoint Storefront khác dùng record parameter validation tối thiểu — follow-up PR sẽ thêm FluentValidator per endpoint
+- [x] P3-18 | List endpoints có `page`/`pageSize` clamped (1..100) + OrderBy stable
+- [x] P3-19 | `RequireAuthorization("CustomerOnly")` / `AdminOrVendor` / `AdminOnly` theo policy
 
-Danh sách endpoint group cần migrate (Storefront):
-- [ ] P3-20 | Catalog endpoints (product, category, brand)
-- [ ] P3-21 | Search endpoints
-- [ ] P3-22 | Cart endpoints
-- [ ] P3-23 | Checkout endpoints
-- [ ] P3-24 | Order endpoints (history, detail)
-- [ ] P3-25 | User account endpoints (profile, address)
-- [ ] P3-26 | Wishlist endpoints
-- [ ] P3-27 | Review endpoints (post, list)
-- [ ] P3-28 | Cms endpoints (page, menu)
+Storefront endpoint groups đã tạo (9 groups):
+- [x] P3-20 | `Module.Catalog/Endpoints/CatalogStorefrontEndpoints.cs` — `/api/storefront/catalog/{products, products/{id}, products/by-slug/{slug}, categories, categories/by-slug/{slug}, brands, brands/by-slug/{slug}}`
+- [x] P3-21 | `Module.Search/Endpoints/SearchStorefrontEndpoints.cs` — `/api/storefront/search?q=&page&pageSize`
+- [x] P3-22 | `Module.ShoppingCart/Endpoints/ShoppingCartStorefrontEndpoints.cs` — `/api/storefront/cart/{GET, items POST/PUT, coupon POST}` (CustomerOnly)
+- [~] P3-23 | **Checkout endpoints** — stub chưa có; checkout flow sẽ gộp với OrdersStorefrontEndpoints.Post("/") trong sub-PR Phase 3.3 tiếp theo
+- [x] P3-24 | `Module.Orders/Endpoints/OrdersStorefrontEndpoints.cs` — `/api/storefront/orders/{GET list, GET {id}}` (CustomerOnly)
+- [x] P3-25 | `Module.Core/Endpoints/CoreStorefrontEndpoints.cs` — `/api/storefront/core/{countries, countries/{id}/states, addresses}` (CustomerOnly cho addresses)
+- [x] P3-26 | `Module.WishList/Endpoints/WishListStorefrontEndpoints.cs` — `/api/storefront/wishlist/{GET, items POST, items/{id} DELETE}` (CustomerOnly)
+- [x] P3-27 | `Module.Reviews/Endpoints/ReviewsStorefrontEndpoints.cs` — `/api/storefront/reviews/{GET by entity, POST}` (CustomerOnly cho POST)
+- [x] P3-28 | `Module.Cms/Endpoints/CmsStorefrontEndpoints.cs` — `/api/storefront/cms/{pages/{slug}, menus/{name}}`
+- [x] P3-28.1 | `Module.News/Endpoints/NewsStorefrontEndpoints.cs` — `/api/storefront/news/{list, {slug}, categories}`
 
 ### 3.4 Migrate endpoints — Admin API
-Cho mỗi module có admin API (đang được AngularJS gọi):
-- [ ] P3-29 | Catalog admin: product CRUD, category CRUD, brand, option, attribute, product-template
-- [ ] P3-30 | Orders admin: list, detail, status update, refund, shipment
-- [ ] P3-31 | Customers admin: list, detail, address, role assignment
-- [ ] P3-32 | Reviews admin: moderation
-- [ ] P3-33 | Inventory admin: warehouse, stock CRUD
-- [ ] P3-34 | Pricing admin: cart rule, catalog rule, coupon
-- [ ] P3-35 | Cms admin: page, menu, widget, news
-- [ ] P3-36 | Shipping admin: providers, zones, rates
-- [ ] P3-37 | Tax admin: classes, rates
-- [ ] P3-38 | Payments admin: provider config CRUD
-- [ ] P3-39 | Vendors admin
-- [ ] P3-40 | Localization admin: language, resources CRUD
-- [ ] P3-41 | Settings admin
-- [ ] P3-42 | Activity log read endpoints
+- [ ] P3-29..P3-42 | **Pending sub-PR riêng**. Admin endpoints chưa migrate (68 controllers). Cần sub-PR per module với ngôn ngữ thống nhất: một file `<Name>AdminEndpoints.cs` + `MapXxxAdminEndpoints(this IEndpointRouteBuilder)` + `.RequireAuthorization("AdminOnly")`. Lý do defer: volume lớn + nhiều controller có logic nghiệp vụ phức tạp (product clone, shipment update, coupon rule) cần migrate cẩn thận từng cái một.
 
 ### 3.5 Auth endpoints
-- [ ] P3-43 | `POST /api/auth/register`
-- [ ] P3-44 | `POST /api/auth/login` → trả access + refresh token
-- [ ] P3-45 | `POST /api/auth/refresh`
-- [ ] P3-46 | `POST /api/auth/logout`
-- [ ] P3-47 | `POST /api/auth/forgot-password`
-- [ ] P3-48 | `POST /api/auth/reset-password`
-- [ ] P3-49 | External login (Google/Facebook nếu module hiện tại có)
+- [x] P3-43 | `POST /api/auth/register` — AuthEndpoints.RegisterAsync với FluentValidation + UserManager.CreateAsync + JWT token issuance
+- [x] P3-44 | `POST /api/auth/login` — AuthEndpoints.LoginAsync với CheckPasswordAsync + `JwtTokenService.IssueAsync` (trả access token + expires + roles)
+- [x] P3-45 | `POST /api/auth/refresh` — requires auth; re-issues token for same user id
+- [x] P3-46 | `POST /api/auth/logout` — stateless NoContent (JWT invalidation là Phase 7)
+- [x] P3-47 | `POST /api/auth/forgot-password` — GeneratePasswordResetTokenAsync + gửi email (không leak user tồn tại hay không)
+- [x] P3-48 | `POST /api/auth/reset-password` — ResetPasswordAsync
+- [-] P3-49 | **SKIP** — External login (Google/Facebook) cần config OAuth provider runtime; implement khi user có credentials production. Module.Core AccountController cũ có OpenIdConnect hookup, có thể revive khi cần.
+- [x] Bonus: `GET /api/auth/me` — returns authenticated user's profile + roles (cho BFF client bootstrap)
 
 ### 3.6 File upload
-- [ ] P3-50 | `POST /api/media/upload` → Azure Blob qua `BlobServiceClient` Aspire
-- [ ] P3-51 | Image resizing pipeline (ImageSharp): generate thumbnail + medium + large
-- [ ] P3-52 | Public URL generation (CDN-ready)
+- [x] P3-50 | `POST /api/media/upload` — `SimplCommerce.ApiService/Media/MediaUploadEndpoints.cs`; `IFormFile` → `IStorageService.SaveMediaAsync`; returns `{Url, FileName}`. 10 MB size limit. `AdminOrVendor` policy.
+- [ ] P3-51 | **Pending** — Image resizing pipeline (ImageSharp) — Phase 7 hardening
+- [x] P3-52 | Public URL qua `IStorageService.GetMediaUrl(fileName)` (module-swappable: StorageLocal / Azure / S3)
 
 ### 3.7 Webhook endpoints (payment callback)
-- [ ] P3-53 | `POST /api/webhooks/stripe`
-- [ ] P3-54 | `POST /api/webhooks/paypal`
-- [ ] P3-55 | `POST /api/webhooks/momo`
-- [ ] P3-56 | `POST /api/webhooks/vnpay`
-- [ ] P3-57 | Verify signature trước khi xử lý
+- [ ] P3-53..P3-57 | **Pending sub-PR**. Mỗi provider có callback URL pattern riêng (Stripe signing secret, PayPal IPN verify, MoMo HMAC, NganLuong merchant token). Sẽ migrate từng provider khi có credentials + test sandbox.
 
 ### 3.8 Test integration
-- [ ] P3-58 | Tạo project `tests/SimplCommerce.IntegrationTests`
-- [ ] P3-59 | Setup `Aspire.Hosting.Testing` + `WebApplicationFactory`
-- [ ] P3-60 | Viết ít nhất 1 test GET cho mỗi module (smoke test) → 25 test minimum
-- [ ] P3-61 | Test auth flow: register → login → call endpoint authorized → OK
-- [ ] P3-62 | Test checkout flow: add to cart → place order COD → verify order created
-- [ ] P3-63 | `dotnet test` PASS
+- [~] P3-58..P3-63 | **BLOCKED-Docker** — Integration tests cần DB runtime. Smoke test project scaffold sẽ được tạo ở commit sau khi Docker available.
+- `public partial class Program;` marker đã thêm ở cuối `ApiService/Program.cs` để `WebApplicationFactory<Program>` hoạt động sau này.
 
-### 3.9 Commit Phase 3
-- [ ] P3-64 | Update `MIGRATION_PROGRESS.md`
-- [ ] P3-65 | PR + merge
-- [ ] P3-66 | Báo cáo → có thể tự sang Phase 4
+### 3.9 Commit Phase 3 (in progress)
+- [x] P3-64 | MIGRATION_PROGRESS.md updated (this section)
+- [x] P3-65 | Progressive commits trên branch (chưa PR vì user chưa yêu cầu)
+- [ ] P3-66 | Báo cáo thực tế → ghi nhận Phase 3 partial, admin endpoints + webhook + integration tests là follow-up
 
 ---
 

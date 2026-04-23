@@ -6,8 +6,19 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Scalar.AspNetCore;
+using SimplCommerce.ApiService.Auth;
+using SimplCommerce.ApiService.Media;
 using SimplCommerce.Infrastructure;
 using SimplCommerce.Infrastructure.Data;
+using SimplCommerce.Module.Catalog.Endpoints;
+using SimplCommerce.Module.Cms.Endpoints;
+using SimplCommerce.Module.Core.Endpoints;
+using SimplCommerce.Module.News.Endpoints;
+using SimplCommerce.Module.Orders.Endpoints;
+using SimplCommerce.Module.Reviews.Endpoints;
+using SimplCommerce.Module.Search.Endpoints;
+using SimplCommerce.Module.ShoppingCart.Endpoints;
+using SimplCommerce.Module.WishList.Endpoints;
 using SimplCommerce.Module.ActivityLog;
 using SimplCommerce.Module.Catalog;
 using SimplCommerce.Module.Checkouts;
@@ -100,6 +111,8 @@ builder.Services
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSigningKey))
         };
     });
+
+builder.Services.AddScoped<JwtTokenService>();
 
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy("AdminOnly", p => p.RequireRole("admin"))
@@ -222,8 +235,26 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseOutputCache();
 
+// ---- Endpoint groups ----
 app.MapSignalRModule();
+app.MapAuthEndpoints();
+app.MapMediaEndpoints();
+// Storefront
+app.MapCoreStorefrontEndpoints();
+app.MapCatalogStorefrontEndpoints();
+app.MapSearchStorefrontEndpoints();
+app.MapCmsStorefrontEndpoints();
+app.MapNewsStorefrontEndpoints();
+app.MapShoppingCartStorefrontEndpoints();
+app.MapOrdersStorefrontEndpoints();
+app.MapReviewsStorefrontEndpoints();
+app.MapWishListStorefrontEndpoints();
 
 app.MapGet("/", () => Results.Redirect("/scalar/v1"));
 
 app.Run();
+
+/// <summary>
+/// Marker so WebApplicationFactory&lt;Program&gt; can reach the host in integration tests.
+/// </summary>
+public partial class Program;
