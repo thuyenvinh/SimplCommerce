@@ -42,7 +42,7 @@ public static class ReviewsStorefrontEndpoints
             return Results.Ok(new { total, page, pageSize, items });
         });
 
-        group.MapPost("/", async (SubmitReviewRequest req, IRepository<Review> repo, ClaimsPrincipal principal) =>
+        group.MapPost("/", (SubmitReviewRequest req, IRepository<Review> repo, ClaimsPrincipal principal) =>
         {
             if (!TryGetUserId(principal, out var userId)) return Results.Unauthorized();
             if (req.Rating < 1 || req.Rating > 5) return Results.BadRequest("Rating must be between 1 and 5.");

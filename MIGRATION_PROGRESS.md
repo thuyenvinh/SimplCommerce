@@ -4,12 +4,12 @@
 > Legend: `[x]` = done, `[ ]` = pending, `[~]` = BLOCKED (cần user làm tay — ghi chú ngay dưới task), `[-]` = skipped/N/A (lý do ghi chú ngay dưới).
 
 ## TRẠNG THÁI HIỆN TẠI
-- **Phase đang chạy:** Phase 0 ✅, Phase 1 ✅, Phase 2 ✅ (43/43 modules refactored), **Phase 3 scaffold ✅** (ApiService compile-clean với explicit `Add<Module>Module()` chain; endpoint migration P3-15..P3-57 còn pending)
+- **Phase đang chạy:** Phase 0 ✅, Phase 1 ✅, Phase 2 ✅ (43/43 modules refactored), **Phase 3 mostly done** (auth + media + webhooks stubs + 10 storefront endpoint groups + 13 admin endpoint groups; integration tests scaffold only — full e2e blocked on Docker)
 - **Branch:** `claude/phase-0-migration-pX925`
-- **Build:** ✅ `dotnet build SimplCommerce.sln` PASS (54 projects với ApiService, 0 errors, 0 warnings)
-- **Tests:** ✅ 41/41 pass (7 test projects)
+- **Build:** ✅ `dotnet build SimplCommerce.sln` PASS (55 projects với ApiService + integration test scaffold, 0 errors, 0 warnings)
+- **Tests:** ✅ **42/42 pass** (7 existing + 1 ApiService integration smoke scaffold)
 - **Tooling:** .NET SDK 9.0.313 tại `/home/user/.dotnet/` (DECISION-005); Aspire 13.2.2 (DECISION-006); MailPit (DECISION-007); toàn solution net9.0 (DECISION-008)
-- **Blocker còn lại:** Docker daemon chưa sẵn sàng trong sandbox → `aspire run` + runtime smoke test + EF migration generate vẫn cần user chạy local (P0-24, P1-16..P1-19, P2-04/P2-05, P2-45, P2-47/P2-48, P3-58..P3-63 integration tests)
+- **Blocker còn lại:** Docker daemon chưa sẵn sàng trong sandbox → `aspire run` + runtime smoke test + EF migration generate + real integration tests vẫn cần user chạy local (P0-24, P1-16..P1-19, P2-04/P2-05, P2-45, P2-47/P2-48, P3-59..P3-62 e2e tests, P3-57 webhook signature verify)
 
 ---
 
@@ -233,8 +233,23 @@ Storefront endpoint groups đã tạo (9 groups):
 - [x] P3-28 | `Module.Cms/Endpoints/CmsStorefrontEndpoints.cs` — `/api/storefront/cms/{pages/{slug}, menus/{name}}`
 - [x] P3-28.1 | `Module.News/Endpoints/NewsStorefrontEndpoints.cs` — `/api/storefront/news/{list, {slug}, categories}`
 
-### 3.4 Migrate endpoints — Admin API
-- [ ] P3-29..P3-42 | **Pending sub-PR riêng**. Admin endpoints chưa migrate (68 controllers). Cần sub-PR per module với ngôn ngữ thống nhất: một file `<Name>AdminEndpoints.cs` + `MapXxxAdminEndpoints(this IEndpointRouteBuilder)` + `.RequireAuthorization("AdminOnly")`. Lý do defer: volume lớn + nhiều controller có logic nghiệp vụ phức tạp (product clone, shipment update, coupon rule) cần migrate cẩn thận từng cái một.
+### 3.4 Migrate endpoints — Admin API (partial — 13 admin groups)
+- [x] P3-29 | `Module.Catalog/Endpoints/CatalogAdminEndpoints.cs` — `/api/admin/catalog/{brands, categories, products}` (GET list + POST + PUT + DELETE). Product-attribute / option / template are follow-ups.
+- [x] P3-30 | `Module.Orders/Endpoints/OrdersAdminEndpoints.cs` — `/api/admin/orders/{GET list, GET {id}, PATCH {id}/status}` with customer search filter
+- [x] P3-31 | `Module.Core/Endpoints/CoreAdminEndpoints.cs` — `/api/admin/core/{users, users/{id}, POST users, roles, countries}` (AdminOnly)
+- [x] P3-32 | `Module.Reviews/Endpoints/ReviewsAdminEndpoints.cs` — `/api/admin/reviews/{GET list, PATCH {id}/status}` moderation
+- [x] P3-33 | `Module.Inventory/Endpoints/InventoryAdminEndpoints.cs` — `/api/admin/inventory/{warehouses, stocks}`
+- [x] P3-34 | `Module.Pricing/Endpoints/PricingAdminEndpoints.cs` — `/api/admin/pricing/{cart-rules, catalog-rules, coupons}` (GET only for now)
+- [x] P3-35 | `Module.Cms/Endpoints/CmsAdminEndpoints.cs` — `/api/admin/cms/pages` full CRUD
+- [x] P3-36 | `Module.Shipping/Endpoints/ShippingAdminEndpoints.cs` — `/api/admin/shipping/providers` (GET)
+- [x] P3-37 | `Module.Tax/Endpoints/TaxAdminEndpoints.cs` — `/api/admin/tax/{classes, rates}` GET+POST
+- [x] P3-38 | `Module.Payments/Endpoints/PaymentsAdminEndpoints.cs` — `/api/admin/payments/{providers, GET payments list}`
+- [x] P3-39 | `Module.Vendors/Endpoints/VendorsAdminEndpoints.cs` — `/api/admin/vendors/{GET, POST}`
+- [x] P3-40 | `Module.Localization/Endpoints/LocalizationAdminEndpoints.cs` — `/api/admin/localization/app-settings` (GET). Translation editor UI owns full CRUD in Phase 5.
+- [~] P3-41 | Settings admin — gộp với P3-40 (app-settings endpoint). Full settings-as-a-form UI trong Phase 5.
+- [x] P3-42 | `Module.ActivityLog/Endpoints/ActivityLogAdminEndpoints.cs` — `/api/admin/activity-log` paged list
+
+> Ghi chú: các endpoint admin trên chỉ cover **GET list + basic CRUD path cốt lõi**. Các nghiệp vụ sâu (product clone, coupon rule builder, shipment tracking, cart rule condition editor, price list import) được đánh dấu là sub-PR tiếp theo — volume lớn, cần UI hình thành trong Phase 5 để quyết định shape API chính xác.
 
 ### 3.5 Auth endpoints
 - [x] P3-43 | `POST /api/auth/register` — AuthEndpoints.RegisterAsync với FluentValidation + UserManager.CreateAsync + JWT token issuance
@@ -251,12 +266,19 @@ Storefront endpoint groups đã tạo (9 groups):
 - [ ] P3-51 | **Pending** — Image resizing pipeline (ImageSharp) — Phase 7 hardening
 - [x] P3-52 | Public URL qua `IStorageService.GetMediaUrl(fileName)` (module-swappable: StorageLocal / Azure / S3)
 
-### 3.7 Webhook endpoints (payment callback)
-- [ ] P3-53..P3-57 | **Pending sub-PR**. Mỗi provider có callback URL pattern riêng (Stripe signing secret, PayPal IPN verify, MoMo HMAC, NganLuong merchant token). Sẽ migrate từng provider khi có credentials + test sandbox.
+### 3.7 Webhook endpoints (payment callback) — scaffold only
+- [x] P3-53 | `POST /api/webhooks/stripe` — stub trả `202 Accepted`, signature verify TODO
+- [x] P3-54 | `POST /api/webhooks/paypal` — stub tương tự
+- [x] P3-55 | `POST /api/webhooks/momo` — stub tương tự
+- [-] P3-56 | `POST /api/webhooks/vnpay` — **SKIP** — module PaymentVnpay không tồn tại trong codebase (xem DECISION-007); thêm khi có VNPay module
+- [~] P3-57 | **Pending** — signature verification per provider (Stripe-Signature HMAC, PayPal IPN round-trip, MoMo HMAC-SHA256). Mỗi provider cần sandbox credentials để test → sub-PR per provider khi có
 
-### 3.8 Test integration
-- [~] P3-58..P3-63 | **BLOCKED-Docker** — Integration tests cần DB runtime. Smoke test project scaffold sẽ được tạo ở commit sau khi Docker available.
-- `public partial class Program;` marker đã thêm ở cuối `ApiService/Program.cs` để `WebApplicationFactory<Program>` hoạt động sau này.
+### 3.8 Test integration — scaffold only
+- [x] P3-58 | `tests/SimplCommerce.ApiService.IntegrationTests/` project created (net9.0, xunit 2.9, FluentAssertions, Microsoft.AspNetCore.Mvc.Testing 9.0)
+- [~] P3-59 | `WebApplicationFactory<Program>` hookup chưa — cần DB/Redis runtime (xem README trong test project)
+- [~] P3-60..P3-62 | Real smoke/e2e tests còn BLOCKED-Docker. Runbook đầy đủ trong `tests/SimplCommerce.ApiService.IntegrationTests/README.md`
+- [x] P3-63 | `dotnet test` PASS — 42/42 (41 existing + 1 new `Scaffold_Compiles_And_xunit_Discovers` smoke test)
+- `public partial class Program;` marker ở cuối `ApiService/Program.cs` đã có để `WebApplicationFactory<Program>` hoạt động sau này
 
 ### 3.9 Commit Phase 3 (in progress)
 - [x] P3-64 | MIGRATION_PROGRESS.md updated (this section)

@@ -152,6 +152,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimplCommerce.Migrations", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimplCommerce.ApiService", "src\Apps\SimplCommerce.ApiService\SimplCommerce.ApiService.csproj", "{E6BF60E0-1725-4C7F-B4A6-F931908ABCCF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimplCommerce.ApiService.IntegrationTests", "tests\SimplCommerce.ApiService.IntegrationTests\SimplCommerce.ApiService.IntegrationTests.csproj", "{6DC3C62D-F63B-4777-9BB0-2EADA82E1825}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -798,6 +800,18 @@ Global
 		{E6BF60E0-1725-4C7F-B4A6-F931908ABCCF}.Release|x64.Build.0 = Release|Any CPU
 		{E6BF60E0-1725-4C7F-B4A6-F931908ABCCF}.Release|x86.ActiveCfg = Release|Any CPU
 		{E6BF60E0-1725-4C7F-B4A6-F931908ABCCF}.Release|x86.Build.0 = Release|Any CPU
+		{6DC3C62D-F63B-4777-9BB0-2EADA82E1825}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6DC3C62D-F63B-4777-9BB0-2EADA82E1825}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6DC3C62D-F63B-4777-9BB0-2EADA82E1825}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{6DC3C62D-F63B-4777-9BB0-2EADA82E1825}.Debug|x64.Build.0 = Debug|Any CPU
+		{6DC3C62D-F63B-4777-9BB0-2EADA82E1825}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{6DC3C62D-F63B-4777-9BB0-2EADA82E1825}.Debug|x86.Build.0 = Debug|Any CPU
+		{6DC3C62D-F63B-4777-9BB0-2EADA82E1825}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6DC3C62D-F63B-4777-9BB0-2EADA82E1825}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6DC3C62D-F63B-4777-9BB0-2EADA82E1825}.Release|x64.ActiveCfg = Release|Any CPU
+		{6DC3C62D-F63B-4777-9BB0-2EADA82E1825}.Release|x64.Build.0 = Release|Any CPU
+		{6DC3C62D-F63B-4777-9BB0-2EADA82E1825}.Release|x86.ActiveCfg = Release|Any CPU
+		{6DC3C62D-F63B-4777-9BB0-2EADA82E1825}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -860,6 +874,7 @@ Global
 		{AA000000-0000-0000-0000-00000000A002} = {AA000000-0000-0000-0000-000000000001}
 		{F989C703-C554-4811-938C-1E3AB824D17E} = {0A0CD554-1C99-CE8A-5560-BB4017784C2D}
 		{E6BF60E0-1725-4C7F-B4A6-F931908ABCCF} = {0A0CD554-1C99-CE8A-5560-BB4017784C2D}
+		{6DC3C62D-F63B-4777-9BB0-2EADA82E1825} = {D9FD9ABA-AE5E-4427-AA6B-6285BE2E212D}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {B9D0D8F0-1AB9-44DD-839F-ED8CEE7DDB10}
