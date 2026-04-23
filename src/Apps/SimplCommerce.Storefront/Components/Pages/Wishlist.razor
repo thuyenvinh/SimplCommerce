@@ -1,0 +1,63 @@
+@page "/account/wishlist"
+@attribute [Authorize]
+@rendermode RenderMode.InteractiveServer
+@inject IWishlistApi WishlistClient
+@inject ISnackbar Snack
+
+<PageTitle>My wishlist — SimplCommerce</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">My wishlist</MudText>
+
+@if (_items is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_items.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">Your wishlist is empty.</MudAlert>
+}
+else
+{
+    <MudTable T="WishListItemDto" Items="_items" Hover="true" Dense="true">
+        <HeaderContent>
+            <MudTh>Product #</MudTh>
+            <MudTh>Qty</MudTh>
+            <MudTh>Note</MudTh>
+            <MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.ProductId</MudTd>
+            <MudTd>@context.Quantity</MudTd>
+            <MudTd>@context.Description</MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                               Size="Size.Small" OnClick="@(() => Remove(context.Id))" />
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private IReadOnlyList<WishListItemDto>? _items;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        _items = await WishlistClient.ListAsync();
+        StateHasChanged();
+    }
+
+    private async Task Remove(long id)
+    {
+        var resp = await WishlistClient.RemoveAsync(id);
+        if (resp.IsSuccessStatusCode)
+        {
+            Snack.Add("Removed from wishlist.", Severity.Success);
+            await Reload();
+        }
+        else
+        {
+            Snack.Add("Couldn't remove.", Severity.Error);
+        }
+    }
+}

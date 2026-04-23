@@ -1,0 +1,53 @@
+@page "/tax-classes"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminTaxApi Tax
+@inject ISnackbar Snack
+
+<PageTitle>Tax classes — Admin</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Tax classes</MudText>
+
+<MudPaper Class="pa-4">
+    <EditForm Model="_input" OnValidSubmit="Create" FormName="newTaxClass">
+        <DataAnnotationsValidator />
+        <MudStack Row="true" AlignItems="AlignItems.End">
+            <MudTextField @bind-Value="_input.Name" Label="Name" Required="true" />
+            <MudButton ButtonType="ButtonType.Submit" Color="Color.Primary" Variant="Variant.Filled">Add</MudButton>
+        </MudStack>
+    </EditForm>
+    <MudDivider Class="my-3" />
+
+    @if (_list is null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else
+    {
+        <MudTable T="AdminTaxClassItem" Items="_list" Hover="true" Dense="true">
+            <HeaderContent><MudTh>ID</MudTh><MudTh>Name</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Id</MudTd>
+                <MudTd>@context.Name</MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private IReadOnlyList<AdminTaxClassItem>? _list;
+    private NewInput _input = new();
+
+    protected override async Task OnInitializedAsync() => await Reload();
+    private async Task Reload() { _list = await Tax.ListClassesAsync(); StateHasChanged(); }
+
+    private async Task Create()
+    {
+        var resp = await Tax.CreateClassAsync(new AdminTaxClassInput(_input.Name));
+        if (resp.IsSuccessStatusCode) { Snack.Add("Added.", Severity.Success); _input = new(); await Reload(); }
+        else { Snack.Add("Create failed.", Severity.Error); }
+    }
+
+    public sealed class NewInput
+    {
+        [System.ComponentModel.DataAnnotations.Required] public string Name { get; set; } = string.Empty;
+    }
+}

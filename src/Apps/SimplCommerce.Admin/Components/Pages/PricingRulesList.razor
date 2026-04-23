@@ -1,0 +1,71 @@
+@page "/pricing"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminPricingApi Pricing
+
+<PageTitle>Pricing rules — Admin</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Pricing rules</MudText>
+
+<MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+    <MudTabPanel Text="Cart rules">
+        @if (_cartRules is null) { <MudProgressCircular Indeterminate="true" /> }
+        else
+        {
+            <MudTable T="AdminCartRuleItem" Items="_cartRules" Hover="true" Dense="true">
+                <HeaderContent><MudTh>ID</MudTh><MudTh>Name</MudTh><MudTh>Window</MudTh><MudTh>Usage cap</MudTh><MudTh>Active</MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Id</MudTd>
+                    <MudTd>@context.Name</MudTd>
+                    <MudTd>@context.StartOn?.ToString("d") — @context.EndOn?.ToString("d")</MudTd>
+                    <MudTd>@context.UsageLimitPerCoupon</MudTd>
+                    <MudTd>@(context.IsActive ? "✓" : "—")</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudTabPanel>
+    <MudTabPanel Text="Catalog rules">
+        @if (_catalogRules is null) { <MudProgressCircular Indeterminate="true" /> }
+        else
+        {
+            <MudTable T="AdminCatalogRuleItem" Items="_catalogRules" Hover="true" Dense="true">
+                <HeaderContent><MudTh>ID</MudTh><MudTh>Name</MudTh><MudTh>Window</MudTh><MudTh>Active</MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Id</MudTd>
+                    <MudTd>@context.Name</MudTd>
+                    <MudTd>@context.StartOn?.ToString("d") — @context.EndOn?.ToString("d")</MudTd>
+                    <MudTd>@(context.IsActive ? "✓" : "—")</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudTabPanel>
+    <MudTabPanel Text="Coupons">
+        @if (_coupons is null) { <MudProgressCircular Indeterminate="true" /> }
+        else
+        {
+            <MudTable T="AdminCouponItem" Items="_coupons" Hover="true" Dense="true">
+                <HeaderContent><MudTh>ID</MudTh><MudTh>Code</MudTh><MudTh>Cart rule</MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Id</MudTd>
+                    <MudTd>@context.Code</MudTd>
+                    <MudTd>@context.CartRuleId</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private IReadOnlyList<AdminCartRuleItem>? _cartRules;
+    private IReadOnlyList<AdminCatalogRuleItem>? _catalogRules;
+    private IReadOnlyList<AdminCouponItem>? _coupons;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var a = Pricing.ListCartRulesAsync();
+        var b = Pricing.ListCatalogRulesAsync();
+        var c = Pricing.ListCouponsAsync();
+        await Task.WhenAll(a, b, c);
+        _cartRules = a.Result;
+        _catalogRules = b.Result;
+        _coupons = c.Result;
+    }
+}

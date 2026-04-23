@@ -1,0 +1,29 @@
+@page "/shipping-providers"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminShippingApi Shipping
+
+<PageTitle>Shipping providers — Admin</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Shipping providers</MudText>
+
+<MudPaper Class="pa-4">
+    @if (_providers is null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else
+    {
+        <MudTable T="AdminShippingProviderItem" Items="_providers" Hover="true">
+            <HeaderContent><MudTh>ID</MudTh><MudTh>Name</MudTh><MudTh>Enabled</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Id</MudTd>
+                <MudTd>@context.Name</MudTd>
+                <MudTd>@(context.IsEnabled ? "✓" : "—")</MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private IReadOnlyList<AdminShippingProviderItem>? _providers;
+    protected override async Task OnInitializedAsync() => _providers = await Shipping.ListProvidersAsync();
+}

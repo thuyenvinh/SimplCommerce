@@ -37,3 +37,26 @@ public record AdminStockItem(long Id, long ProductId, long WarehouseId, int Quan
 // --- Activity log admin ---
 public record AdminActivityItem(long Id, long ActivityTypeId, long UserId, long EntityId, string? EntityTypeId, DateTimeOffset CreatedOn);
 public record AdminActivityPage(int Total, int Page, int PageSize, IReadOnlyList<AdminActivityItem> Items);
+
+// --- Vendors admin ---
+public record AdminVendorItem(long Id, string Name, string Slug, string? Description);
+public record AdminVendorInput(string Name, string Slug, string? Description);
+
+// --- Tax admin ---
+public record AdminTaxClassItem(long Id, string Name);
+public record AdminTaxClassInput(string Name);
+public record AdminTaxRateItem(long Id, long TaxClassId, string CountryId, long? StateOrProvinceId, string? ZipCode, decimal Rate);
+public record AdminTaxRateInput(long TaxClassId, string CountryId, long? StateOrProvinceId, string? ZipCode, decimal Rate);
+
+// --- Shipping admin ---
+public record AdminShippingProviderItem(string Id, string Name, bool IsEnabled);
+
+// --- Payments admin ---
+public record AdminPaymentProviderItem(string Id, string Name, bool IsEnabled);
+public record AdminPaymentItem(long Id, long OrderId, string? PaymentMethod, decimal PaymentFee, decimal Amount, int Status, DateTimeOffset CreatedOn);
+public record AdminPaymentsPage(int Total, int Page, int PageSize, IReadOnlyList<AdminPaymentItem> Items);
+
+// --- Pricing admin ---
+public record AdminCartRuleItem(long Id, string Name, DateTimeOffset? StartOn, DateTimeOffset? EndOn, int? UsageLimitPerCoupon, bool IsActive);
+public record AdminCatalogRuleItem(long Id, string Name, DateTimeOffset? StartOn, DateTimeOffset? EndOn, bool IsActive);
+public record AdminCouponItem(long Id, string Code, long CartRuleId);

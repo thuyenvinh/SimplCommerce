@@ -54,6 +54,10 @@ builder.Services.AddHttpClient<IAccountApi, AccountApi>(c => c.BaseAddress = new
     .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
 builder.Services.AddHttpClient<IOrderApi, OrderApi>(c => c.BaseAddress = new Uri(apiBase))
     .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
+builder.Services.AddHttpClient<IWishlistApi, WishlistApi>(c => c.BaseAddress = new Uri(apiBase))
+    .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
+builder.Services.AddHttpClient<ICmsApi, CmsApi>(c => c.BaseAddress = new Uri(apiBase));
+builder.Services.AddHttpClient<INewsApi, NewsApi>(c => c.BaseAddress = new Uri(apiBase));
 
 builder.Services.AddScoped<CookieAuthStateService>();
 

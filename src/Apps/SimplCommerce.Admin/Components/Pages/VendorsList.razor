@@ -1,0 +1,67 @@
+@page "/vendors"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminVendorsApi Vendors
+@inject ISnackbar Snack
+
+<PageTitle>Vendors — Admin</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Vendors</MudText>
+
+<MudPaper Class="pa-4">
+    <EditForm Model="_input" OnValidSubmit="Create" FormName="newVendor">
+        <DataAnnotationsValidator />
+        <MudStack Row="true" AlignItems="AlignItems.End">
+            <MudTextField @bind-Value="_input.Name" Label="Name" Required="true" />
+            <MudTextField @bind-Value="_input.Slug" Label="Slug" Required="true" />
+            <MudTextField @bind-Value="_input.Description" Label="Description" />
+            <MudButton ButtonType="ButtonType.Submit" Color="Color.Primary" Variant="Variant.Filled">Add</MudButton>
+        </MudStack>
+    </EditForm>
+    <MudDivider Class="my-3" />
+
+    @if (_list is null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else
+    {
+        <MudTable T="AdminVendorItem" Items="_list" Hover="true" Dense="true">
+            <HeaderContent>
+                <MudTh>ID</MudTh><MudTh>Name</MudTh><MudTh>Slug</MudTh><MudTh>Description</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Id</MudTd>
+                <MudTd>@context.Name</MudTd>
+                <MudTd>@context.Slug</MudTd>
+                <MudTd>@context.Description</MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private IReadOnlyList<AdminVendorItem>? _list;
+    private NewInput _input = new();
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload() { _list = await Vendors.ListAsync(); StateHasChanged(); }
+
+    private async Task Create()
+    {
+        var resp = await Vendors.CreateAsync(new AdminVendorInput(_input.Name, _input.Slug, _input.Description));
+        if (resp.IsSuccessStatusCode)
+        {
+            Snack.Add("Vendor created.", Severity.Success);
+            _input = new();
+            await Reload();
+        }
+        else { Snack.Add("Create failed.", Severity.Error); }
+    }
+
+    public sealed class NewInput
+    {
+        [System.ComponentModel.DataAnnotations.Required] public string Name { get; set; } = string.Empty;
+        [System.ComponentModel.DataAnnotations.Required] public string Slug { get; set; } = string.Empty;
+        public string? Description { get; set; }
+    }
+}

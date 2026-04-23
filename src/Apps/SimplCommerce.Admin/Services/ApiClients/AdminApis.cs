@@ -145,3 +145,86 @@ public sealed class AdminActivityApi(HttpClient http) : IAdminActivityApi
     public Task<AdminActivityPage?> ListAsync(int page, int pageSize, CancellationToken ct) =>
         http.GetFromJsonAsync<AdminActivityPage>($"/api/admin/activity-log?page={page}&pageSize={pageSize}", ct);
 }
+
+public interface IAdminVendorsApi
+{
+    Task<IReadOnlyList<AdminVendorItem>?> ListAsync(CancellationToken ct = default);
+    Task<HttpResponseMessage> CreateAsync(AdminVendorInput input, CancellationToken ct = default);
+}
+
+public sealed class AdminVendorsApi(HttpClient http) : IAdminVendorsApi
+{
+    public async Task<IReadOnlyList<AdminVendorItem>?> ListAsync(CancellationToken ct) =>
+        await http.GetFromJsonAsync<List<AdminVendorItem>>("/api/admin/vendors/", ct);
+
+    public Task<HttpResponseMessage> CreateAsync(AdminVendorInput input, CancellationToken ct) =>
+        http.PostAsJsonAsync("/api/admin/vendors/", input, ct);
+}
+
+public interface IAdminTaxApi
+{
+    Task<IReadOnlyList<AdminTaxClassItem>?> ListClassesAsync(CancellationToken ct = default);
+    Task<HttpResponseMessage> CreateClassAsync(AdminTaxClassInput input, CancellationToken ct = default);
+    Task<IReadOnlyList<AdminTaxRateItem>?> ListRatesAsync(CancellationToken ct = default);
+    Task<HttpResponseMessage> CreateRateAsync(AdminTaxRateInput input, CancellationToken ct = default);
+}
+
+public sealed class AdminTaxApi(HttpClient http) : IAdminTaxApi
+{
+    public async Task<IReadOnlyList<AdminTaxClassItem>?> ListClassesAsync(CancellationToken ct) =>
+        await http.GetFromJsonAsync<List<AdminTaxClassItem>>("/api/admin/tax/classes", ct);
+
+    public Task<HttpResponseMessage> CreateClassAsync(AdminTaxClassInput input, CancellationToken ct) =>
+        http.PostAsJsonAsync("/api/admin/tax/classes", input, ct);
+
+    public async Task<IReadOnlyList<AdminTaxRateItem>?> ListRatesAsync(CancellationToken ct) =>
+        await http.GetFromJsonAsync<List<AdminTaxRateItem>>("/api/admin/tax/rates", ct);
+
+    public Task<HttpResponseMessage> CreateRateAsync(AdminTaxRateInput input, CancellationToken ct) =>
+        http.PostAsJsonAsync("/api/admin/tax/rates", input, ct);
+}
+
+public interface IAdminShippingApi
+{
+    Task<IReadOnlyList<AdminShippingProviderItem>?> ListProvidersAsync(CancellationToken ct = default);
+}
+
+public sealed class AdminShippingApi(HttpClient http) : IAdminShippingApi
+{
+    public async Task<IReadOnlyList<AdminShippingProviderItem>?> ListProvidersAsync(CancellationToken ct) =>
+        await http.GetFromJsonAsync<List<AdminShippingProviderItem>>("/api/admin/shipping/providers", ct);
+}
+
+public interface IAdminPaymentsApi
+{
+    Task<IReadOnlyList<AdminPaymentProviderItem>?> ListProvidersAsync(CancellationToken ct = default);
+    Task<AdminPaymentsPage?> ListPaymentsAsync(int page = 1, int pageSize = 20, CancellationToken ct = default);
+}
+
+public sealed class AdminPaymentsApi(HttpClient http) : IAdminPaymentsApi
+{
+    public async Task<IReadOnlyList<AdminPaymentProviderItem>?> ListProvidersAsync(CancellationToken ct) =>
+        await http.GetFromJsonAsync<List<AdminPaymentProviderItem>>("/api/admin/payments/providers", ct);
+
+    public Task<AdminPaymentsPage?> ListPaymentsAsync(int page, int pageSize, CancellationToken ct) =>
+        http.GetFromJsonAsync<AdminPaymentsPage>($"/api/admin/payments/?page={page}&pageSize={pageSize}", ct);
+}
+
+public interface IAdminPricingApi
+{
+    Task<IReadOnlyList<AdminCartRuleItem>?> ListCartRulesAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<AdminCatalogRuleItem>?> ListCatalogRulesAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<AdminCouponItem>?> ListCouponsAsync(CancellationToken ct = default);
+}
+
+public sealed class AdminPricingApi(HttpClient http) : IAdminPricingApi
+{
+    public async Task<IReadOnlyList<AdminCartRuleItem>?> ListCartRulesAsync(CancellationToken ct) =>
+        await http.GetFromJsonAsync<List<AdminCartRuleItem>>("/api/admin/pricing/cart-rules", ct);
+
+    public async Task<IReadOnlyList<AdminCatalogRuleItem>?> ListCatalogRulesAsync(CancellationToken ct) =>
+        await http.GetFromJsonAsync<List<AdminCatalogRuleItem>>("/api/admin/pricing/catalog-rules", ct);
+
+    public async Task<IReadOnlyList<AdminCouponItem>?> ListCouponsAsync(CancellationToken ct) =>
+        await http.GetFromJsonAsync<List<AdminCouponItem>>("/api/admin/pricing/coupons", ct);
+}

@@ -39,3 +39,11 @@ public record OrderListItem(long Id, DateTimeOffset CreatedOn, decimal OrderTota
 public record OrderItemDto(long ProductId, string ProductName, int Quantity, decimal ProductPrice);
 public record OrderDetailDto(long Id, DateTimeOffset CreatedOn, decimal SubTotal, decimal OrderTotal,
     int OrderStatus, IReadOnlyList<OrderItemDto> Items);
+
+public record WishListItemDto(long Id, long ProductId, int Quantity, string? Description);
+public record AddWishListItemRequest(long ProductId, int Quantity = 1, string? Description = null);
+
+public record CmsPageDto(long Id, string Name, string Slug, string? Body);
+
+public record NewsSummary(long Id, string Name, string Slug, string? ShortContent);
+public record NewsDetail(long Id, string Name, string Slug, string? ShortContent, string? FullContent);

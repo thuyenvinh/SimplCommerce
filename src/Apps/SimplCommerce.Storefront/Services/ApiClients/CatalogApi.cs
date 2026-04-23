@@ -105,3 +105,48 @@ public sealed class OrderApi(HttpClient http) : IOrderApi
     public Task<OrderDetailDto?> GetAsync(long id, CancellationToken ct) =>
         http.GetFromJsonAsync<OrderDetailDto>($"/api/storefront/orders/{id}", ct);
 }
+
+public interface IWishlistApi
+{
+    Task<IReadOnlyList<WishListItemDto>?> ListAsync(CancellationToken ct = default);
+    Task<HttpResponseMessage> AddAsync(AddWishListItemRequest req, CancellationToken ct = default);
+    Task<HttpResponseMessage> RemoveAsync(long id, CancellationToken ct = default);
+}
+
+public sealed class WishlistApi(HttpClient http) : IWishlistApi
+{
+    public async Task<IReadOnlyList<WishListItemDto>?> ListAsync(CancellationToken ct) =>
+        await http.GetFromJsonAsync<List<WishListItemDto>>("/api/storefront/wishlist/", ct);
+
+    public Task<HttpResponseMessage> AddAsync(AddWishListItemRequest req, CancellationToken ct) =>
+        http.PostAsJsonAsync("/api/storefront/wishlist/items", req, ct);
+
+    public Task<HttpResponseMessage> RemoveAsync(long id, CancellationToken ct) =>
+        http.DeleteAsync($"/api/storefront/wishlist/items/{id}", ct);
+}
+
+public interface ICmsApi
+{
+    Task<CmsPageDto?> GetPageAsync(string slug, CancellationToken ct = default);
+}
+
+public sealed class CmsApi(HttpClient http) : ICmsApi
+{
+    public Task<CmsPageDto?> GetPageAsync(string slug, CancellationToken ct) =>
+        http.GetFromJsonAsync<CmsPageDto>($"/api/storefront/cms/pages/{Uri.EscapeDataString(slug)}", ct);
+}
+
+public interface INewsApi
+{
+    Task<IReadOnlyList<NewsSummary>?> ListAsync(int page = 1, int pageSize = 12, CancellationToken ct = default);
+    Task<NewsDetail?> GetAsync(string slug, CancellationToken ct = default);
+}
+
+public sealed class NewsApi(HttpClient http) : INewsApi
+{
+    public async Task<IReadOnlyList<NewsSummary>?> ListAsync(int page, int pageSize, CancellationToken ct) =>
+        await http.GetFromJsonAsync<List<NewsSummary>>($"/api/storefront/news/?page={page}&pageSize={pageSize}", ct);
+
+    public Task<NewsDetail?> GetAsync(string slug, CancellationToken ct) =>
+        http.GetFromJsonAsync<NewsDetail>($"/api/storefront/news/{Uri.EscapeDataString(slug)}", ct);
+}

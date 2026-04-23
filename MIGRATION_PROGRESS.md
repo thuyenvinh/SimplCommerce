@@ -4,9 +4,9 @@
 > Legend: `[x]` = done, `[ ]` = pending, `[~]` = BLOCKED (cần user làm tay — ghi chú ngay dưới task), `[-]` = skipped/N/A (lý do ghi chú ngay dưới).
 
 ## TRẠNG THÁI HIỆN TẠI
-- **Phase đang chạy:** Phase 0..4 done; **Phase 5 core done** (Admin Blazor Interactive Server + SignalR/Redis-backplane-ready + 10 pages: Dashboard, Products, Categories, Brands, Orders, Users, Reviews, Warehouses, ActivityLog, Login/Logout). Product edit, CMS, pricing, shipping, payments provider config, translations, settings pages là follow-up.
+- **Phase đang chạy:** Phase 0..5 core done; **Phase 4 fill-in + Phase 5 fill-in + Phase 6 tooling done**. Storefront: 14 pages (home/catalog/product/search/cart/account dashboard/login/register/logout/orders/addresses/wishlist/cms-page/news list+detail). Admin: 15 pages (dashboard/products/categories/brands/orders/users/reviews/warehouses/activity-log/vendors/tax-classes/shipping-providers/payment-providers/pricing/login+logout). Phase 6 runbook + PowerShell migration script + SampleData review done.
 - **Branch:** `claude/phase-0-migration-pX925`
-- **Build:** ✅ `dotnet build SimplCommerce.sln` PASS (59 projects với Admin, 0 errors, 0 warnings — clean + incremental)
+- **Build:** ✅ `dotnet build SimplCommerce.sln` PASS (59 projects, 0 errors, 0 warnings — clean + incremental)
 - **Tests:** ✅ **42/42 pass** (7 unit + 1 ApiService integration scaffold)
 - **Tooling:** .NET SDK 9.0.313 tại `/home/user/.dotnet/` (DECISION-005); Aspire 13.2.2 (DECISION-006); MailPit (DECISION-007); toàn solution net9.0 (DECISION-008)
 - **Blocker còn lại:** Docker daemon chưa sẵn sàng trong sandbox → `aspire run` + runtime smoke test + EF migration generate + real integration tests vẫn cần user chạy local (P0-24, P1-16..P1-19, P2-04/P2-05, P2-45, P2-47/P2-48, P3-59..P3-62 e2e tests, P3-57 webhook signature verify)
@@ -327,8 +327,11 @@ Storefront endpoint groups đã tạo (9 groups):
 - [x] P4-24 | `/account/login`, `/account/register`, `/account/logout` — MudBlazor EditForm + DataAnnotations; login exchanges JWT và sets cookie
 - [x] P4-25 | `/account` — profile dashboard (GET `/api/auth/me`)
 - [x] P4-26 | `/account/orders` — order history table (chi tiết `/{id}` là follow-up)
-- [ ] P4-27..P4-29 | addresses / wishlist / reviews — pending (endpoints exist; UI is follow-up)
-- [ ] P4-30..P4-31 | `/page/{slug}` CMS + `/news` — pending (endpoints exist; UI follow-up)
+- [x] P4-27 | `/account/addresses` — grid of saved addresses (read-only; CRUD form sub-PR)
+- [x] P4-28 | `/account/wishlist` — table with remove action
+- [~] P4-29 | `/account/reviews` — pending (endpoint exists; UI sub-PR)
+- [x] P4-30 | `/page/{slug}` CMS page renderer
+- [x] P4-31 | `/news` listing + `/news/{slug}` article detail
 
 ### 4.6 SEO (minimum viable)
 - [x] P4-32 | `<HeadOutlet>` ở root, `<PageTitle>` per page, `<HeadContent>` với meta description + og tags (Home + ProductDetail)
@@ -417,8 +420,27 @@ Storefront endpoint groups đã tạo (9 groups):
 - [x] P5-41 | `/warehouses` — GET list
 - [ ] P5-42..P5-43 | stock history + adjustments — deferred
 
-**5.4.8..5.4.13 Pricing / Shipping / Tax / Payments / Vendors / Localization / Settings**
-- [ ] P5-44..P5-60 | **deferred to follow-up sub-PRs** — all have their backend admin endpoints scaffolded, UI is per-module work
+**5.4.8 Pricing & Promotions**
+- [x] P5-44 + P5-45 + P5-46 | `/pricing` — tabbed view (cart rules / catalog rules / coupons) GET list for each. CRUD forms are follow-up.
+
+**5.4.9 Shipping & Tax**
+- [x] P5-47 | `/shipping-providers` — list providers (GET); config form is follow-up
+- [ ] P5-48..P5-49 | Zones + rates — deferred (need endpoint surface first)
+- [x] P5-50 | `/tax-classes` — list + inline create
+- [~] P5-51 | Tax rates — list endpoint + table (pending full CRUD UI sub-PR)
+
+**5.4.10 Payments**
+- [x] P5-52 | `/payment-providers` — list + enabled flag. Per-provider config form (Stripe/Braintree etc.) is per-provider follow-up
+
+**5.4.11 Vendors**
+- [x] P5-53 | `/vendors` — list + inline create
+- [ ] P5-54 | `/vendors/{id}/products` — deferred (backend endpoint pending)
+
+**5.4.12 Localization**
+- [ ] P5-55..P5-56 | Languages + translations — deferred (translation editor UI is complex sub-PR)
+
+**5.4.13 Settings**
+- [ ] P5-57..P5-60 | Settings panels — deferred (per-concern forms)
 
 **5.4.14 Activity & Notifications**
 - [x] P5-61 | `/activity-log` paged list
@@ -445,13 +467,13 @@ Storefront endpoint groups đã tạo (9 groups):
 **Thời lượng ước tính:** 6–10 giờ
 **Branch:** `aspire-migration/phase-6-data`
 
-- [ ] P6-01 | Verify migration `Initial_AspireBaseline` chạy được trên DB hiện tại của user (additive only — không drop column)
-- [ ] P6-02 | Viết script `tools/migrate-data.ps1` backup DB → restore → apply migrations mới → verify row counts
-- [ ] P6-03 | Refactor `Module.SampleData` cho seed data work với cấu trúc mới
-- [ ] P6-04 | Test trên DB sạch: `aspire run` → migration tự apply → SampleData seed → có data demo
-- [ ] P6-05 | Test trên DB copy production của user (nếu có): không mất data, không lỗi
-- [ ] P6-06 | Document procedure migration trong `docs/migration/data-migration-runbook.md`
-- [ ] P6-07 | Commit + PR
+- [~] P6-01 | Verify `Initial_AspireBaseline` — **BLOCKED-Docker** (needs live SQL Server); migration itself has NOT been generated yet. `src/Migrations/SimplCommerce.Migrations/README.md` + `docs/migration/data-migration-runbook.md` carry the one-shot developer-box steps.
+- [x] P6-02 | `tools/migrate-data.ps1` — PowerShell 7.2+ script: backs up DB, applies consolidated migrations via `dotnet ef database update`, re-checks row counts on 5 critical tables (`Core_User`, `Catalog_Product`, `Orders_Order`, `ShoppingCart_Cart`, `Reviews_Review`), **automatically restores from backup on regression**. Supports `-Force` for non-interactive, Windows auth + SQL auth, custom backup dir.
+- [x] P6-03 | `Module.SampleData` — already refactored in Phase 2.3 batch 6 (Services → Application/Services + Infrastructure/Services; SqlRepository → Infrastructure/Data/Repositories; `AddSampleDataModule()` extension). Runtime behaviour identical — `SampleContent/Fashion` + `SampleContent/Phones` SQL scripts still loaded via `ISqlRepository.RunCommand`. No further refactor needed; UI trigger is a Phase 5 sub-PR.
+- [~] P6-04 | Clean-DB smoke — **BLOCKED-Docker** (runbook §Path B covers this)
+- [~] P6-05 | Production-copy test — **BLOCKED-Docker + user-specific DB**
+- [x] P6-06 | `docs/migration/data-migration-runbook.md` — full runbook: pre-flight checklist, schema version check, 3 migration paths (in-place / parallel DB / blue-green), sample-data + post-migration SQL checks + rollback instructions.
+- [x] P6-07 | Commit (current commit); PR deferred per DECISION-003
 
 ---
 

@@ -72,6 +72,16 @@ builder.Services.AddHttpClient<IAdminInventoryApi, AdminInventoryApi>(c => c.Bas
     .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
 builder.Services.AddHttpClient<IAdminActivityApi, AdminActivityApi>(c => c.BaseAddress = new Uri(apiBase))
     .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
+builder.Services.AddHttpClient<IAdminVendorsApi, AdminVendorsApi>(c => c.BaseAddress = new Uri(apiBase))
+    .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
+builder.Services.AddHttpClient<IAdminTaxApi, AdminTaxApi>(c => c.BaseAddress = new Uri(apiBase))
+    .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
+builder.Services.AddHttpClient<IAdminShippingApi, AdminShippingApi>(c => c.BaseAddress = new Uri(apiBase))
+    .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
+builder.Services.AddHttpClient<IAdminPaymentsApi, AdminPaymentsApi>(c => c.BaseAddress = new Uri(apiBase))
+    .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
+builder.Services.AddHttpClient<IAdminPricingApi, AdminPricingApi>(c => c.BaseAddress = new Uri(apiBase))
+    .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
 
 builder.Services.AddScoped<CookieAuthStateService>();
 builder.Services.AddResponseCompression(o => o.EnableForHttps = true);
