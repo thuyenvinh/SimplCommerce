@@ -32,6 +32,12 @@ builder.AddProject<Projects.SimplCommerce_Storefront>("storefront")
     .WithReference(seq)
     .WaitFor(api);
 
+builder.AddProject<Projects.SimplCommerce_Admin>("admin")
+    .WithReference(api)
+    .WithReference(redis)
+    .WithReference(seq)
+    .WaitFor(api);
+
 builder.AddProject<Projects.SimplCommerce_WebHost>("webhost")
     .WithReference(simplDb)
     .WithReference(redis)

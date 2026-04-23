@@ -1,0 +1,65 @@
+@page "/orders"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminOrdersApi Orders
+@inject ISnackbar Snack
+
+<PageTitle>Orders — Admin</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Orders</MudText>
+
+<MudPaper Class="pa-4">
+    <MudStack Row="true" AlignItems="AlignItems.End" Class="mb-3">
+        <MudTextField T="string" @bind-Value="_customerSearch" Label="Customer name / email"
+                      DebounceInterval="400" OnDebounceIntervalElapsed="Reload" Style="max-width: 300px" />
+        <MudNumericField T="int?" @bind-Value="_status" Label="Status (int)" Style="max-width: 140px"
+                         OnBlur="Reload" />
+        <MudSpacer />
+        <MudText Typo="Typo.caption">@(_page?.Total.ToString() ?? "—") result(s)</MudText>
+    </MudStack>
+
+    @if (_page is null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (_page.Items.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">No orders match.</MudAlert>
+    }
+    else
+    {
+        <MudTable T="AdminOrderListItem" Items="_page.Items" Hover="true" Dense="true">
+            <HeaderContent>
+                <MudTh>#</MudTh><MudTh>Placed</MudTh><MudTh>Customer</MudTh>
+                <MudTh>Total</MudTh><MudTh>Status</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Id</MudTd>
+                <MudTd>@context.CreatedOn.ToLocalTime().ToString("g")</MudTd>
+                <MudTd>@context.Customer.FullName<br /><MudText Typo="Typo.caption">@context.Customer.Email</MudText></MudTd>
+                <MudTd>@context.OrderTotal.ToString("C")</MudTd>
+                <MudTd>@context.OrderStatus</MudTd>
+            </RowTemplate>
+        </MudTable>
+        <MudPagination Count="@((int)Math.Ceiling(_page.Total / (double)_pageSize))"
+                       Selected="_pageNum"
+                       SelectedChanged="OnPageChange"
+                       Class="mt-3" />
+    }
+</MudPaper>
+
+@code {
+    private string _customerSearch = string.Empty;
+    private int? _status;
+    private int _pageNum = 1;
+    private const int _pageSize = 20;
+    private AdminOrdersPage? _page;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        _page = await Orders.ListAsync(_status, _customerSearch, _pageNum, _pageSize);
+        StateHasChanged();
+    }
+
+    private async Task OnPageChange(int p) { _pageNum = p; await Reload(); }
+}

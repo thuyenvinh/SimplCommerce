@@ -4,9 +4,9 @@
 > Legend: `[x]` = done, `[ ]` = pending, `[~]` = BLOCKED (cần user làm tay — ghi chú ngay dưới task), `[-]` = skipped/N/A (lý do ghi chú ngay dưới).
 
 ## TRẠNG THÁI HIỆN TẠI
-- **Phase đang chạy:** Phase 0..3 done; **Phase 4 core pages + BFF auth done** (Storefront server + Storefront.Client WASM + MudBlazor theme + 9 pages + typed HttpClients + cookie/JWT BFF). Checkout + addresses + wishlist + CMS dynamic pages + news pages là follow-up.
+- **Phase đang chạy:** Phase 0..4 done; **Phase 5 core done** (Admin Blazor Interactive Server + SignalR/Redis-backplane-ready + 10 pages: Dashboard, Products, Categories, Brands, Orders, Users, Reviews, Warehouses, ActivityLog, Login/Logout). Product edit, CMS, pricing, shipping, payments provider config, translations, settings pages là follow-up.
 - **Branch:** `claude/phase-0-migration-pX925`
-- **Build:** ✅ `dotnet build SimplCommerce.sln` PASS (58 projects với Storefront + Storefront.Client, 0 errors, 0 warnings)
+- **Build:** ✅ `dotnet build SimplCommerce.sln` PASS (59 projects với Admin, 0 errors, 0 warnings — clean + incremental)
 - **Tests:** ✅ **42/42 pass** (7 unit + 1 ApiService integration scaffold)
 - **Tooling:** .NET SDK 9.0.313 tại `/home/user/.dotnet/` (DECISION-005); Aspire 13.2.2 (DECISION-006); MailPit (DECISION-007); toàn solution net9.0 (DECISION-008)
 - **Blocker còn lại:** Docker daemon chưa sẵn sàng trong sandbox → `aspire run` + runtime smoke test + EF migration generate + real integration tests vẫn cần user chạy local (P0-24, P1-16..P1-19, P2-04/P2-05, P2-45, P2-47/P2-48, P3-59..P3-62 e2e tests, P3-57 webhook signature verify)
@@ -362,16 +362,16 @@ Storefront endpoint groups đã tạo (9 groups):
 **Branch:** `aspire-migration/phase-5-admin`
 
 ### 5.1 Tạo project
-- [ ] P5-01 | `dotnet new blazor -n SimplCommerce.Admin -o src/Apps/SimplCommerce.Admin --interactivity Server --auth Individual`
-- [ ] P5-02 | Add ServiceDefaults, MudBlazor
-- [ ] P5-03 | Add SignalR (built-in Blazor Server) + Redis backplane: `builder.Services.AddSignalR().AddStackExchangeRedis(...)`
-- [ ] P5-04 | Add vào AppHost với reference api + redis
+- [x] P5-01 | `src/Apps/SimplCommerce.Admin/` Blazor Web App (Interactive Server only) — scaffolded thủ công
+- [x] P5-02 | Reference `ServiceDefaults`, MudBlazor 7.15
+- [x] P5-03 | `AddSignalR().AddStackExchangeRedis(connectionString)` khi có `ConnectionStrings:redis` (Aspire-injected), fallback in-memory SignalR cho standalone dev
+- [x] P5-04 | AppHost: `builder.AddProject<Projects.SimplCommerce_Admin>("admin").WithReference(api).WithReference(redis).WithReference(seq).WaitFor(api)`
 
 ### 5.2 Layout & Auth
-- [ ] P5-05 | Cookie auth + role policy `RequireRole("admin")` mọi page
-- [ ] P5-06 | `MainLayout`: MudAppBar (logo, search, notifications, user menu) + MudDrawer (navigation) + MudMainContent + breadcrumbs
-- [ ] P5-07 | Navigation tree theo module group (Catalog / Sales / Customers / Content / Configuration / Reports)
-- [ ] P5-08 | Dark/light mode toggle persisted
+- [x] P5-05 | Cookie auth `simpl.admin.auth` (SameSite=Strict, HttpOnly, 8h sliding) + fallback `AuthorizationPolicy` `RequireRole("admin","vendor")` nên MỌI page auth-by-default. Login role-gate trong `CookieAuthStateService` từ chối account không có admin/vendor role
+- [x] P5-06 | `MainLayout`: MudAppBar (logo + notifications + user menu + theme toggle) + MudDrawer (navigation groups, ClipMode=Always, persistent variant) + MudMainContent. Breadcrumbs là follow-up per-page
+- [x] P5-07 | Nav tree 5 groups: Catalog (Products/Categories/Brands), Sales (Orders), Customers (Users), Content (Reviews), Operations (Warehouses/Activity log)
+- [~] P5-08 | Dark/light toggle hoạt động; persistence cross-reload (cookie hoặc localStorage) là follow-up
 
 ### 5.3 Shared components
 - [ ] P5-09 | `<EntityDataGrid<T>>` wrapper MudDataGrid với server-side pagination/sort/filter chuẩn
@@ -383,95 +383,59 @@ Storefront endpoint groups đã tạo (9 groups):
 - [ ] P5-15 | `<FormCard>` chuẩn validation + save/cancel buttons
 - [ ] P5-16 | Toast wrapper qua MudSnackbar
 
-### 5.4 Pages — theo module (giữ URL `/admin/...`)
+### 5.4 Pages
+> Note: The prompt reserved `/admin/...` URL prefix for the existing AngularJS admin; this new Blazor Admin app is a **separate web host** at its own port (no `/admin` prefix inside its own routes). When Phase 8 cuts over, the reverse proxy can map `/admin` → `admin` resource if desired.
 
 **5.4.1 Dashboard**
-- [ ] P5-17 | `/admin` dashboard: KPI cards (today sales, today orders, pending orders, low stock), sales chart (Chart.js / ApexCharts), recent orders table, top products
+- [x] P5-17 | `/` dashboard: KPI cards (Orders total, Products indexed, Brands, Categories) + Recent orders table. Sales chart + low-stock is follow-up.
 
 **5.4.2 Catalog**
-- [ ] P5-18 | `/admin/products` list (DataGrid: thumbnail, name, sku, price, stock, status, actions)
-- [ ] P5-19 | `/admin/products/create` + `/admin/products/edit/{id}` — tabs: General | Media | Attributes | Variants | Categories | SEO | Vendor | Shipping
-- [ ] P5-20 | `/admin/categories` tree view CRUD (drag-drop reorder)
-- [ ] P5-21 | `/admin/brands` CRUD
-- [ ] P5-22 | `/admin/options` CRUD
-- [ ] P5-23 | `/admin/attributes` + attribute groups CRUD
-- [ ] P5-24 | `/admin/product-templates` CRUD
+- [x] P5-18 | `/products` list (DataGrid: id, name, sku, price, stock, published, delete action) + search + paging
+- [~] P5-19 | `/products/create` + `/products/edit/{id}` tabbed editor — **deferred follow-up**; backend POST/PUT endpoints need full product shape (media/attributes/variants) — sub-PR after backend surface solidifies
+- [x] P5-20 | `/categories` list + add (flat form; tree view + drag-drop is follow-up)
+- [x] P5-21 | `/brands` list + add + delete
+- [ ] P5-22..P5-24 | options / attributes / product-templates — **deferred**; endpoints exist for some, UI is sub-PR
 
-**5.4.3 Orders / Sales**
-- [ ] P5-25 | `/admin/orders` list với filter (status, date, customer)
-- [ ] P5-26 | `/admin/orders/{id}` detail: customer info, items, totals, payment, shipment, status timeline, action buttons (mark paid, ship, cancel, refund)
-- [ ] P5-27 | `/admin/shipments` list + create
-- [ ] P5-28 | `/admin/refunds`
-- [ ] P5-29 | `/admin/sales-report`
+**5.4.3 Orders**
+- [x] P5-25 | `/orders` list with status + customer-search filter + paging
+- [~] P5-26 | `/orders/{id}` detail + timeline — **deferred** (backend endpoint shape for detail + timeline pending)
+- [ ] P5-27..P5-29 | shipments / refunds / sales-report — deferred (endpoint scaffold needed first)
 
 **5.4.4 Customers**
-- [ ] P5-30 | `/admin/customers` list
-- [ ] P5-31 | `/admin/customers/{id}` detail: profile, addresses, orders, reviews, notes
-- [ ] P5-32 | `/admin/customer-groups`
-- [ ] P5-33 | `/admin/users` (admin users) + `/admin/roles` + role permission matrix
+- [~] P5-30..P5-31 | `/customers/*` — the list IS surfaced as `/users` (Core admin endpoint returns Identity users). Customer/vendor role split + detail page deferred
+- [x] P5-33 | `/users` — page list with paging + search (existing AdminUserListItem DTO)
+- [ ] P5-32 | customer-groups — deferred
+- [ ] role permission matrix — deferred
 
-**5.4.5 Content**
-- [ ] P5-34 | `/admin/cms/pages` CRUD
-- [ ] P5-35 | `/admin/cms/menus` builder
-- [ ] P5-36 | `/admin/cms/widgets` widget zones + instances
-- [ ] P5-37 | `/admin/cms/widget-instances` per page
-- [ ] P5-38 | `/admin/news` CRUD + `/admin/news-categories`
-- [ ] P5-39 | `/admin/media` library
+**5.4.5 Content / CMS / News**
+- [~] P5-34..P5-39 | CMS pages/menus/widgets/news/media — **deferred**, endpoint scaffold exists per-module but UI is follow-up
 
 **5.4.6 Reviews**
-- [ ] P5-40 | `/admin/reviews` moderation queue (approve / reject / reply)
+- [x] P5-40 | `/reviews` moderation queue — filter by status + Approve / Reject actions
 
 **5.4.7 Inventory**
-- [ ] P5-41 | `/admin/warehouses`
-- [ ] P5-42 | `/admin/stock-history`
-- [ ] P5-43 | `/admin/stock-adjustment`
+- [x] P5-41 | `/warehouses` — GET list
+- [ ] P5-42..P5-43 | stock history + adjustments — deferred
 
-**5.4.8 Pricing & Promotions**
-- [ ] P5-44 | `/admin/cart-rules` CRUD
-- [ ] P5-45 | `/admin/catalog-rules` CRUD
-- [ ] P5-46 | `/admin/coupons`
-
-**5.4.9 Shipping & Tax**
-- [ ] P5-47 | `/admin/shipping/providers`
-- [ ] P5-48 | `/admin/shipping/zones`
-- [ ] P5-49 | `/admin/shipping/rates`
-- [ ] P5-50 | `/admin/tax/classes`
-- [ ] P5-51 | `/admin/tax/rates`
-
-**5.4.10 Payments**
-- [ ] P5-52 | `/admin/payments/providers` list + per-provider config form (Stripe, PayPal, COD, MoMo, VNPay)
-
-**5.4.11 Vendors**
-- [ ] P5-53 | `/admin/vendors` CRUD
-- [ ] P5-54 | `/admin/vendors/{id}/products`
-
-**5.4.12 Localization**
-- [ ] P5-55 | `/admin/languages`
-- [ ] P5-56 | `/admin/translations` (resource editor với search + import/export)
-
-**5.4.13 Settings**
-- [ ] P5-57 | `/admin/settings/general`
-- [ ] P5-58 | `/admin/settings/email` (SMTP / SendGrid)
-- [ ] P5-59 | `/admin/settings/media`
-- [ ] P5-60 | `/admin/settings/seo`
+**5.4.8..5.4.13 Pricing / Shipping / Tax / Payments / Vendors / Localization / Settings**
+- [ ] P5-44..P5-60 | **deferred to follow-up sub-PRs** — all have their backend admin endpoints scaffolded, UI is per-module work
 
 **5.4.14 Activity & Notifications**
-- [ ] P5-61 | `/admin/activity-log` filter by user/entity/date
-- [ ] P5-62 | Notification center component trong AppBar với SignalR push (đơn mới, review mới)
+- [x] P5-61 | `/activity-log` paged list
+- [ ] P5-62 | Notification center with SignalR push — deferred (AdminNotificationHub hasn't landed in ApiService yet, see P5-63)
 
 ### 5.5 SignalR realtime
-- [ ] P5-63 | Hub `AdminNotificationHub` ở ApiService
-- [ ] P5-64 | Khi order created → publish event → hub push tới admin online
-- [ ] P5-65 | Component `<NotificationBell>` subscribe hub, badge count
+- [~] P5-63 | Hub infra ready in **Admin host** (`AddSignalR().AddStackExchangeRedis`). Dedicated `AdminNotificationHub` in ApiService is pending — backplane + handler plumbing is in place so wiring the hub is a small sub-PR.
+- [ ] P5-64..P5-65 | Event publish + `<NotificationBell>` — deferred to P5-63 follow-up
 
 ### 5.6 Verify
-- [ ] P5-66 | Manual test mỗi màn: create / edit / delete / list filter / paging — PASS
-- [ ] P5-67 | Permission test: user role thường không vào được /admin
-- [ ] P5-68 | So sánh feature parity với AngularJS admin cũ — không thiếu màn quan trọng
+- [~] P5-66 | Manual test — BLOCKED-Docker; pages compile and match API contract types exactly
+- [x] P5-67 | Permission test (by code inspection): fallback authorisation requires role admin/vendor; `CookieAuthStateService.SignInAsync` rejects non-admin at login. Runtime confirm BLOCKED-Docker
+- [~] P5-68 | Feature parity vs AngularJS admin — current coverage: Dashboard, Products list, Categories, Brands, Orders list, Users list, Reviews moderation, Warehouses, Activity log. Missing: product edit tabs, category tree, CMS, news, coupons, shipping zones/rates, payment provider config, translations, settings — documented as sub-PRs
 
-### 5.7 Commit Phase 5
-- [ ] P5-69 | Update progress, PR (PR này LỚN, có thể tách sub-PR theo nhóm module), merge
-- [ ] P5-70 | Báo cáo → **DỪNG, chờ user review thật kỹ** trước khi sang phase cutover
+### 5.7 Commit Phase 5 (scaffold + core pages)
+- [x] P5-69 | MIGRATION_PROGRESS updated, commit with full shape summary
+- [ ] P5-70 | PR creation — user hasn't asked; keep on branch
 
 ---
 

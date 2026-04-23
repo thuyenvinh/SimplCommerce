@@ -1,0 +1,86 @@
+@page "/products"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminCatalogApi Catalog
+@inject ISnackbar Snack
+
+<PageTitle>Products — Admin</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Products</MudText>
+
+<MudPaper Class="pa-4">
+    <MudStack Row="true" AlignItems="AlignItems.End" Class="mb-3">
+        <MudTextField T="string" @bind-Value="_search" Label="Search by name / SKU" Immediate="false" DebounceInterval="400"
+                      OnDebounceIntervalElapsed="Reload" Style="max-width: 400px" />
+        <MudSpacer />
+        <MudText Typo="Typo.caption">@(_page?.Total.ToString() ?? "—") result(s)</MudText>
+    </MudStack>
+
+    @if (_page is null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (_page.Items.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">No products match.</MudAlert>
+    }
+    else
+    {
+        <MudTable T="ProductListItem" Items="_page.Items" Hover="true" Dense="true">
+            <HeaderContent>
+                <MudTh>ID</MudTh>
+                <MudTh>Name</MudTh>
+                <MudTh>SKU</MudTh>
+                <MudTh>Price</MudTh>
+                <MudTh>Stock</MudTh>
+                <MudTh>Published</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Id</MudTd>
+                <MudTd>@context.Name</MudTd>
+                <MudTd>@context.Sku</MudTd>
+                <MudTd>@context.Price.ToString("C")</MudTd>
+                <MudTd>@context.StockQuantity</MudTd>
+                <MudTd>@(context.IsPublished ? "✓" : "—")</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                   OnClick="@(() => Delete(context.Id))" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+        <MudPagination Count="@((int)Math.Ceiling(_page.Total / (double)_pageSize))"
+                       Selected="_pageNum"
+                       SelectedChanged="OnPageChange"
+                       Class="mt-3" />
+    }
+</MudPaper>
+
+@code {
+    private string _search = string.Empty;
+    private int _pageNum = 1;
+    private const int _pageSize = 20;
+    private ProductsPage? _page;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        _page = await Catalog.ListProductsAsync(_pageNum, _pageSize, _search);
+        StateHasChanged();
+    }
+
+    private async Task OnPageChange(int p) { _pageNum = p; await Reload(); }
+
+    private async Task Delete(long id)
+    {
+        var resp = await Catalog.DeleteProductAsync(id);
+        if (resp.IsSuccessStatusCode)
+        {
+            Snack.Add("Product deleted.", Severity.Success);
+            await Reload();
+        }
+        else
+        {
+            Snack.Add("Couldn't delete — HTTP " + (int)resp.StatusCode, Severity.Error);
+        }
+    }
+}
