@@ -28,7 +28,7 @@ public static class VendorsAdminEndpoints
             return Results.Ok(list);
         });
 
-        group.MapPost("/", async (VendorInput input, IRepository<Vendor> repo) =>
+        group.MapPost("/", (VendorInput input, IRepository<Vendor> repo) =>
         {
             var vendor = new Vendor { Name = input.Name, Slug = input.Slug, Description = input.Description ?? string.Empty };
             repo.Add(vendor);

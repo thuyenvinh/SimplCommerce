@@ -24,7 +24,7 @@ public static class TaxAdminEndpoints
         group.MapGet("/classes", async (IRepository<TaxClass> repo) =>
             Results.Ok(await repo.Query().Select(c => new { c.Id, c.Name }).ToListAsync()));
 
-        group.MapPost("/classes", async (TaxClassInput input, IRepository<TaxClass> repo) =>
+        group.MapPost("/classes", (TaxClassInput input, IRepository<TaxClass> repo) =>
         {
             var tc = new TaxClass { Name = input.Name };
             repo.Add(tc);
@@ -37,7 +37,7 @@ public static class TaxAdminEndpoints
                 .Select(r => new { r.Id, r.TaxClassId, r.CountryId, r.StateOrProvinceId, r.ZipCode, r.Rate })
                 .ToListAsync()));
 
-        group.MapPost("/rates", async (TaxRateInput input, IRepository<TaxRate> repo) =>
+        group.MapPost("/rates", (TaxRateInput input, IRepository<TaxRate> repo) =>
         {
             var rate = new TaxRate
             {

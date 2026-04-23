@@ -27,7 +27,7 @@ public static class CmsAdminEndpoints
             return Results.Ok(list);
         });
 
-        group.MapPost("/pages", async (PageInput input, IRepository<Page> repo) =>
+        group.MapPost("/pages", (PageInput input, IRepository<Page> repo) =>
         {
             var page = new Page { Name = input.Name, Slug = input.Slug, Body = input.Body ?? string.Empty, IsPublished = input.IsPublished };
             repo.Add(page);

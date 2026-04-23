@@ -29,7 +29,7 @@ public static class CoreAdminEndpoints
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var pattern = $"%{search.Trim()}%";
-                query = query.Where(u => EF.Functions.Like(u.Email, pattern) || EF.Functions.Like(u.FullName, pattern));
+                query = query.Where(u => EF.Functions.Like(u.Email ?? string.Empty, pattern) || EF.Functions.Like(u.FullName ?? string.Empty, pattern));
             }
             var total = await query.CountAsync();
             var rows = await query.OrderByDescending(u => u.CreatedOn)
