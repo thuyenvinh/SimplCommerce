@@ -18,12 +18,21 @@ var seq = builder.AddSeq("seq")
     .WithDataVolume()
     .WithLifetime(ContainerLifetime.Persistent);
 
+var api = builder.AddProject<Projects.SimplCommerce_ApiService>("api")
+    .WithReference(simplDb)
+    .WithReference(redis)
+    .WithReference(blobs)
+    .WithReference(mail)
+    .WithReference(seq)
+    .WaitFor(sql);
+
 builder.AddProject<Projects.SimplCommerce_WebHost>("webhost")
     .WithReference(simplDb)
     .WithReference(redis)
     .WithReference(blobs)
     .WithReference(mail)
     .WithReference(seq)
+    .WithReference(api)
     .WaitFor(sql);
 
 builder.Build().Run();

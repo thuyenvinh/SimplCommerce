@@ -4,11 +4,12 @@
 > Legend: `[x]` = done, `[ ]` = pending, `[~]` = BLOCKED (cần user làm tay — ghi chú ngay dưới task), `[-]` = skipped/N/A (lý do ghi chú ngay dưới).
 
 ## TRẠNG THÁI HIỆN TẠI
-- **Phase đang chạy:** Phase 0 ✅, Phase 1 ✅, **Phase 2 partial** (2.1 + 2.4 + 2.5 done; 2.2 + 2.3 deferred sub-PR; 2.6 build PASS, runtime blocked)
-- **Branch:** `claude/phase-0-migration-pX925` (gộp Phase 0 + Phase 1 + Phase 2 partial — xem DECISION-002)
-- **Build:** ✅ `dotnet build SimplCommerce.sln` PASS (52 projects với Migrations, 0 errors, 1 pre-existing warning ASP0014)
-- **Tooling:** .NET SDK 9.0.313 tại `/home/user/.dotnet/` (DECISION-005); Aspire 13.2.2 (DECISION-006); MailPit (DECISION-007); toàn solution net9.0 (DECISION-008); 3 modules dormant (DECISION-009)
-- **Blocker còn lại:** Docker daemon chưa sẵn sàng trong sandbox → `aspire run` + runtime smoke test + EF migration generate vẫn cần user chạy local (P0-24, P1-16..P1-19, P2-04/P2-05, P2-45, P2-47/P2-48)
+- **Phase đang chạy:** Phase 0 ✅, Phase 1 ✅, Phase 2 ✅ (43/43 modules refactored), **Phase 3 scaffold ✅** (ApiService compile-clean với explicit `Add<Module>Module()` chain; endpoint migration P3-15..P3-57 còn pending)
+- **Branch:** `claude/phase-0-migration-pX925`
+- **Build:** ✅ `dotnet build SimplCommerce.sln` PASS (54 projects với ApiService, 0 errors, 0 warnings)
+- **Tests:** ✅ 41/41 pass (7 test projects)
+- **Tooling:** .NET SDK 9.0.313 tại `/home/user/.dotnet/` (DECISION-005); Aspire 13.2.2 (DECISION-006); MailPit (DECISION-007); toàn solution net9.0 (DECISION-008)
+- **Blocker còn lại:** Docker daemon chưa sẵn sàng trong sandbox → `aspire run` + runtime smoke test + EF migration generate vẫn cần user chạy local (P0-24, P1-16..P1-19, P2-04/P2-05, P2-45, P2-47/P2-48, P3-58..P3-63 integration tests)
 
 ---
 
@@ -190,22 +191,27 @@ Với MỖI module:
 **Branch:** `aspire-migration/phase-3-api-service`
 
 ### 3.1 Tạo ApiService
-- [ ] P3-01 | `dotnet new web -n SimplCommerce.ApiService -o src/Apps/SimplCommerce.ApiService` (.NET 9)
-- [ ] P3-02 | Add reference: ServiceDefaults, Migrations project, **TẤT CẢ** module project
-- [ ] P3-03 | Add NuGet: Microsoft.AspNetCore.Authentication.JwtBearer, FluentValidation.AspNetCore, Scalar.AspNetCore, Microsoft.AspNetCore.OpenApi
-- [ ] P3-04 | Add vào AppHost: `var api = builder.AddProject<Projects.SimplCommerce_ApiService>("api").WithReference(simplDb).WithReference(redis).WithReference(blobs).WithReference(mail).WaitFor(sql);`
+- [x] P3-01 | `src/Apps/SimplCommerce.ApiService/` (.NET 9 web project) — scaffolded thủ công vì sandbox không có `dotnet new` template trigger tương thích
+- [x] P3-02 | Reference: ServiceDefaults, Migrations, **39 module projects** (trừ `EmailSenderSendgrid`, `StorageAmazonS3`, `StorageAzureBlob` — các opt-in variants không được wire vào composition root này, giữ cho deployment-time swap)
+- [x] P3-03 | NuGet: `Aspire.Microsoft.EntityFrameworkCore.SqlServer` 13.2.2, `Aspire.StackExchange.Redis.DistributedCaching` 13.2.2, `Aspire.Azure.Storage.Blobs` 13.2.2, `FluentValidation` 11.10 + `FluentValidation.AspNetCore` 11.3, `Microsoft.AspNetCore.Authentication.JwtBearer` 9.0, `Microsoft.AspNetCore.OpenApi` 9.0, `Scalar.AspNetCore` 2.0
+- [x] P3-04 | AppHost `Program.cs` có `var api = builder.AddProject<Projects.SimplCommerce_ApiService>("api").WithReference(simplDb).WithReference(redis).WithReference(blobs).WithReference(mail).WithReference(seq).WaitFor(sql)`. WebHost giờ cũng `.WithReference(api)` để share service discovery.
 
 ### 3.2 Setup ApiService Program.cs
-- [ ] P3-05 | `builder.AddServiceDefaults();`
-- [ ] P3-06 | `builder.AddSqlServerDbContext<SimplDbContext>("SimplCommerce");`
-- [ ] P3-07 | `builder.AddRedisDistributedCache("redis");`
-- [ ] P3-08 | `builder.AddAzureBlobClient("blobs");`
-- [ ] P3-09 | Add Identity Core (không cookie, dùng JWT): `builder.Services.AddIdentityCore<User>().AddRoles<Role>().AddEntityFrameworkStores<SimplDbContext>().AddDefaultTokenProviders();`
-- [ ] P3-10 | JWT config: issuer, audience, signing key (đọc từ user-secrets / Aspire parameter)
-- [ ] P3-11 | `builder.Services.AddAuthorization();` + define policies (`AdminOnly`, `CustomerOnly`)
-- [ ] P3-12 | `builder.Services.AddOpenApi();` + Scalar UI tại `/scalar`
-- [ ] P3-13 | Đăng ký tất cả module: `builder.AddCoreModule().AddCatalogModule()...`
-- [ ] P3-14 | Output cache + response compression + CORS (chỉ cho phép Storefront/Admin origin)
+- [x] P3-05 | `builder.AddServiceDefaults()` — OpenTelemetry + health + service discovery kế thừa từ ServiceDefaults
+- [x] P3-06 | `builder.AddSqlServerDbContext<SimplDbContext>("SimplCommerce", options => options.UseSqlServer(sql => sql.MigrationsAssembly("SimplCommerce.Migrations")))` — point EF ở project Migrations mới
+- [x] P3-07 | `builder.AddRedisDistributedCache("redis")`
+- [x] P3-08 | `builder.AddAzureBlobServiceClient("blobs")` — dùng API mới, `AddAzureBlobClient` đã deprecated trong Aspire 13
+- [x] P3-09 | `AddIdentityCore<User>().AddRoles<Role>().AddEntityFrameworkStores<SimplDbContext>().AddDefaultTokenProviders()` — không cookie middleware
+- [x] P3-10 | JWT config từ `builder.Configuration["Jwt:*"]` (Issuer, Audience, SigningKey) với dev fallback. Production: inject qua Aspire parameter.
+- [x] P3-11 | `AddAuthorizationBuilder()` + 3 policy: `AdminOnly` (role=admin), `AdminOrVendor` (role=admin,vendor), `CustomerOnly` (authenticated)
+- [x] P3-12 | `AddOpenApi()` + `MapScalarApiReference()` ở Development; root `/` redirect tới `/scalar/v1`
+- [x] P3-13 | **39 `Add<Module>Module()` call explicit** theo topological order (Core → Localization/ActivityLog/Tax/Contacts/Vendors → Catalog → Cms/Search/News/Inventory/Pricing → Shipping family → ShoppingCart → Checkouts → Orders → Shipments/Reviews/WishList/ProductComparison/ProductRecentlyViewed → Payments + 7 providers → Comments/SampleData/EmailSenderSmtp/DinkToPdf/StorageLocal → Notifications → SignalR → HangfireJobs). **Không có reflection scan.** Nếu thiếu module nào, compile fail ngay (verified by test build).
+- [x] P3-14 | `AddResponseCompression`, `AddOutputCache`, `AddCors` (origins storefront + admin only)
+
+Verify:
+- `dotnet build SimplCommerce.sln` → 54 projects, 0 errors, 0 warnings
+- ApiService assembly built: `src/Apps/SimplCommerce.ApiService/bin/Debug/net9.0/SimplCommerce.ApiService.dll`
+- Runtime verify (aspire run + scalar UI mở, JWT token lấy được, endpoint gọi được) — **BLOCKED-Docker**, cần user chạy local
 
 ### 3.3 Migrate endpoints — Storefront API trước
 Cho mỗi controller trong `Module.StorefrontApi`:

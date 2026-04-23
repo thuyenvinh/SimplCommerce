@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\SimplCommerce.WebHost\SimplCommerce.WebHost.csproj" IsAspireProjectResource="true" />
+    <ProjectReference Include="..\..\Apps\SimplCommerce.ApiService\SimplCommerce.ApiService.csproj" IsAspireProjectResource="true" />
   </ItemGroup>
 
 </Project>
