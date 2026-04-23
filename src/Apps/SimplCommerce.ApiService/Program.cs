@@ -131,6 +131,7 @@ builder.Services
 builder.Services.AddScoped<JwtTokenService>();
 
 builder.Services.AddWebhookVerifiers(builder.Configuration);
+builder.Services.AddMediaImagePipeline();
 
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy("AdminOnly", p => p.RequireRole("admin"))
@@ -292,6 +293,7 @@ app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseResponseCompression();
 app.UseHttpsRedirection();
 app.UseCors();
+app.UseMediaImagePipeline();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();

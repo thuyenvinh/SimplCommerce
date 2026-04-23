@@ -263,7 +263,7 @@ Storefront endpoint groups đã tạo (9 groups):
 
 ### 3.6 File upload
 - [x] P3-50 | `POST /api/media/upload` — `SimplCommerce.ApiService/Media/MediaUploadEndpoints.cs`; `IFormFile` → `IStorageService.SaveMediaAsync`; returns `{Url, FileName}`. 10 MB size limit. `AdminOrVendor` policy.
-- [ ] P3-51 | **Pending** — Image resizing pipeline (ImageSharp) — Phase 7 hardening
+- [x] P3-51 | ImageSharp.Web pipeline wired in ApiService (`MediaImagePipeline`): serves `/user-content/{file}` with query commands `width/height/rmode/format/quality`, disk cache `is-cache/` (30-day), 7-day browser cache. Safety rails: command whitelist (`SanitizeCommands`), width/height clamped 1..4000, quality clamped 10..90, arbitrary commands dropped. 6 unit tests cover clamp + whitelist behaviour
 - [x] P3-52 | Public URL qua `IStorageService.GetMediaUrl(fileName)` (module-swappable: StorageLocal / Azure / S3)
 
 ### 3.7 Webhook endpoints (payment callback) — scaffold only
@@ -346,7 +346,7 @@ Storefront endpoint groups đã tạo (9 groups):
 ### 4.8 Performance
 - [x] P4-41 | Response compression Brotli + Gzip enabled
 - [x] P4-40 + P4-43 | `AddOutputCache()` enabled (per-page `[OutputCache]` attributes là follow-up). .NET 9 static asset fingerprinting đã tự động
-- [~] P4-42 | Lazy images + srcset phụ thuộc vào image resizing pipeline P3-51 (Phase 7 hardening)
+- [~] P4-42 | Lazy images + srcset: backend pipeline P3-51 đã xong (ImageSharp.Web). Storefront `<img loading="lazy">` + srcset helper là sub-PR UI (chưa làm trong pass này)
 
 ### 4.9 Verify
 - [x] P4-47 | Build clean: 0 errors, 0 warnings trên toàn solution (58 projects gồm Storefront + Storefront.Client)
@@ -493,7 +493,7 @@ Storefront endpoint groups đã tạo (9 groups):
 - [x] P7-05 | k6 script tại `tools/loadtest/storefront.js`: 5 hot endpoints (/, /category/{slug}, /product/{slug}, /api/storefront/catalog/products, /api/storefront/search), ramp 50 VU, threshold p95<500ms + error rate <1%
 - [~] P7-06 | DB index tuning — defer cho đến khi có baseline trên DB copy (xem data-migration-runbook)
 - [x] P7-07 | Output cache đã enable (`AddOutputCache()`); per-endpoint `[OutputCache]` attr là fine-tune follow-up
-- [~] P7-08 | Image pipeline WebP + lazy — ImageSharp dependency đã planned Phase 3 (P3-51), UI lazy-load là follow-up
+- [~] P7-08 | Image pipeline WebP + lazy — backend done (P3-51 ImageSharp.Web serving WebP via `format=webp`); UI `loading="lazy"` + srcset là sub-PR
 
 ### 7.3 Security
 - [x] P7-09 | Rate limit 100 req/min/IP trên `/api/auth/*` qua `.RequireRateLimiting("auth")` + global token-bucket 200/min/IP
