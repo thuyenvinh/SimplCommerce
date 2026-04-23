@@ -1,21 +1,19 @@
-﻿using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
+using System;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using SimplCommerce.Infrastructure.Modules;
-using SimplCommerce.Module.Core.Services;
 
 namespace SimplCommerce.Module.StorageAzureBlob
 {
+    [Obsolete("Call services.AddStorageAzureBlobModule() in your composition root.")]
     public class ModuleInitializer : IModuleInitializer
     {
-        public void ConfigureServices(IServiceCollection serviceCollection)
-        {
-            serviceCollection.AddSingleton<IStorageService, AzureBlobStorageService>();
-        }
+        public void ConfigureServices(IServiceCollection services) =>
+            services.AddStorageAzureBlobModule();
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            
         }
     }
 }

@@ -8,14 +8,16 @@
 
 ### 1.1 Tổng quan
 
-- **Tổng số module:** 41 (dưới `src/Modules/`)
+- **Tổng số module:** 43 (dưới `src/Modules/`)
 - **Tổng `.cs` files trong modules:** ~866
 - **Modules có `wwwroot/admin/` (AngularJS templates):** 21
 - **Modules có `Areas/` (Razor View MVC):** 26
 - **Modules có `Migrations/`:** 0 (tất cả migration nằm tập trung ngoài module — xem §6)
-- **Tất cả 41 modules đều có `IsBundledWithHost = true`** trong `module.json`
+- **Tất cả 43 modules đều có `IsBundledWithHost = true`** trong `module.json`
 
-> Note: Prompt CLAUDE_CODE_PROMPT.md ước tính "25 module" — thực tế là **41**. Tất cả các module storage (AmazonS3, AzureBlob, Local), toàn bộ 7 payment providers (Braintree, Cashfree, CoD, Momo, NganLuong, PaypalExpress, Stripe + Payments core), 4 shipping (Shipping, ShippingFree, ShippingPrices, ShippingTableRate), 2 email senders (Smtp, Sendgrid), Shipments, Comments, Contacts, DinkToPdf, HangfireJobs, SignalR, ProductComparison, ProductRecentlyViewed — đều là module riêng cần migrate. Cần lưu ý phạm vi Phase 2–5 rộng hơn dự kiến ban đầu.
+> Note: Prompt CLAUDE_CODE_PROMPT.md ước tính "25 module" — thực tế là **43**. Tất cả các module storage (AmazonS3, AzureBlob, Local), toàn bộ 7 payment providers (Braintree, Cashfree, CoD, Momo, NganLuong, PaypalExpress, Stripe + Payments core), 4 shipping (Shipping, ShippingFree, ShippingPrices, ShippingTableRate), 2 email senders (Smtp, Sendgrid), Shipments, Comments, Contacts, DinkToPdf, HangfireJobs, SignalR, Notifications, ProductComparison, ProductRecentlyViewed — đều là module riêng cần migrate. Cần lưu ý phạm vi Phase 2–5 rộng hơn dự kiến ban đầu.
+
+> **Correction (2026-04-18):** báo cáo trước đây ghi "41 modules" là sai. Bảng chi tiết bên dưới luôn có 43 hàng — lỗi chỉ ở summary text, đã sửa.
 
 ### 1.2 Bảng chi tiết
 

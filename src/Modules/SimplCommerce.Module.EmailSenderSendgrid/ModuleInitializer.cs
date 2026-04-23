@@ -1,18 +1,16 @@
-﻿using SimplCommerce.Infrastructure.Modules;
 using System;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Hosting;
-using SimplCommerce.Module.Core.Services;
+using Microsoft.Extensions.DependencyInjection;
+using SimplCommerce.Infrastructure.Modules;
 
 namespace SimplCommerce.Module.EmailSenderSendgrid
 {
+    [Obsolete("Call services.AddEmailSenderSendgridModule() in your composition root.")]
     public class ModuleInitializer : IModuleInitializer
     {
-        public void ConfigureServices(IServiceCollection serviceCollection)
-        {
-            serviceCollection.AddScoped<IEmailSender, EmailSender>();
-        }
+        public void ConfigureServices(IServiceCollection services) =>
+            services.AddEmailSenderSendgridModule();
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {

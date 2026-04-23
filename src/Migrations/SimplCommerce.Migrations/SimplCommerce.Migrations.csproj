@@ -43,13 +43,7 @@
     <ProjectReference Include="..\..\Modules\SimplCommerce.Module.Inventory\SimplCommerce.Module.Inventory.csproj" />
     <ProjectReference Include="..\..\Modules\SimplCommerce.Module.Localization\SimplCommerce.Module.Localization.csproj" />
     <ProjectReference Include="..\..\Modules\SimplCommerce.Module.News\SimplCommerce.Module.News.csproj" />
-    <!--
-      SimplCommerce.Module.Notifications + its transitive deps (HangfireJobs, SignalR) do not
-      compile on .NET 9 yet (AsyncHelper removed in .NET 8, IApplicationBuilder.UseSignalR
-      removed in ASP.NET Core 3+). They've been dormant — not referenced by WebHost and
-      absent from modules.json. Port them to .NET 9 in a dedicated commit before wiring
-      their entities into migrations.
-    -->
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.Notifications\SimplCommerce.Module.Notifications.csproj" />
     <ProjectReference Include="..\..\Modules\SimplCommerce.Module.Orders\SimplCommerce.Module.Orders.csproj" />
     <ProjectReference Include="..\..\Modules\SimplCommerce.Module.PaymentBraintree\SimplCommerce.Module.PaymentBraintree.csproj" />
     <ProjectReference Include="..\..\Modules\SimplCommerce.Module.PaymentCashfree\SimplCommerce.Module.PaymentCashfree.csproj" />
