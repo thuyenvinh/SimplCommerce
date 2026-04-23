@@ -52,6 +52,7 @@ public static class Extensions
             .WithMetrics(metrics =>
             {
                 metrics
+                    .AddMeter("SimplCommerce")
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation();

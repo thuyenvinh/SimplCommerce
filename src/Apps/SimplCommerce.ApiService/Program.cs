@@ -6,7 +6,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Scalar.AspNetCore;
+using System.Threading.RateLimiting;
 using SimplCommerce.ApiService.Auth;
+using SimplCommerce.ApiService.Hardening;
 using SimplCommerce.ApiService.Media;
 using SimplCommerce.ApiService.Webhooks;
 using SimplCommerce.Infrastructure;
@@ -145,6 +147,45 @@ builder.Services.AddOpenApi(options =>
 
 builder.Services.AddResponseCompression(o => o.EnableForHttps = true);
 builder.Services.AddOutputCache();
+
+// ---- Rate limiting (P7-09) ----
+// Login / register / password-reset endpoints capped at 100 req/min/IP to blunt
+// credential stuffing + enumeration. Anything else uses a softer global limiter so
+// a single misbehaving client can't DoS the stack but normal browsing stays free.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("auth", ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: ctx.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                Window = TimeSpan.FromMinutes(1),
+                PermitLimit = 100,
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            }));
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
+        RateLimitPartition.GetTokenBucketLimiter(
+            partitionKey: ctx.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+            factory: _ => new TokenBucketRateLimiterOptions
+            {
+                TokenLimit = 200,
+                TokensPerPeriod = 200,
+                ReplenishmentPeriod = TimeSpan.FromMinutes(1),
+                AutoReplenishment = true,
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            }));
+});
+
+// ---- Hardening (P7-10/11/13/16/18/19) ----
+builder.Services.AddSimplHtmlSanitizer();
+builder.Services.AddSingleton<SimplMetrics>();
+
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<SimplDbContext>("sqlserver")
+    .AddCheck("ready", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy(), tags: new[] { "ready" });
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
     p.WithOrigins("https://localhost:5001", "https://localhost:5002")
         .AllowAnyHeader()
@@ -237,9 +278,14 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+// Must run before anything that reads TraceIdentifier / logs.
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<SecurityHeadersMiddleware>();
+
 app.UseResponseCompression();
 app.UseHttpsRedirection();
 app.UseCors();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseOutputCache();
