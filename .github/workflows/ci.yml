@@ -36,8 +36,13 @@ jobs:
       - name: Build (warnings as errors)
         run: dotnet build SimplCommerce.sln --no-restore -c Release -p:TreatWarningsAsErrors=true
 
-      - name: Test
-        run: dotnet test SimplCommerce.sln --no-build -c Release --logger "trx;LogFileName=tests.trx" --results-directory artifacts/tests
+      - name: Test (with coverage)
+        run: >
+          dotnet test SimplCommerce.sln --no-build -c Release
+          --logger "trx;LogFileName=tests.trx"
+          --results-directory artifacts/tests
+          --collect:"XPlat Code Coverage"
+          --settings tests/coverlet.runsettings
 
       - name: Upload test results
         if: always()
@@ -45,6 +50,30 @@ jobs:
         with:
           name: tests-${{ github.run_id }}
           path: artifacts/tests
+
+      - name: Install reportgenerator
+        if: always()
+        run: dotnet tool install -g dotnet-reportgenerator-globaltool
+
+      - name: Aggregate coverage
+        if: always()
+        run: |
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          reportgenerator \
+            "-reports:artifacts/tests/**/coverage.cobertura.xml" \
+            "-targetdir:artifacts/coverage" \
+            "-reporttypes:Cobertura;HtmlSummary;TextSummary;MarkdownSummaryGithub"
+          cat artifacts/coverage/Summary.txt || true
+          if [ -f artifacts/coverage/SummaryGithub.md ]; then
+            cat artifacts/coverage/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ github.run_id }}
+          path: artifacts/coverage
 
   publish-images:
     # Only publish on pushes to the primary migration branches; PRs stay in the

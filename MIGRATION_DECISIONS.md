@@ -128,3 +128,15 @@
   - Phase 2 scope giảm (không còn việc bump TFM).
   - Tất cả package NuGet 8.0.x transitively nâng lên 9.0 — runtime binding redirect không cần vì .NET 9 SDK tự chọn.
   - Test projects vẫn chạy với xunit hiện tại; nếu package xunit có issue trên net9.0, sẽ bump trong commit riêng.
+
+## DECISION-010: Bump MailKit 4.2.0 → 4.16.0 (GHSA-9j88-vvj5-vhgr)
+- **Date:** 2026-04-23
+- **Phase:** 7 (follow-up)
+- **Context:** Khi bật `TreatWarningsAsErrors=true` + restore với feed vulnerabilities mới nhất, `SimplCommerce.Module.EmailSenderSmtp` fail với `NU1902: MailKit 4.2.0 has known moderate severity vulnerability` (GHSA-9j88-vvj5-vhgr). Các bump 4.8.0/4.9.0/4.10.0/4.13.0 vẫn match advisory. MailKit 4.16.0 là bản mới nhất khi kiểm tra feed và clean.
+- **Decision:** Bump trực tiếp lên `MailKit 4.16.0`.
+- **Alternatives considered:**
+  - Suppress NU1902 bằng `<NoWarn>` — che mất vulnerability thật, không acceptable.
+  - Giữ 4.2.0 và chấp nhận warning (disable WaE) — mâu thuẫn với CI gate (P7-29 yêu cầu TreatWarningsAsErrors).
+- **Consequences:**
+  - API surface MailKit tương thích ngược trong minor/patch 4.x — code gọi `ISmtpClient` / `MimeMessage` không cần thay đổi.
+  - MimeKit transitively bump từ 4.2.0 → 4.16.0 → closes GHSA-g7hc-96xr-gvvx.
