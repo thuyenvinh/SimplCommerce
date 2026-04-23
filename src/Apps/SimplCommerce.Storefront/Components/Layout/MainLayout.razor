@@ -1,0 +1,64 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider @ref="_themeProvider" IsDarkMode="_isDark" Theme="SimplTheme.Instance" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudLink Href="/" Color="Color.Inherit" Underline="Underline.None">
+            <MudText Typo="Typo.h5" Class="ml-2">SimplCommerce</MudText>
+        </MudLink>
+        <MudSpacer />
+        <MudTextField T="string" @bind-Value="_search" Placeholder="Search products…"
+            Variant="Variant.Outlined" Margin="Margin.Dense" Class="mr-4" Style="max-width: 400px"
+            Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
+            OnAdornmentClick="OnSearchClick" OnKeyDown="OnSearchKeyDown" Immediate="true" />
+        <MudIconButton Icon="@Icons.Material.Filled.ShoppingCart" Color="Color.Inherit" Href="/cart" />
+        <AuthorizeView>
+            <Authorized>
+                <MudMenu Icon="@Icons.Material.Filled.Person" Color="Color.Inherit">
+                    <MudMenuItem Href="/account">My account</MudMenuItem>
+                    <MudMenuItem Href="/account/orders">Orders</MudMenuItem>
+                    <MudMenuItem Href="/account/logout">Logout</MudMenuItem>
+                </MudMenu>
+            </Authorized>
+            <NotAuthorized>
+                <MudButton Variant="Variant.Text" Color="Color.Inherit" Href="/account/login">Sign in</MudButton>
+            </NotAuthorized>
+        </AuthorizeView>
+        <MudIconButton Icon="@(_isDark ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+            Color="Color.Inherit" OnClick="@(() => _isDark = !_isDark)" />
+    </MudAppBar>
+
+    <MudMainContent Class="pt-16 px-4">
+        <MudContainer MaxWidth="MaxWidth.Large" Class="my-6">
+            @Body
+        </MudContainer>
+        <MudDivider />
+        <MudContainer MaxWidth="MaxWidth.Large" Class="my-4">
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                © @DateTime.UtcNow.Year SimplCommerce. Built with .NET Aspire + Blazor.
+            </MudText>
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private MudThemeProvider? _themeProvider;
+    private bool _isDark;
+    private string _search = string.Empty;
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+
+    private void OnSearchClick() => DoSearch();
+    private void OnSearchKeyDown(KeyboardEventArgs e) { if (e.Key == "Enter") DoSearch(); }
+
+    private void DoSearch()
+    {
+        if (!string.IsNullOrWhiteSpace(_search))
+        {
+            Nav.NavigateTo($"/search?q={Uri.EscapeDataString(_search)}");
+        }
+    }
+}

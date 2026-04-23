@@ -26,6 +26,12 @@ var api = builder.AddProject<Projects.SimplCommerce_ApiService>("api")
     .WithReference(seq)
     .WaitFor(sql);
 
+builder.AddProject<Projects.SimplCommerce_Storefront>("storefront")
+    .WithReference(api)
+    .WithReference(redis)
+    .WithReference(seq)
+    .WaitFor(api);
+
 builder.AddProject<Projects.SimplCommerce_WebHost>("webhost")
     .WithReference(simplDb)
     .WithReference(redis)

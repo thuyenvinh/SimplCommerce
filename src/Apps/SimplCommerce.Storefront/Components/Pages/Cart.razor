@@ -1,0 +1,32 @@
+@page "/cart"
+@attribute [Authorize]
+@rendermode RenderMode.InteractiveServer
+@inject ICartApi CartClient
+
+<PageTitle>Your cart — SimplCommerce</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Your cart</MudText>
+
+@if (_raw is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudPaper Class="pa-4">
+        <MudText>Raw cart payload (pretty JSON) — Phase 4 follow-up will bind this to a typed CartView record after the backend settles its shape.</MudText>
+        <pre>@_raw</pre>
+    </MudPaper>
+}
+
+@code {
+    private string? _raw;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var resp = await CartClient.GetAsync();
+        _raw = resp.IsSuccessStatusCode
+            ? await resp.Content.ReadAsStringAsync()
+            : $"Cart unavailable (HTTP {(int)resp.StatusCode}).";
+    }
+}
