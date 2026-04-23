@@ -484,7 +484,7 @@ Storefront endpoint groups đã tạo (9 groups):
 **Branch:** `aspire-migration/phase-7-testing`
 
 ### 7.1 Test coverage
-- [~] P7-01 | Unit tests (target ≥ 60%): có 41 existing pre-migration unit tests still passing. Coverage instrumentation + fill-in to 60% là sub-PR (per-module test projects cần build-out)
+- [~] P7-01 | Unit tests (target ≥ 60%): **57 new tests added** across 3 new test projects — `tests/SimplCommerce.ApiService.UnitTests` (41 tests: Auth validators, JwtTokenService with mocked UserManager, CorrelationIdMiddleware, SecurityHeadersMiddleware CSP contract, SimplMetrics counter recording, HtmlSanitizer allow/deny list), `tests/SimplCommerce.Module.Catalog.Tests` (8 tests: ProductPricingService sale/expiry/percent logic), `tests/SimplCommerce.Storefront.UnitTests` (8 tests: CatalogApi/SearchApi URL encoding + BFF DelegatingHandler bearer-token propagation). Total **99 tests across 11 projects**. Coverage instrumentation (coverlet/reportgenerator) for measured ≥60% still a follow-up
 - [~] P7-02 | Integration E2E per flow: scaffold project có (tests/SimplCommerce.ApiService.IntegrationTests) + 1 smoke test. DB-backed e2e BLOCKED-Docker
 - [~] P7-03 | API contract tests: deferred cùng P7-02 — scaffold ready, DB needed
 - [~] P7-04 | Playwright E2E — BLOCKED-Docker
