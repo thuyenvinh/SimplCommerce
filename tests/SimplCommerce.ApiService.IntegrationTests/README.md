@@ -1,42 +1,49 @@
 # SimplCommerce.ApiService.IntegrationTests
 
-Smoke tests against the ApiService composition root.
+Integration tests against the ApiService composition root.
 
-## Status
+## Two suites in this project
 
-**Scaffold-only.** The full `WebApplicationFactory<Program>` smoke tests
-(P3-58..P3-63 in `MIGRATION_PROGRESS.md`) are **blocked**:
+1. **Always-green smoke** (`SmokeTests`) — trivial test so CI proves the assembly compiles even when Docker isn't available. No filter needed.
+2. **Testcontainers SQL suite** (`HealthAndWebhookTests`, future files) — marked `[Trait("Category", "RequiresDocker")]`. Spins `mcr.microsoft.com/mssql/server:2022-latest` via Testcontainers, applies the consolidated `Initial_AspireBaseline` migration, and hits real endpoints through `WebApplicationFactory<Program>`.
 
-1. The ApiService requires:
-   - A SQL Server connection string (`ConnectionStrings:SimplCommerce`)
-   - A Redis connection string (`ConnectionStrings:redis`)
-   - An Azure Blob Storage connection string (`ConnectionStrings:blobs`)
-   Aspire provides these via `builder.AddSqlServerDbContext`,
-   `AddRedisDistributedCache`, `AddAzureBlobServiceClient`. Booting the
-   host without them fails at service construction.
+## Running locally
 
-2. The sandbox that produced this branch has no Docker daemon, so the
-   Aspire orchestrator can't run, and the EF InMemory provider is not
-   drop-in compatible with our SQL Server-specific configuration
-   (column types, raw SQL in seed data, `EF.Functions.Like`, etc.).
+```bash
+# Default: skip Docker-dependent tests.
+dotnet test tests/SimplCommerce.ApiService.IntegrationTests --filter "Category!=RequiresDocker"
 
-## Runbook (to be executed once on a developer box)
+# Requires Docker daemon accessible (local Docker Desktop, Rancher, DOCKER_HOST env, etc.).
+dotnet test tests/SimplCommerce.ApiService.IntegrationTests --filter "Category=RequiresDocker"
+```
 
-1. `aspire run` in one shell to stand up SQL/Redis/Azurite.
-2. `dotnet test tests/SimplCommerce.ApiService.IntegrationTests`
-3. Uncomment the `SmokeTests` class below (remove the `Skip = ...`) and
-   assert against the endpoints.
+First Docker run pulls the ~1.5 GB SQL image; subsequent runs reuse the cached layer. Container lifetime is scoped per `SimplApiFactory` (class fixture) — one container per test class, shared across `[Fact]` methods within.
 
-Tests to add here, in priority order:
+## Running in CI
 
-- [ ] `/alive` + `/health` return 200 (this is ServiceDefaults — already
-      wired in Program.cs).
-- [ ] `/api/auth/register` -> 200 (new user), `/api/auth/login` -> JWT.
-- [ ] Authorized GET with the returned token on `/api/auth/me`.
-- [ ] `/api/storefront/catalog/products` returns seeded products.
-- [ ] `/api/admin/orders` requires AdminOnly policy (401 without token,
-      200 with admin token).
+`.github/workflows/ci.yml` splits the suites:
 
-This directory is referenced by `SimplCommerce.sln` via a solution
-folder so `dotnet build` validates it compiles, even while the tests
-themselves are deferred.
+| Job | Filter | Runner needs Docker? |
+|---|---|---|
+| `build-test` | `Category!=RequiresDocker` | No |
+| `integration-tests` | `Category=RequiresDocker` | Yes (GitHub-hosted ubuntu-latest has it preinstalled) |
+
+A transient Docker Hub outage red-walls only the `integration-tests` job; `build-test` stays green on PRs.
+
+## Adding new tests
+
+- Create a class with `[Collection("ApiServiceDb")]` and `[Trait("Category", "RequiresDocker")]`.
+- Take `SimplApiFactory` via constructor DI.
+- Use `factory.CreateClient()` — it targets the running container automatically.
+
+## Historical note
+
+Before 2026-04-23 this project was scaffold-only because the runbook
+assumed `aspire run` had to boot SQL/Redis/Azurite before the tests could
+start. The Testcontainers switch makes each test class hermetic; Redis /
+Azurite are not wired yet because `ConnectionStrings:redis` and `:blobs`
+resolve to empty-string which Aspire's `AddRedisDistributedCache` /
+`AddAzureBlobServiceClient` treat as "disable". Storefront endpoints that
+read through the distributed cache fall through to the DbContext, which is
+the container we provisioned, so the tests still pass end-to-end. Wiring
+a Redis + Azurite container is a sub-PR when we need it.

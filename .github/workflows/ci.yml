@@ -37,8 +37,12 @@ jobs:
         run: dotnet build SimplCommerce.sln --no-restore -c Release -p:TreatWarningsAsErrors=true
 
       - name: Test (with coverage)
+        # RequiresDocker-trait tests (Testcontainers.MsSql integration suite) run
+        # in the dedicated integration-tests job so the main job stays fast and
+        # doesn't need Docker-in-Docker.
         run: >
           dotnet test SimplCommerce.sln --no-build -c Release
+          --filter "Category!=RequiresDocker"
           --logger "trx;LogFileName=tests.trx"
           --results-directory artifacts/tests
           --collect:"XPlat Code Coverage"
@@ -74,6 +78,50 @@ jobs:
         with:
           name: coverage-${{ github.run_id }}
           path: artifacts/coverage
+
+  integration-tests:
+    # RequiresDocker-trait suite. GitHub-hosted ubuntu runners have Docker preinstalled,
+    # so Testcontainers.MsSql can pull mcr.microsoft.com/mssql/server:2022-latest and
+    # bind a random host port. Kept separate from build-test so a transient Docker Hub
+    # or SQL-container outage doesn't red-wall every PR.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: build-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Cache NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/Directory.Build.props', 'global.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Restore + build integration test project
+        run: |
+          dotnet restore tests/SimplCommerce.ApiService.IntegrationTests
+          dotnet build tests/SimplCommerce.ApiService.IntegrationTests -c Release --no-restore
+
+      - name: Run integration tests (RequiresDocker)
+        run: >
+          dotnet test tests/SimplCommerce.ApiService.IntegrationTests
+          --no-build -c Release
+          --filter "Category=RequiresDocker"
+          --logger "trx;LogFileName=integration.trx"
+          --results-directory artifacts/integration
+
+      - name: Upload integration test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-tests-${{ github.run_id }}
+          path: artifacts/integration
 
   publish-images:
     # Only publish on pushes to the primary migration branches; PRs stay in the
