@@ -28,6 +28,12 @@
                 <MudButton Variant="Variant.Text" Color="Color.Inherit" Href="/account/login">Sign in</MudButton>
             </NotAuthorized>
         </AuthorizeView>
+        <MudMenu Icon="@Icons.Material.Filled.Language" Color="Color.Inherit" AriaLabel="Choose language">
+            @foreach (var c in SupportedCultures)
+            {
+                <MudMenuItem OnClick="@(() => SwitchLanguage(c.Name))">@c.NativeName</MudMenuItem>
+            }
+        </MudMenu>
         <MudIconButton Icon="@(_isDark ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
             Color="Color.Inherit" OnClick="@(() => _isDark = !_isDark)" />
     </MudAppBar>
@@ -51,6 +57,12 @@
     private string _search = string.Empty;
     [Inject] private NavigationManager Nav { get; set; } = default!;
 
+    private static readonly System.Globalization.CultureInfo[] SupportedCultures =
+    {
+        new("en-US"),
+        new("vi-VN"),
+    };
+
     private void OnSearchClick() => DoSearch();
     private void OnSearchKeyDown(KeyboardEventArgs e) { if (e.Key == "Enter") DoSearch(); }
 
@@ -60,5 +72,13 @@
         {
             Nav.NavigateTo($"/search?q={Uri.EscapeDataString(_search)}");
         }
+    }
+
+    private void SwitchLanguage(string culture)
+    {
+        // Force a full reload to /language?... so the cookie set on the server
+        // takes effect on the very next render. The endpoint redirects back here.
+        var returnUrl = Uri.EscapeDataString(Nav.ToBaseRelativePath(Nav.Uri));
+        Nav.NavigateTo($"/language?culture={Uri.EscapeDataString(culture)}&returnUrl=/{returnUrl}", forceLoad: true);
     }
 }

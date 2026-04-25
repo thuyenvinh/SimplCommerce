@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Localization;
 using MudBlazor.Services;
+using System.Globalization;
 using SimplCommerce.Storefront.Components;
+using SimplCommerce.Storefront.Services;
 using SimplCommerce.Storefront.Services.ApiClients;
 using SimplCommerce.Storefront.Services.Auth;
 
@@ -62,7 +65,29 @@ builder.Services.AddHttpClient<INewsApi, NewsApi>(c => c.BaseAddress = new Uri(a
 builder.Services.AddScoped<CookieAuthStateService>();
 
 builder.Services.AddResponseCompression(o => o.EnableForHttps = true);
-builder.Services.AddOutputCache();
+builder.Services.AddOutputCache(options =>
+{
+    options.AddPolicy("Sitemap", b => b.Cache().Expire(TimeSpan.FromHours(1)));
+});
+builder.Services.AddScoped<SitemapBuilder>();
+
+// ---- Localization (P4-37..P4-39) ----
+// Cookie-based culture provider lets a logged-out visitor switch language without
+// touching profile state; the Localization module's translation strings flow in via
+// IStringLocalizer once a SharedResource resx is added under Resources/.
+builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+
+var supportedCultures = (builder.Configuration.GetSection("Localization:Cultures").Get<string[]>()
+    ?? new[] { "en-US", "vi-VN" })
+    .Select(c => new CultureInfo(c))
+    .ToArray();
+
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    options.DefaultRequestCulture = new RequestCulture(supportedCultures[0]);
+    options.SupportedCultures = supportedCultures;
+    options.SupportedUICultures = supportedCultures;
+});
 
 var app = builder.Build();
 
@@ -77,6 +102,7 @@ if (!app.Environment.IsDevelopment())
 app.UseResponseCompression();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseRequestLocalization();
 app.UseAntiforgery();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -87,10 +113,31 @@ app.MapRazorComponents<App>()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(SimplCommerce.Storefront.Client._Imports).Assembly);
 
-// Simple health-friendly redirect for anyone landing on the auto-generated /weather route, etc.
-app.MapGet("/sitemap.xml", () => Results.Text(
-    """<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>""",
-    "application/xml"));
+// SEO endpoints: dynamic sitemap built from catalog slugs (1-hour OutputCache),
+// robots.txt advertising it.
+app.MapGet("/sitemap.xml", async (HttpContext ctx, SitemapBuilder builder, CancellationToken ct) =>
+{
+    var baseUrl = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
+    var xml = await builder.BuildAsync(baseUrl, ct);
+    return Results.Text(xml, "application/xml");
+}).CacheOutput("Sitemap");
+
 app.MapGet("/robots.txt", () => Results.Text("User-agent: *\nAllow: /\nSitemap: /sitemap.xml", "text/plain"));
+
+// Cookie-based language switcher. Set the .AspNetCore.Culture cookie that
+// CookieRequestCultureProvider reads on the next request, then redirect back.
+// GET so a Blazor `NavigateTo(forceLoad: true)` works without antiforgery.
+app.MapGet("/language", (string culture, string? returnUrl, HttpContext ctx) =>
+{
+    if (!supportedCultures.Any(c => c.Name == culture))
+    {
+        return Results.BadRequest("Unsupported culture.");
+    }
+    ctx.Response.Cookies.Append(
+        CookieRequestCultureProvider.DefaultCookieName,
+        CookieRequestCultureProvider.MakeCookieValue(new RequestCulture(culture, culture)),
+        new CookieOptions { Expires = DateTimeOffset.UtcNow.AddYears(1), IsEssential = true, HttpOnly = false, SameSite = SameSiteMode.Lax });
+    return Results.LocalRedirect(string.IsNullOrWhiteSpace(returnUrl) ? "/" : returnUrl);
+});
 
 app.Run();

@@ -336,12 +336,12 @@ Storefront endpoint groups đã tạo (9 groups):
 ### 4.6 SEO (minimum viable)
 - [x] P4-32 | `<HeadOutlet>` ở root, `<PageTitle>` per page, `<HeadContent>` với meta description + og tags (Home + ProductDetail)
 - [x] P4-33 | JSON-LD `Product` schema trên ProductDetail (BreadcrumbList + Organization là follow-up)
-- [~] P4-34 | `/sitemap.xml` — stub XML rỗng hợp lệ; dynamic generation từ catalog là follow-up
+- [x] P4-34 | `/sitemap.xml` dynamic generation: `SitemapBuilder` walks `ICatalogApi.ListCategoriesAsync()` + paginated `ListProductsAsync()` (cap 5000 URLs, page 200), emits valid sitemaps.org XML with `<loc>/<changefreq>/<priority>`, served from Storefront with `OutputCache "Sitemap"` (1-hour). 4 unit tests cover root + categories + products, base URL trimming, short-page pagination stop, changefreq/priority shape
 - [x] P4-35 | `/robots.txt` trỏ sitemap
 - [~] P4-36 | Prerender verify — rendermode `InteractiveAuto` (prerender default=true); runtime verify BLOCKED-Docker
 
 ### 4.7 Localization
-- [ ] P4-37..P4-39 | Pending — `IStringLocalizer` adapter + language switcher đợi ApiService expose localization resources qua endpoint dedicated (chưa có)
+- [~] P4-37..P4-39 | Storefront wired: `AddLocalization(Resources)` + `UseRequestLocalization` + supported cultures from `Localization:Cultures` config (default `en-US, vi-VN`). `GET /language?culture=&returnUrl=` sets `.AspNetCore.Culture` cookie. `MainLayout.razor` ships a MudMenu language switcher. Translation strings (resx files under `Resources/`) là sub-PR — keys hiện trả lại nguyên dạng cho đến khi resx được tạo
 
 ### 4.8 Performance
 - [x] P4-41 | Response compression Brotli + Gzip enabled
