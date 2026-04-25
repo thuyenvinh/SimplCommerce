@@ -1,21 +1,19 @@
-﻿using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
+using System;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using SimplCommerce.Infrastructure.Modules;
-using SimplCommerce.Module.Core.Services;
 
 namespace SimplCommerce.Module.StorageAmazonS3
 {
+    [Obsolete("Call services.AddStorageAmazonS3Module() in your composition root.")]
     public class ModuleInitializer : IModuleInitializer
     {
-        public void ConfigureServices(IServiceCollection serviceCollection)
-        {
-            serviceCollection.AddSingleton<IStorageService, S3StorageService>();
-        }
+        public void ConfigureServices(IServiceCollection services) =>
+            services.AddStorageAmazonS3Module();
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            
         }
     }
 }

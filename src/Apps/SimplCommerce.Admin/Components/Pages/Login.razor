@@ -1,0 +1,57 @@
+@page "/login"
+@layout SimplCommerce.Admin.Components.Layout.EmptyLayout
+@rendermode RenderMode.InteractiveServer
+@attribute [AllowAnonymous]
+@inject CookieAuthStateService AuthState
+@inject NavigationManager Nav
+
+<PageTitle>Sign in — Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraSmall" Class="mt-16">
+    <MudPaper Class="pa-6">
+        <MudText Typo="Typo.h5" Class="mb-4">SimplCommerce admin</MudText>
+        <EditForm Model="_input" OnValidSubmit="HandleLogin" FormName="adminLogin">
+            <DataAnnotationsValidator />
+            <MudTextField @bind-Value="_input.Email" Label="Email" Required="true" />
+            <MudTextField @bind-Value="_input.Password" Label="Password" InputType="InputType.Password" Required="true" Class="mt-2" />
+            @if (_error is not null)
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-3">@_error</MudAlert>
+            }
+            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Class="mt-4" Disabled="_busy">Sign in</MudButton>
+        </EditForm>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
+    private LoginInput _input = new();
+    private string? _error;
+    private bool _busy;
+
+    private async Task HandleLogin()
+    {
+        _busy = true;
+        _error = null;
+        var (ok, err) = await AuthState.SignInAsync(_input.Email, _input.Password);
+        _busy = false;
+        if (ok)
+        {
+            Nav.NavigateTo(string.IsNullOrWhiteSpace(ReturnUrl) ? "/" : "/" + ReturnUrl.TrimStart('/'), forceLoad: true);
+        }
+        else
+        {
+            _error = err;
+        }
+    }
+
+    public sealed class LoginInput
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Password { get; set; } = string.Empty;
+    }
+}

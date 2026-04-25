@@ -1,0 +1,75 @@
+@page "/"
+@rendermode RenderMode.InteractiveAuto
+@inject ICatalogApi Catalog
+
+<PageTitle>SimplCommerce — Ecommerce with .NET Aspire + Blazor</PageTitle>
+<HeadContent>
+    <meta name="description" content="SimplCommerce storefront — browse featured products, categories, and brands." />
+    <meta property="og:title" content="SimplCommerce" />
+    <meta property="og:type" content="website" />
+</HeadContent>
+
+<MudText Typo="Typo.h3" Class="mb-6">Welcome to SimplCommerce</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="9">
+        <MudText Typo="Typo.h5" Class="mb-4">Featured products</MudText>
+        @if (_products is null)
+        {
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        }
+        else if (_products.Items.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info">No products published yet.</MudAlert>
+        }
+        else
+        {
+            <MudGrid>
+                @foreach (var p in _products.Items)
+                {
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudCard>
+                            <MudCardMedia Image="@(p.ThumbnailUrl ?? "/images/placeholder.png")" Height="180" />
+                            <MudCardContent>
+                                <MudLink Href="@($"/product/{p.Slug}")" Underline="Underline.Hover">
+                                    <MudText Typo="Typo.subtitle1">@p.Name</MudText>
+                                </MudLink>
+                                <MudText Typo="Typo.h6" Color="Color.Primary">@p.Price.ToString("C")</MudText>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    </MudItem>
+    <MudItem xs="12" md="3">
+        <MudText Typo="Typo.h6" Class="mb-2">Categories</MudText>
+        @if (_categories is null)
+        {
+            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+        }
+        else
+        {
+            <MudList T="CategoryItem" Dense="true">
+                @foreach (var c in _categories)
+                {
+                    <MudListItem T="CategoryItem" Href="@($"/category/{c.Slug}")">@c.Name</MudListItem>
+                }
+            </MudList>
+        }
+    </MudItem>
+</MudGrid>
+
+@code {
+    private PagedResult<ProductListItem>? _products;
+    private IReadOnlyList<CategoryItem>? _categories;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var productsTask = Catalog.ListProductsAsync(pageSize: 12);
+        var categoriesTask = Catalog.ListCategoriesAsync();
+        await Task.WhenAll(productsTask, categoriesTask);
+        _products = productsTask.Result;
+        _categories = categoriesTask.Result;
+    }
+}

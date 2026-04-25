@@ -1,0 +1,49 @@
+@page "/news/{Slug}"
+@rendermode RenderMode.InteractiveAuto
+@inject INewsApi News
+
+<PageTitle>@(_item?.Name ?? Slug) — SimplCommerce</PageTitle>
+<HeadContent>
+    @if (_item is not null)
+    {
+        <meta name="description" content="@(_item.ShortContent ?? _item.Name)" />
+        <meta property="og:title" content="@_item.Name" />
+        <meta property="og:type" content="article" />
+    }
+</HeadContent>
+
+@if (_item is null && !_loaded)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_item is null)
+{
+    <MudAlert Severity="Severity.Warning">Article not found.</MudAlert>
+}
+else
+{
+    <MudText Typo="Typo.h3" Class="mb-4">@_item.Name</MudText>
+    @if (!string.IsNullOrWhiteSpace(_item.ShortContent))
+    {
+        <MudText Typo="Typo.subtitle1" Class="mb-2">@_item.ShortContent</MudText>
+    }
+    @if (!string.IsNullOrWhiteSpace(_item.FullContent))
+    {
+        <MudPaper Class="pa-4">
+            @((MarkupString)_item.FullContent)
+        </MudPaper>
+    }
+}
+
+@code {
+    [Parameter] public string Slug { get; set; } = default!;
+    private NewsDetail? _item;
+    private bool _loaded;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loaded = false;
+        _item = await News.GetAsync(Slug);
+        _loaded = true;
+    }
+}

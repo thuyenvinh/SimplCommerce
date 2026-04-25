@@ -1,0 +1,29 @@
+@page "/payment-providers"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminPaymentsApi Payments
+
+<PageTitle>Payment providers — Admin</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Payment providers</MudText>
+
+<MudPaper Class="pa-4">
+    @if (_providers is null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else
+    {
+        <MudTable T="AdminPaymentProviderItem" Items="_providers" Hover="true">
+            <HeaderContent><MudTh>ID</MudTh><MudTh>Name</MudTh><MudTh>Enabled</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Id</MudTd>
+                <MudTd>@context.Name</MudTd>
+                <MudTd>@(context.IsEnabled ? "✓" : "—")</MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private IReadOnlyList<AdminPaymentProviderItem>? _providers;
+    protected override async Task OnInitializedAsync() => _providers = await Payments.ListProvidersAsync();
+}

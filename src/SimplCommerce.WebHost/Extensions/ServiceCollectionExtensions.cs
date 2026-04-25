@@ -1,12 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
-using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
-using System.Runtime.Loader;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -14,7 +11,6 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -35,21 +31,11 @@ namespace SimplCommerce.WebHost.Extensions
 
         public static IServiceCollection AddModules(this IServiceCollection services)
         {
+            // Every module is statically project-referenced after Phase 2; Assembly.Load works
+            // because the dependency is already in the AppDomain probing path.
             foreach (var module in _modulesConfig.GetModules())
             {
-                if(!module.IsBundledWithHost)
-                {
-                    TryLoadModuleAssembly(module.Id, module);
-                    if (module.Assembly == null)
-                    {
-                        throw new Exception($"Cannot find main assembly for module {module.Id}");
-                    }
-                }
-                else
-                {
-                    module.Assembly = Assembly.Load(new AssemblyName(module.Id));
-                }
-
+                module.Assembly = Assembly.Load(new AssemblyName(module.Id));
                 GlobalConfiguration.Modules.Add(module);
             }
 
@@ -58,10 +44,12 @@ namespace SimplCommerce.WebHost.Extensions
 
         public static IServiceCollection AddCustomizedMvc(this IServiceCollection services, IList<ModuleInfo> modules)
         {
-            var mvcBuilder = services
+            services
                 .AddMvc(o =>
                 {
-                    o.EnableEndpointRouting = false;
+                    // Endpoint routing (default) is required by MapDynamicControllerRoute and the
+                    // top-level app.MapControllerRoute(...) calls in Program.cs. We used to set
+                    // this to false alongside UseEndpoints(); ASP0014 flagged that inconsistency.
                     o.ModelBinderProviders.Insert(0, new InvariantDecimalModelBinderProvider());
                 })
                 .AddViewLocalization()
@@ -74,10 +62,8 @@ namespace SimplCommerce.WebHost.Extensions
                 })
                 .AddNewtonsoftJson();
 
-            foreach (var module in modules.Where(x => !x.IsBundledWithHost))
-            {
-                AddApplicationPart(mvcBuilder, module.Assembly);
-            }
+            // Phase 2 static manifest marks every module as bundled, so no dynamic ApplicationPart
+            // registration is needed anymore — MVC picks them up from the already-loaded assemblies.
 
             return services;
         }
@@ -109,25 +95,6 @@ namespace SimplCommerce.WebHost.Extensions
                 o.ModelBindingMessageProvider.SetUnknownValueIsInvalidAccessor((x) => L["The supplied value is invalid for {0}.", x]);
                 o.ModelBindingMessageProvider.SetValueMustNotBeNullAccessor((x) => L["Null value is invalid."]);
             });
-        }
-
-        private static void AddApplicationPart(IMvcBuilder mvcBuilder, Assembly assembly)
-        {
-            var partFactory = ApplicationPartFactory.GetApplicationPartFactory(assembly);
-            foreach (var part in partFactory.GetApplicationParts(assembly))
-            {
-                mvcBuilder.PartManager.ApplicationParts.Add(part);
-            }
-
-            var relatedAssemblies = RelatedAssemblyAttribute.GetRelatedAssemblies(assembly, throwOnError: false);
-            foreach (var relatedAssembly in relatedAssemblies)
-            {
-                partFactory = ApplicationPartFactory.GetApplicationPartFactory(relatedAssembly);
-                foreach (var part in partFactory.GetApplicationParts(relatedAssembly))
-                {
-                    mvcBuilder.PartManager.ApplicationParts.Add(part);
-                }
-            }
         }
 
         public static IServiceCollection AddCustomizedIdentity(this IServiceCollection services, IConfiguration configuration)
@@ -218,9 +185,14 @@ namespace SimplCommerce.WebHost.Extensions
 
         public static IServiceCollection AddCustomizedDataStore(this IServiceCollection services, IConfiguration configuration)
         {
-            services.AddDbContextPool<SimplDbContext>(options => 
+            // Aspire injects ConnectionStrings__SimplCommerce; retain DefaultConnection fallback
+            // for standalone runs of the WebHost outside the AppHost orchestrator.
+            var connectionString = configuration.GetConnectionString("SimplCommerce")
+                ?? configuration.GetConnectionString("DefaultConnection");
+
+            services.AddDbContextPool<SimplDbContext>(options =>
             {
-                options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"), b => b.MigrationsAssembly("SimplCommerce.WebHost"));
+                options.UseSqlServer(connectionString, b => b.MigrationsAssembly("SimplCommerce.WebHost"));
                 options.EnableSensitiveDataLogging();
             });
             return services;
@@ -247,49 +219,6 @@ namespace SimplCommerce.WebHost.Extensions
             }
 
             return services;
-        }
-
-        private static void TryLoadModuleAssembly(string moduleFolderPath, ModuleInfo module)
-        {
-            const string binariesFolderName = "bin";
-            var binariesFolderPath = Path.Combine(moduleFolderPath, binariesFolderName);
-            var binariesFolder = new DirectoryInfo(binariesFolderPath);
-
-            if (Directory.Exists(binariesFolderPath))
-            {
-                foreach (var file in binariesFolder.GetFileSystemInfos("*.dll", SearchOption.AllDirectories))
-                {
-                    Assembly assembly;
-                    try
-                    {
-                        assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(file.FullName);
-                    }
-                    catch (FileLoadException)
-                    {
-                        // Get loaded assembly. This assembly might be loaded
-                        assembly = Assembly.Load(new AssemblyName(Path.GetFileNameWithoutExtension(file.Name)));
-
-                        if (assembly == null)
-                        {
-                            throw;
-                        }
-
-                        string loadedAssemblyVersion = FileVersionInfo.GetVersionInfo(assembly.Location).FileVersion;
-                        string tryToLoadAssemblyVersion = FileVersionInfo.GetVersionInfo(file.FullName).FileVersion;
-
-                        // Or log the exception somewhere and don't add the module to list so that it will not be initialized
-                        if (tryToLoadAssemblyVersion != loadedAssemblyVersion)
-                        {
-                            throw new Exception($"Cannot load {file.FullName} {tryToLoadAssemblyVersion} because {assembly.Location} {loadedAssemblyVersion} has been loaded");
-                        }
-                    }
-
-                    if (Path.GetFileNameWithoutExtension(assembly.ManifestModule.Name) == module.Id)
-                    {
-                        module.Assembly = assembly;
-                    }
-                }
-            }
         }
 
         private static Task HandleRemoteLoginFailure(RemoteFailureContext ctx)

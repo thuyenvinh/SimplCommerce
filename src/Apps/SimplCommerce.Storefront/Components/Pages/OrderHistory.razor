@@ -1,0 +1,38 @@
+@page "/account/orders"
+@attribute [Authorize]
+@rendermode RenderMode.InteractiveServer
+@inject IOrderApi Orders
+
+<PageTitle>My orders — SimplCommerce</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">My orders</MudText>
+
+@if (_orders is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_orders.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">You haven't placed any orders yet.</MudAlert>
+}
+else
+{
+    <MudTable T="OrderListItem" Items="_orders" Hover="true">
+        <HeaderContent>
+            <MudTh>Order #</MudTh>
+            <MudTh>Placed on</MudTh>
+            <MudTh>Total</MudTh>
+            <MudTh>Status</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.Id</MudTd>
+            <MudTd>@context.CreatedOn.ToLocalTime().ToString("g")</MudTd>
+            <MudTd>@context.OrderTotal.ToString("C")</MudTd>
+            <MudTd>@context.OrderStatus</MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private IReadOnlyList<OrderListItem>? _orders;
+    protected override async Task OnInitializedAsync() => _orders = await Orders.ListAsync();
+}

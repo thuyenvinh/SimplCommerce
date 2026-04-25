@@ -1,0 +1,76 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <!-- Migrations emit a lot of identifier warnings from the EF scaffolder that we don't control. -->
+    <NoWarn>$(NoWarn);CS8981</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!--
+    Phase 2 consolidation target: all EF migrations eventually live here. The project
+    references every module project that contributes entities so the scaffolder can
+    discover mappings via ICustomModelBuilder across the whole modular domain.
+
+    Until the existing migrations in SimplCommerce.WebHost/Migrations are moved here
+    (requires a live SQL Server to regenerate a consolidated Initial_AspireBaseline
+    snapshot — see MIGRATION_PROGRESS.md P2-04/P2-05), this project just provides the
+    scaffold. dotnet ef commands from this project's directory work once migrations
+    are moved.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\SimplCommerce.Infrastructure\SimplCommerce.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.ActivityLog\SimplCommerce.Module.ActivityLog.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.Catalog\SimplCommerce.Module.Catalog.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.Checkouts\SimplCommerce.Module.Checkouts.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.Cms\SimplCommerce.Module.Cms.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.Comments\SimplCommerce.Module.Comments.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.Contacts\SimplCommerce.Module.Contacts.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.Core\SimplCommerce.Module.Core.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.DinkToPdf\SimplCommerce.Module.DinkToPdf.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.EmailSenderSmtp\SimplCommerce.Module.EmailSenderSmtp.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.Inventory\SimplCommerce.Module.Inventory.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.Localization\SimplCommerce.Module.Localization.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.News\SimplCommerce.Module.News.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.Notifications\SimplCommerce.Module.Notifications.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.Orders\SimplCommerce.Module.Orders.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.PaymentBraintree\SimplCommerce.Module.PaymentBraintree.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.PaymentCashfree\SimplCommerce.Module.PaymentCashfree.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.PaymentCoD\SimplCommerce.Module.PaymentCoD.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.PaymentMomo\SimplCommerce.Module.PaymentMomo.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.PaymentNganLuong\SimplCommerce.Module.PaymentNganLuong.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.PaymentPaypalExpress\SimplCommerce.Module.PaymentPaypalExpress.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.PaymentStripe\SimplCommerce.Module.PaymentStripe.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.Payments\SimplCommerce.Module.Payments.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.Pricing\SimplCommerce.Module.Pricing.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.ProductComparison\SimplCommerce.Module.ProductComparison.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.ProductRecentlyViewed\SimplCommerce.Module.ProductRecentlyViewed.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.Reviews\SimplCommerce.Module.Reviews.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.SampleData\SimplCommerce.Module.SampleData.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.Search\SimplCommerce.Module.Search.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.Shipments\SimplCommerce.Module.Shipments.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.Shipping\SimplCommerce.Module.Shipping.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.ShippingFree\SimplCommerce.Module.ShippingFree.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.ShippingPrices\SimplCommerce.Module.ShippingPrices.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.ShippingTableRate\SimplCommerce.Module.ShippingTableRate.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.ShoppingCart\SimplCommerce.Module.ShoppingCart.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.StorageLocal\SimplCommerce.Module.StorageLocal.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.Tax\SimplCommerce.Module.Tax.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.Vendors\SimplCommerce.Module.Vendors.csproj" />
+    <ProjectReference Include="..\..\Modules\SimplCommerce.Module.WishList\SimplCommerce.Module.WishList.csproj" />
+  </ItemGroup>
+
+</Project>
