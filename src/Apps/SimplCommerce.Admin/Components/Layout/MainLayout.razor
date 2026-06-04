@@ -10,7 +10,7 @@
         <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" OnClick="@(() => _drawerOpen = !_drawerOpen)" />
         <MudText Typo="Typo.h6" Class="ml-2">SimplCommerce admin</MudText>
         <MudSpacer />
-        <MudIconButton Icon="@Icons.Material.Filled.Notifications" Color="Color.Inherit" Href="/activity-log" />
+        <NotificationBell />
         <AuthorizeView>
             <Authorized>
                 <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit">

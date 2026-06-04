@@ -2,6 +2,9 @@
 @attribute [Authorize]
 @rendermode RenderMode.InteractiveServer
 @inject ICartApi CartClient
+@inject ICheckoutApi CheckoutClient
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
 
 <PageTitle>Your cart — SimplCommerce</PageTitle>
 
@@ -13,14 +16,18 @@
 }
 else
 {
-    <MudPaper Class="pa-4">
-        <MudText>Raw cart payload (pretty JSON) — Phase 4 follow-up will bind this to a typed CartView record after the backend settles its shape.</MudText>
+    <MudPaper Class="pa-4 mb-4">
         <pre>@_raw</pre>
     </MudPaper>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               OnClick="StartCheckout" Disabled="_starting">
+        @(_starting ? "Starting checkout…" : "Proceed to checkout")
+    </MudButton>
 }
 
 @code {
     private string? _raw;
+    private bool _starting;
 
     protected override async Task OnInitializedAsync()
     {
@@ -28,5 +35,24 @@ else
         _raw = resp.IsSuccessStatusCode
             ? await resp.Content.ReadAsStringAsync()
             : $"Cart unavailable (HTTP {(int)resp.StatusCode}).";
+    }
+
+    private async Task StartCheckout()
+    {
+        _starting = true;
+        try
+        {
+            var resp = await CheckoutClient.StartAsync();
+            if (resp is null)
+            {
+                Snackbar.Add("Could not start checkout. Make sure your cart isn't empty.", Severity.Warning);
+                return;
+            }
+            Nav.NavigateTo($"/checkout/{resp.CheckoutId}/address");
+        }
+        finally
+        {
+            _starting = false;
+        }
     }
 }

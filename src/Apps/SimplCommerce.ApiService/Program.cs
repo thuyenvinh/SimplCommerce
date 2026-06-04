@@ -8,6 +8,7 @@ using Microsoft.OpenApi.Models;
 using Scalar.AspNetCore;
 using System.Threading.RateLimiting;
 using SimplCommerce.ApiService.Auth;
+using SimplCommerce.ApiService.CheckoutFlow;
 using SimplCommerce.ApiService.Hardening;
 using SimplCommerce.ApiService.Media;
 using SimplCommerce.ApiService.Webhooks;
@@ -273,6 +274,20 @@ builder.Services
     .AddSignalRModule()
     .AddHangfireJobsModule(builder.Configuration);
 
+// SignalR Redis backplane (shared with Admin host). Falls back to in-process when
+// "redis" isn't configured so dev boxes without Redis still work — broadcast just
+// stays inside this ApiService instance until ops adds the connection string.
+var apiSignalRRedis = builder.Configuration.GetConnectionString("redis");
+if (!string.IsNullOrWhiteSpace(apiSignalRRedis))
+{
+    builder.Services.Configure<Microsoft.AspNetCore.SignalR.HubOptions>(_ => { });
+    builder.Services.AddSignalR().AddStackExchangeRedis(apiSignalRRedis);
+}
+
+builder.Services.AddTransient<
+    MediatR.INotificationHandler<SimplCommerce.Module.Orders.Events.OrderCreated>,
+    SimplCommerce.ApiService.Notifications.OrderCreatedAdminBroadcastHandler>();
+
 var app = builder.Build();
 
 app.MapDefaultEndpoints();
@@ -311,6 +326,7 @@ app.MapSearchStorefrontEndpoints();
 app.MapCmsStorefrontEndpoints();
 app.MapNewsStorefrontEndpoints();
 app.MapShoppingCartStorefrontEndpoints();
+app.MapCheckoutStorefrontEndpoints();
 app.MapOrdersStorefrontEndpoints();
 app.MapReviewsStorefrontEndpoints();
 app.MapWishListStorefrontEndpoints();

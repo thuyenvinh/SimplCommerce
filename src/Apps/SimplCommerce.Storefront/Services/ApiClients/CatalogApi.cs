@@ -136,6 +136,43 @@ public sealed class CmsApi(HttpClient http) : ICmsApi
         http.GetFromJsonAsync<CmsPageDto>($"/api/storefront/cms/pages/{Uri.EscapeDataString(slug)}", ct);
 }
 
+public interface ICheckoutApi
+{
+    Task<CheckoutStartResponse?> StartAsync(CancellationToken ct = default);
+    Task<CheckoutSummaryDto?> GetAsync(Guid id, CancellationToken ct = default);
+    Task<HttpResponseMessage> SaveShippingAsync(Guid id, CheckoutAddressRequest req, CancellationToken ct = default);
+    Task<IReadOnlyList<PaymentMethodOption>?> ListPaymentMethodsAsync(CancellationToken ct = default);
+    Task<PlaceOrderResponse?> PlaceOrderAsync(Guid id, PlaceOrderRequest req, CancellationToken ct = default);
+}
+
+public sealed class CheckoutApi(HttpClient http) : ICheckoutApi
+{
+    public async Task<CheckoutStartResponse?> StartAsync(CancellationToken ct)
+    {
+        using var resp = await http.PostAsync("/api/storefront/checkout/", content: null, ct);
+        return resp.IsSuccessStatusCode
+            ? await resp.Content.ReadFromJsonAsync<CheckoutStartResponse>(ct)
+            : null;
+    }
+
+    public Task<CheckoutSummaryDto?> GetAsync(Guid id, CancellationToken ct)
+        => http.GetFromJsonAsync<CheckoutSummaryDto>($"/api/storefront/checkout/{id}", ct);
+
+    public Task<HttpResponseMessage> SaveShippingAsync(Guid id, CheckoutAddressRequest req, CancellationToken ct)
+        => http.PostAsJsonAsync($"/api/storefront/checkout/{id}/shipping", req, ct);
+
+    public async Task<IReadOnlyList<PaymentMethodOption>?> ListPaymentMethodsAsync(CancellationToken ct)
+        => await http.GetFromJsonAsync<List<PaymentMethodOption>>("/api/storefront/checkout/payment-methods", ct);
+
+    public async Task<PlaceOrderResponse?> PlaceOrderAsync(Guid id, PlaceOrderRequest req, CancellationToken ct)
+    {
+        using var resp = await http.PostAsJsonAsync($"/api/storefront/checkout/{id}/place-order", req, ct);
+        return resp.IsSuccessStatusCode
+            ? await resp.Content.ReadFromJsonAsync<PlaceOrderResponse>(ct)
+            : null;
+    }
+}
+
 public interface INewsApi
 {
     Task<IReadOnlyList<NewsSummary>?> ListAsync(int page = 1, int pageSize = 12, CancellationToken ct = default);

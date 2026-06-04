@@ -52,6 +52,8 @@ builder.Services.AddHttpClient<ISearchApi, SearchApi>(c => c.BaseAddress = new U
     .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
 builder.Services.AddHttpClient<ICartApi, CartApi>(c => c.BaseAddress = new Uri(apiBase))
     .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
+builder.Services.AddHttpClient<ICheckoutApi, CheckoutApi>(c => c.BaseAddress = new Uri(apiBase))
+    .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
 builder.Services.AddHttpClient<IAuthApi, AuthApi>(c => c.BaseAddress = new Uri(apiBase));
 builder.Services.AddHttpClient<IAccountApi, AccountApi>(c => c.BaseAddress = new Uri(apiBase))
     .AddHttpMessageHandler<ApiAuthDelegatingHandler>();

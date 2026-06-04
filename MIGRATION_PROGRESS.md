@@ -225,7 +225,7 @@ Storefront endpoint groups đã tạo (9 groups):
 - [x] P3-20 | `Module.Catalog/Endpoints/CatalogStorefrontEndpoints.cs` — `/api/storefront/catalog/{products, products/{id}, products/by-slug/{slug}, categories, categories/by-slug/{slug}, brands, brands/by-slug/{slug}}`
 - [x] P3-21 | `Module.Search/Endpoints/SearchStorefrontEndpoints.cs` — `/api/storefront/search?q=&page&pageSize`
 - [x] P3-22 | `Module.ShoppingCart/Endpoints/ShoppingCartStorefrontEndpoints.cs` — `/api/storefront/cart/{GET, items POST/PUT, coupon POST}` (CustomerOnly)
-- [~] P3-23 | **Checkout endpoints** — stub chưa có; checkout flow sẽ gộp với OrdersStorefrontEndpoints.Post("/") trong sub-PR Phase 3.3 tiếp theo
+- [x] P3-23 | **Checkout endpoints live** — `CheckoutStorefrontEndpoints` in `src/Apps/SimplCommerce.ApiService/CheckoutFlow/`: `POST /api/storefront/checkout` (create from cart), `GET /{id}` (summary), `POST /{id}/shipping` (serialize `DeliveryInformationVm` into `checkout.ShippingData` matching legacy schema → tax + shipping recalc), `GET /payment-methods`, `POST /{id}/place-order` (calls existing `IOrderService.CreateOrder` so domain events + email handlers keep firing untouched). Ownership check on every mutate. 4 contract unit tests.
 - [x] P3-24 | `Module.Orders/Endpoints/OrdersStorefrontEndpoints.cs` — `/api/storefront/orders/{GET list, GET {id}}` (CustomerOnly)
 - [x] P3-25 | `Module.Core/Endpoints/CoreStorefrontEndpoints.cs` — `/api/storefront/core/{countries, countries/{id}/states, addresses}` (CustomerOnly cho addresses)
 - [x] P3-26 | `Module.WishList/Endpoints/WishListStorefrontEndpoints.cs` — `/api/storefront/wishlist/{GET, items POST, items/{id} DELETE}` (CustomerOnly)
@@ -323,7 +323,7 @@ Storefront endpoint groups đã tạo (9 groups):
 - [x] P4-19 | `/product/{slug}` Product detail — gallery, price/old-price, qty selector, Add to cart, meta + og tags + JSON-LD
 - [x] P4-20 | `/search?q=` Search results — paged grid (facets follow-up)
 - [~] P4-21 | `/cart` Cart — authorized; renders raw cart payload from API (typed CartView record là follow-up khi endpoint `/api/storefront/cart/` shape ổn định)
-- [ ] P4-22..P4-23 | `/checkout/*` — **pending follow-up PR** (checkout flow endpoint đang được hoàn thiện)
+- [x] P4-22..P4-23 | `/checkout/{id}/address` + `/checkout/{id}/payment` + `/checkout/{orderId}/success` Blazor pages live. Cart page got a "Proceed to checkout" button driving the flow. `ICheckoutApi` typed client wires Storefront BFF cookie auth through to the ApiService minimal endpoints.
 - [x] P4-24 | `/account/login`, `/account/register`, `/account/logout` — MudBlazor EditForm + DataAnnotations; login exchanges JWT và sets cookie
 - [x] P4-25 | `/account` — profile dashboard (GET `/api/auth/me`)
 - [x] P4-26 | `/account/orders` — order history table (chi tiết `/{id}` là follow-up)
@@ -444,11 +444,11 @@ Storefront endpoint groups đã tạo (9 groups):
 
 **5.4.14 Activity & Notifications**
 - [x] P5-61 | `/activity-log` paged list
-- [ ] P5-62 | Notification center with SignalR push — deferred (AdminNotificationHub hasn't landed in ApiService yet, see P5-63)
+- [x] P5-62 | `<NotificationBell>` mounted in Admin `MainLayout.razor`. MudBadge unread counter, dropdown lists last 25, click navigates to the deep link in the notification payload. Connects via `HubConnectionBuilder` forwarding the auth cookie.
 
 ### 5.5 SignalR realtime
-- [~] P5-63 | Hub infra ready in **Admin host** (`AddSignalR().AddStackExchangeRedis`). Dedicated `AdminNotificationHub` in ApiService is pending — backplane + handler plumbing is in place so wiring the hub is a small sub-PR.
-- [ ] P5-64..P5-65 | Event publish + `<NotificationBell>` — deferred to P5-63 follow-up
+- [x] P5-63 | `AdminNotificationHub` lives in new lean shared lib `src/SimplCommerce.RealTime/` (no Module.Core transitives — avoids legacy WebApi.Client polluting the Admin app's HttpClient overloads). Both Admin and ApiService MapHub the same type so Redis backplane fans messages cross-host.
+- [x] P5-64..P5-65 | `OrderCreatedAdminBroadcastHandler` (MediatR `INotificationHandler<OrderCreated>` in ApiService) pushes to `IHubContext<AdminNotificationHub>.Clients.Group("admins")`. `<NotificationBell>` Blazor component listens and renders into MainLayout.
 
 ### 5.6 Verify
 - [~] P5-66 | Manual test — BLOCKED-Docker; pages compile and match API contract types exactly

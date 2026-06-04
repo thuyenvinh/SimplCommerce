@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using SimplCommerce.Module.SignalR.Hubs;
 using SimplCommerce.Module.SignalR.RealTime;
+using SimplCommerce.RealTime;
 
 namespace SimplCommerce.Module.SignalR
 {
@@ -22,6 +23,7 @@ namespace SimplCommerce.Module.SignalR
         public static IEndpointRouteBuilder MapSignalRModule(this IEndpointRouteBuilder endpoints)
         {
             endpoints.MapHub<CommonHub>("/signalr");
+            endpoints.MapHub<SimplCommerce.RealTime.AdminNotificationHub>("/hubs/admin-notifications");
             return endpoints;
         }
     }

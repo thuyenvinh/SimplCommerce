@@ -153,3 +153,29 @@
   - `Initial_AspireBaseline` generated offline: 85 tables covering all 23 entity-owning modules.
   - ApiService now wires `GlobalConfiguration.Modules` — entity discovery works at runtime as well. Previously ApiService would have started up fine but `SimplDbContext.OnModelCreating` would register zero entities → every query would fail. Untested because BLOCKED-Docker; this fix preempts the failure.
   - Three project references added to `SimplCommerce.Migrations.csproj` (DinkToPdf, EmailSenderSmtp, StorageLocal) so Assembly.Load finds every manifest entry.
+
+## DECISION-012: New shared lib `SimplCommerce.RealTime` for cross-host SignalR
+- **Date:** 2026-06-04
+- **Phase:** 5 (P5-63..65 follow-through)
+- **Context:** `AdminNotificationHub` needs to be visible to both the publisher (ApiService) and the subscriber host (Admin Blazor server) so that the Redis SignalR backplane matches messages by `typeof(THub).FullName`. The natural home was `SimplCommerce.Module.SignalR`, but that module transitively references `SimplCommerce.Module.Core`, which carries the legacy `Microsoft.AspNet.WebApi.Client` extension methods — those overload `HttpClient.PostAsJsonAsync` and immediately collided with `System.Net.Http.Json.HttpClientJsonExtensions.PostAsJsonAsync` in the Admin app's existing typed API clients.
+- **Decision:** Add a brand-new lean library `src/SimplCommerce.RealTime/` with no module references — only `FrameworkReference Microsoft.AspNetCore.App`. It hosts `AdminNotificationHub`, `IAdminNotificationClient`, and the `AdminNotification` payload record. Both Admin and ApiService project-reference it directly; `SimplCommerce.Module.SignalR` also references it so `MapSignalRModule` still wires the hub at `/hubs/admin-notifications` on the ApiService side.
+- **Alternatives considered:**
+  - Disambiguate the `PostAsJsonAsync` calls in `AdminApis.cs` via fully-qualified extension method invocation — would have rotted every time a new typed client was added.
+  - Duplicate the hub class on both sides — would break Redis backplane matching since `FullName` would differ.
+  - Strip the legacy WebApi.Client transitive out of Module.Core — out of scope for the SignalR pass and risky.
+- **Consequences:**
+  - One more tiny project (~30 LOC) but it's the kind of seam this refactor needs anyway.
+  - The Admin app's NuGet surface stays clean (no `System.Net.Http.Formatting` etc.).
+  - When Module.Core is finally retired in Phase 8, the dependency loop unwinds further but `SimplCommerce.RealTime` stays as the home of cross-host hub contracts.
+
+## DECISION-013: Bump OpenTelemetry SDK 1.10 → 1.15 (GHSA-4625-4j76-fww9)
+- **Date:** 2026-06-04
+- **Phase:** 1 (follow-up alongside Phase 5 work)
+- **Context:** `OpenTelemetry.Exporter.OpenTelemetryProtocol` 1.10.0 triggered `NU1902` (moderate vulnerability). Same family as MailKit advisory handling — TreatWarningsAsErrors made it a build break.
+- **Decision:** Bump every `OpenTelemetry.*` package in `SimplCommerce.ServiceDefaults` to the highest patched version available on nuget.org: 1.15.3 for the SDK + Hosting + Exporter, 1.15.2 / 1.15.1 for the Instrumentation.* sub-packages (those lag the core SDK by a release).
+- **Alternatives considered:**
+  - Suppress NU1902 — masks future advisories.
+  - Stay on 1.10 and disable WaE in ServiceDefaults — drifts from the rest of the solution's strict-warning posture.
+- **Consequences:**
+  - OTLP exporter behaviour identical (1.x is stable).
+  - Instrumentation packages now slightly out of lockstep with the Exporter (1.15.2 vs 1.15.3) but that combo is officially supported.

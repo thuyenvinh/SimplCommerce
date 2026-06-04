@@ -47,3 +47,19 @@ public record CmsPageDto(long Id, string Name, string Slug, string? Body);
 
 public record NewsSummary(long Id, string Name, string Slug, string? ShortContent);
 public record NewsDetail(long Id, string Name, string Slug, string? ShortContent, string? FullContent);
+
+public record CheckoutStartResponse(Guid CheckoutId);
+public record CheckoutSummaryDto(
+    Guid Id, decimal SubTotal, decimal Discount, decimal? ShippingAmount,
+    decimal? TaxAmount, decimal OrderTotal, string? CouponCode,
+    IReadOnlyList<CheckoutLineDto> Items);
+public record CheckoutLineDto(long ProductId, string ProductName, int Quantity, decimal ProductPrice);
+public record CheckoutAddressRequest(
+    string ContactName, string Phone, string AddressLine1, string? AddressLine2,
+    string CountryId, long StateOrProvinceId, long? DistrictId,
+    string? City, string? ZipCode,
+    bool UseShippingAddressAsBillingAddress = true,
+    string? ShippingMethod = null, string? OrderNote = null);
+public record PaymentMethodOption(string Id, string Name);
+public record PlaceOrderRequest(string PaymentMethod, decimal PaymentFeeAmount = 0);
+public record PlaceOrderResponse(long OrderId);

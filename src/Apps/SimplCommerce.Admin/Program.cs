@@ -106,4 +106,8 @@ app.UseAuthorization();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
+// Hub endpoint for AdminNotificationHub. Sits on this server (Admin) but the Redis
+// backplane lets the ApiService publish notifications via IHubContext on its side.
+app.MapHub<SimplCommerce.RealTime.AdminNotificationHub>("/hubs/admin-notifications");
+
 app.Run();

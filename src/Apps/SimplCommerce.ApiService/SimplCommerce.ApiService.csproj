@@ -22,6 +22,7 @@
     <PackageReference Include="Scalar.AspNetCore" Version="2.0.0" />
     <PackageReference Include="HtmlSanitizer" Version="9.0.892" />
     <PackageReference Include="SixLabors.ImageSharp.Web" Version="3.1.4" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="9.0.0" />
     <PackageReference Include="AspNetCore.HealthChecks.SqlServer" Version="9.0.0" />
     <PackageReference Include="AspNetCore.HealthChecks.Redis" Version="9.0.0" />
     <PackageReference Include="AspNetCore.HealthChecks.Azure.Storage.Blobs" Version="9.0.0" />
@@ -31,6 +32,7 @@
     <!-- Infrastructure + shared -->
     <ProjectReference Include="..\..\ServiceDefaults\SimplCommerce.ServiceDefaults\SimplCommerce.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\SimplCommerce.Infrastructure\SimplCommerce.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\SimplCommerce.RealTime\SimplCommerce.RealTime.csproj" />
     <ProjectReference Include="..\..\Migrations\SimplCommerce.Migrations\SimplCommerce.Migrations.csproj" />
   </ItemGroup>
 

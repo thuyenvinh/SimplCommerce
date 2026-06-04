@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\ServiceDefaults\SimplCommerce.ServiceDefaults\SimplCommerce.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\SimplCommerce.RealTime\SimplCommerce.RealTime.csproj" />
   </ItemGroup>
 
 </Project>
