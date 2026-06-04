@@ -21,6 +21,16 @@ public record AdminOrderListItem(long Id, DateTimeOffset CreatedOn, decimal Orde
 public record AdminOrdersPage(int Total, int Page, int PageSize, IReadOnlyList<AdminOrderListItem> Items);
 public record UpdateOrderStatusRequest(int NewStatus);
 
+public record AdminOrderItemDto(long ProductId, string ProductName, int Quantity, decimal ProductPrice, decimal DiscountAmount);
+public record AdminOrderAddressDto(string ContactName, string Phone, string AddressLine1, string? AddressLine2, string? City, string? ZipCode);
+public record AdminOrderDetail(
+    long Id, DateTimeOffset CreatedOn, DateTimeOffset LatestUpdatedOn,
+    int OrderStatus, string? PaymentMethod, decimal SubTotal, decimal DiscountAmount,
+    decimal TaxAmount, decimal ShippingAmount, decimal OrderTotal,
+    long? CustomerId, string? CustomerEmail, string? CustomerFullName,
+    AdminOrderAddressDto? ShippingAddress, AdminOrderAddressDto? BillingAddress,
+    IReadOnlyList<AdminOrderItemDto> Items);
+
 // --- Core admin (users/roles) ---
 public record AdminUserListItem(long Id, string? Email, string? FullName, DateTimeOffset CreatedOn, bool LockoutEnabled);
 public record AdminUsersPage(int Total, int Page, int PageSize, IReadOnlyList<AdminUserListItem> Items);

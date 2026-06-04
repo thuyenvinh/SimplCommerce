@@ -401,7 +401,7 @@ Storefront endpoint groups đã tạo (9 groups):
 
 **5.4.3 Orders**
 - [x] P5-25 | `/orders` list with status + customer-search filter + paging
-- [~] P5-26 | `/orders/{id}` detail + timeline — **deferred** (backend endpoint shape for detail + timeline pending)
+- [x] P5-26 | `/orders/{id}` admin detail page live. Backend `GET /api/admin/orders/{id}` now projects to `AdminOrderDetail` DTO (items + shipping address + billing address + customer + totals). UI has clickable list rows, MudTable line items, inline status dropdown that PATCHes via `IAdminOrdersApi.UpdateStatusAsync`, MudSnackbar on success/failure. Timeline (audit-log per order) is still a follow-up
 - [ ] P5-27..P5-29 | shipments / refunds / sales-report — deferred (endpoint scaffold needed first)
 
 **5.4.4 Customers**

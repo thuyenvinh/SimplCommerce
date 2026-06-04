@@ -61,6 +61,7 @@ public sealed class AdminCatalogApi(HttpClient http) : IAdminCatalogApi
 public interface IAdminOrdersApi
 {
     Task<AdminOrdersPage?> ListAsync(int? status = null, string? customerSearch = null, int page = 1, int pageSize = 20, CancellationToken ct = default);
+    Task<AdminOrderDetail?> GetAsync(long id, CancellationToken ct = default);
     Task<HttpResponseMessage> UpdateStatusAsync(long id, UpdateOrderStatusRequest req, CancellationToken ct = default);
 }
 
@@ -73,6 +74,9 @@ public sealed class AdminOrdersApi(HttpClient http) : IAdminOrdersApi
         if (!string.IsNullOrWhiteSpace(customerSearch)) url += $"&customerSearch={Uri.EscapeDataString(customerSearch)}";
         return http.GetFromJsonAsync<AdminOrdersPage>(url, ct);
     }
+
+    public Task<AdminOrderDetail?> GetAsync(long id, CancellationToken ct)
+        => http.GetFromJsonAsync<AdminOrderDetail>($"/api/admin/orders/{id}", ct);
 
     public Task<HttpResponseMessage> UpdateStatusAsync(long id, UpdateOrderStatusRequest req, CancellationToken ct) =>
         http.PatchAsJsonAsync($"/api/admin/orders/{id}/status", req, ct);

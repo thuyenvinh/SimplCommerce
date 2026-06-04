@@ -1,0 +1,152 @@
+@page "/orders/{Id:long}"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminOrdersApi Orders
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>Order #@Id — SimplCommerce admin</PageTitle>
+
+@if (_order is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-4">
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Nav.NavigateTo("/orders"))" aria-label="Back to orders" />
+        <MudText Typo="Typo.h4">Order #@_order.Id</MudText>
+        <MudChip T="string" Color="@StatusColor(_order.OrderStatus)" Size="Size.Small">@StatusLabel(_order.OrderStatus)</MudChip>
+        <MudSpacer />
+        <MudSelect T="int" Label="Update status" Value="_targetStatus" ValueChanged="OnStatusChanged" Dense="true" Variant="Variant.Outlined" Style="min-width:200px;">
+            @foreach (var s in StatusOptions)
+            {
+                <MudSelectItem T="int" Value="@s.Value">@s.Label</MudSelectItem>
+            }
+        </MudSelect>
+    </MudStack>
+
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6">Items</MudText>
+                <MudTable Items="_order.Items" Dense="true" Striped="true" Hover="true" Class="mt-2">
+                    <HeaderContent>
+                        <MudTh>Product</MudTh>
+                        <MudTh>Qty</MudTh>
+                        <MudTh>Unit price</MudTh>
+                        <MudTh>Discount</MudTh>
+                        <MudTh>Line total</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Product">@context.ProductName</MudTd>
+                        <MudTd DataLabel="Qty">@context.Quantity</MudTd>
+                        <MudTd DataLabel="Unit price">@context.ProductPrice.ToString("C")</MudTd>
+                        <MudTd DataLabel="Discount">@context.DiscountAmount.ToString("C")</MudTd>
+                        <MudTd DataLabel="Line total">@((context.ProductPrice * context.Quantity - context.DiscountAmount).ToString("C"))</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4 mb-3">
+                <MudText Typo="Typo.h6">Totals</MudText>
+                <MudText><strong>Subtotal:</strong> @_order.SubTotal.ToString("C")</MudText>
+                <MudText><strong>Discount:</strong> @_order.DiscountAmount.ToString("C")</MudText>
+                <MudText><strong>Tax:</strong> @_order.TaxAmount.ToString("C")</MudText>
+                <MudText><strong>Shipping:</strong> @_order.ShippingAmount.ToString("C")</MudText>
+                <MudDivider Class="my-2" />
+                <MudText Typo="Typo.h6"><strong>Total:</strong> @_order.OrderTotal.ToString("C")</MudText>
+            </MudPaper>
+            <MudPaper Class="pa-4 mb-3">
+                <MudText Typo="Typo.h6">Customer</MudText>
+                <MudText>@_order.CustomerFullName</MudText>
+                <MudText Typo="Typo.body2">@_order.CustomerEmail</MudText>
+                <MudText Typo="Typo.caption">Created @_order.CreatedOn.LocalDateTime</MudText>
+            </MudPaper>
+            @if (_order.ShippingAddress is { } ship)
+            {
+                <MudPaper Class="pa-4 mb-3">
+                    <MudText Typo="Typo.h6">Shipping to</MudText>
+                    <MudText>@ship.ContactName</MudText>
+                    <MudText Typo="Typo.body2">@ship.Phone</MudText>
+                    <MudText Typo="Typo.body2">@ship.AddressLine1</MudText>
+                    @if (!string.IsNullOrWhiteSpace(ship.AddressLine2))
+                    {
+                        <MudText Typo="Typo.body2">@ship.AddressLine2</MudText>
+                    }
+                    <MudText Typo="Typo.body2">@ship.City @ship.ZipCode</MudText>
+                </MudPaper>
+            }
+            @if (!string.IsNullOrWhiteSpace(_order.PaymentMethod))
+            {
+                <MudPaper Class="pa-4">
+                    <MudText Typo="Typo.h6">Payment</MudText>
+                    <MudText>@_order.PaymentMethod</MudText>
+                </MudPaper>
+            }
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public long Id { get; set; }
+
+    private AdminOrderDetail? _order;
+    private int _targetStatus;
+
+    private static readonly (int Value, string Label)[] StatusOptions =
+    {
+        (1,   "New"),
+        (10,  "On hold"),
+        (20,  "Pending payment"),
+        (30,  "Payment received"),
+        (35,  "Payment failed"),
+        (40,  "Invoiced"),
+        (50,  "Shipping"),
+        (60,  "Shipped"),
+        (70,  "Complete"),
+        (80,  "Canceled"),
+        (90,  "Refunded"),
+        (100, "Closed"),
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _order = await Orders.GetAsync(Id);
+        if (_order is null)
+        {
+            Snackbar.Add("Order not found.", Severity.Error);
+            Nav.NavigateTo("/orders");
+            return;
+        }
+        _targetStatus = _order.OrderStatus;
+    }
+
+    private async Task OnStatusChanged(int next)
+    {
+        if (_order is null || next == _order.OrderStatus) return;
+        _targetStatus = next;
+        using var resp = await Orders.UpdateStatusAsync(Id, new UpdateOrderStatusRequest(next));
+        if (!resp.IsSuccessStatusCode)
+        {
+            Snackbar.Add($"Update failed (HTTP {(int)resp.StatusCode}).", Severity.Error);
+            return;
+        }
+        _order = await Orders.GetAsync(Id);
+        Snackbar.Add("Status updated.", Severity.Success);
+    }
+
+    private static Color StatusColor(int status) => status switch
+    {
+        1 or 10 => Color.Info,
+        20 => Color.Warning,
+        30 or 40 or 50 or 60 => Color.Primary,
+        70 => Color.Success,
+        80 or 90 or 100 => Color.Default,
+        35 => Color.Error,
+        _ => Color.Default,
+    };
+
+    private static string StatusLabel(int status)
+        => StatusOptions.FirstOrDefault(s => s.Value == status).Label ?? status.ToString();
+}

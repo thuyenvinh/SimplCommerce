@@ -15,6 +15,16 @@ public static class OrdersAdminEndpoints
 {
     public record UpdateStatusRequest(OrderStatus NewStatus);
 
+    public record AdminOrderItem(long ProductId, string ProductName, int Quantity, decimal ProductPrice, decimal DiscountAmount);
+    public record AdminOrderAddress(string ContactName, string Phone, string AddressLine1, string? AddressLine2, string? City, string? ZipCode);
+    public record AdminOrderDetail(
+        long Id, DateTimeOffset CreatedOn, DateTimeOffset LatestUpdatedOn,
+        OrderStatus OrderStatus, string? PaymentMethod, decimal SubTotal, decimal DiscountAmount,
+        decimal TaxAmount, decimal ShippingAmount, decimal OrderTotal,
+        long? CustomerId, string? CustomerEmail, string? CustomerFullName,
+        AdminOrderAddress? ShippingAddress, AdminOrderAddress? BillingAddress,
+        System.Collections.Generic.IReadOnlyList<AdminOrderItem> Items);
+
     public static IEndpointRouteBuilder MapOrdersAdminEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/admin/orders")
@@ -54,9 +64,27 @@ public static class OrdersAdminEndpoints
         {
             var order = await repo.Query()
                 .Include(o => o.Customer)
+                .Include(o => o.ShippingAddress)
+                .Include(o => o.BillingAddress)
                 .Include(o => o.OrderItems).ThenInclude(i => i.Product)
                 .FirstOrDefaultAsync(o => o.Id == id);
-            return order is null ? Results.NotFound() : Results.Ok(order);
+            if (order is null) return Results.NotFound();
+
+            AdminOrderAddress? Map(Module.Orders.Models.OrderAddress? a) => a is null ? null
+                : new AdminOrderAddress(a.ContactName, a.Phone, a.AddressLine1, a.AddressLine2, a.City, a.ZipCode);
+
+            var dto = new AdminOrderDetail(
+                order.Id, order.CreatedOn, order.LatestUpdatedOn,
+                order.OrderStatus, order.PaymentMethod,
+                order.SubTotal, order.DiscountAmount, order.TaxAmount,
+                order.ShippingFeeAmount, order.OrderTotal,
+                order.CustomerId, order.Customer?.Email, order.Customer?.FullName,
+                Map(order.ShippingAddress), Map(order.BillingAddress),
+                order.OrderItems.Select(i => new AdminOrderItem(
+                    i.ProductId, i.Product?.Name ?? string.Empty,
+                    i.Quantity, i.ProductPrice, i.DiscountAmount)).ToList());
+
+            return Results.Ok(dto);
         });
 
         group.MapPatch("/{id:long}/status", async (long id, UpdateStatusRequest req, IRepository<Order> repo) =>
