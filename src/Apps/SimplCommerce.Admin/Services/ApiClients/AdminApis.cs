@@ -24,6 +24,9 @@ public interface IAdminCatalogApi
     Task<HttpResponseMessage> CreateCategoryAsync(CategoryInput input, CancellationToken ct = default);
 
     Task<ProductsPage?> ListProductsAsync(int page = 1, int pageSize = 20, string? search = null, CancellationToken ct = default);
+    Task<ProductEditDto?> GetProductAsync(long id, CancellationToken ct = default);
+    Task<HttpResponseMessage> CreateProductAsync(ProductInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> UpdateProductAsync(long id, ProductInput input, CancellationToken ct = default);
     Task<HttpResponseMessage> DeleteProductAsync(long id, CancellationToken ct = default);
 }
 
@@ -53,6 +56,15 @@ public sealed class AdminCatalogApi(HttpClient http) : IAdminCatalogApi
         if (!string.IsNullOrWhiteSpace(search)) url += $"&search={Uri.EscapeDataString(search)}";
         return http.GetFromJsonAsync<ProductsPage>(url, ct);
     }
+
+    public Task<ProductEditDto?> GetProductAsync(long id, CancellationToken ct)
+        => http.GetFromJsonAsync<ProductEditDto>($"/api/admin/catalog/products/{id}", ct);
+
+    public Task<HttpResponseMessage> CreateProductAsync(ProductInput input, CancellationToken ct) =>
+        http.PostAsJsonAsync("/api/admin/catalog/products", input, ct);
+
+    public Task<HttpResponseMessage> UpdateProductAsync(long id, ProductInput input, CancellationToken ct) =>
+        http.PutAsJsonAsync($"/api/admin/catalog/products/{id}", input, ct);
 
     public Task<HttpResponseMessage> DeleteProductAsync(long id, CancellationToken ct) =>
         http.DeleteAsync($"/api/admin/catalog/products/{id}", ct);

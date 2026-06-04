@@ -1,0 +1,187 @@
+@page "/products/create"
+@page "/products/edit/{Id:long}"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminCatalogApi Catalog
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>@(Id is null ? "New product" : $"Edit product #{Id}") — Admin</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Nav.NavigateTo("/products"))" aria-label="Back" />
+    <MudText Typo="Typo.h4">@(Id is null ? "New product" : $"Edit product #{Id}")</MudText>
+    <MudSpacer />
+    @if (Id is not null)
+    {
+        <MudButton Color="Color.Error" Variant="Variant.Outlined" OnClick="Delete">Delete</MudButton>
+    }
+</MudStack>
+
+@if (_loading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <EditForm Model="_form" OnValidSubmit="Save">
+        <DataAnnotationsValidator />
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudPaper Class="pa-4 mb-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">General</MudText>
+                    <MudTextField @bind-Value="_form.Name" Label="Name" Required="true" />
+                    <MudTextField @bind-Value="_form.Slug" Label="Slug" Required="true" HelperText="URL-friendly identifier." />
+                    <MudTextField @bind-Value="_form.Sku" Label="SKU" />
+                    <MudTextField @bind-Value="_form.ShortDescription" Label="Short description" Lines="2" />
+                    <MudTextField @bind-Value="_form.Description" Label="Description" Lines="4" />
+                    <MudTextField @bind-Value="_form.Specification" Label="Specification" Lines="4" HelperText="Free-form spec sheet / technical details." />
+                </MudPaper>
+                <MudPaper Class="pa-4 mb-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">Pricing</MudText>
+                    <MudNumericField @bind-Value="_form.Price" Label="Price" Format="F2" Min="0m" Required="true" />
+                    <MudNumericField @bind-Value="_form.OldPrice" Label="Compare-at price (optional)" Format="F2" />
+                </MudPaper>
+                <MudPaper Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">Inventory</MudText>
+                    <MudSwitch @bind-Value="_form.StockTrackingIsEnabled" Label="Track stock" Color="Color.Primary" />
+                    <MudNumericField @bind-Value="_form.StockQuantity" Label="Stock quantity" Min="0" Disabled="!_form.StockTrackingIsEnabled" />
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudPaper Class="pa-4 mb-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">Status</MudText>
+                    <MudSwitch @bind-Value="_form.IsPublished" Label="Published" Color="Color.Primary" />
+                    <MudSwitch @bind-Value="_form.IsAllowToOrder" Label="Allow to order" Color="Color.Primary" />
+                    <MudSwitch @bind-Value="_form.IsCallForPricing" Label="Call for pricing" Color="Color.Primary" />
+                    <MudSwitch @bind-Value="_form.IsFeatured" Label="Featured" Color="Color.Primary" />
+                </MudPaper>
+                <MudPaper Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">Brand</MudText>
+                    <MudSelect T="long?" @bind-Value="_form.BrandId" Label="Brand" Clearable="true">
+                        @if (_brands is not null)
+                        {
+                            @foreach (var b in _brands)
+                            {
+                                <MudSelectItem T="long?" Value="@((long?)b.Id)">@b.Name</MudSelectItem>
+                            }
+                        }
+                    </MudSelect>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12">
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                           Disabled="_saving">
+                    @(_saving ? "Saving…" : "Save")
+                </MudButton>
+                <MudButton OnClick="@(() => Nav.NavigateTo("/products"))" Class="ml-2">Cancel</MudButton>
+            </MudItem>
+        </MudGrid>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public long? Id { get; set; }
+
+    private FormModel _form = new();
+    private IReadOnlyList<BrandItem>? _brands;
+    private bool _loading = true;
+    private bool _saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _brands = await Catalog.ListBrandsAsync();
+        if (Id is { } id)
+        {
+            var dto = await Catalog.GetProductAsync(id);
+            if (dto is null)
+            {
+                Snackbar.Add("Product not found.", Severity.Error);
+                Nav.NavigateTo("/products");
+                return;
+            }
+            _form = FromDto(dto);
+        }
+        _loading = false;
+    }
+
+    private async Task Save()
+    {
+        _saving = true;
+        try
+        {
+            var input = _form.ToInput();
+            HttpResponseMessage resp;
+            if (Id is { } id)
+            {
+                resp = await Catalog.UpdateProductAsync(id, input);
+            }
+            else
+            {
+                resp = await Catalog.CreateProductAsync(input);
+            }
+            using (resp)
+            {
+                if (!resp.IsSuccessStatusCode)
+                {
+                    Snackbar.Add($"Save failed (HTTP {(int)resp.StatusCode}).", Severity.Error);
+                    return;
+                }
+            }
+            Snackbar.Add(Id is null ? "Product created." : "Product saved.", Severity.Success);
+            Nav.NavigateTo("/products");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task Delete()
+    {
+        if (Id is not { } id) return;
+        using var resp = await Catalog.DeleteProductAsync(id);
+        if (!resp.IsSuccessStatusCode)
+        {
+            Snackbar.Add($"Delete failed (HTTP {(int)resp.StatusCode}).", Severity.Error);
+            return;
+        }
+        Snackbar.Add("Product deleted.", Severity.Success);
+        Nav.NavigateTo("/products");
+    }
+
+    private static FormModel FromDto(ProductEditDto d) => new()
+    {
+        Name = d.Name, Slug = d.Slug, Sku = d.Sku,
+        Price = d.Price, OldPrice = d.OldPrice,
+        ShortDescription = d.ShortDescription, Description = d.Description, Specification = d.Specification,
+        IsPublished = d.IsPublished, IsAllowToOrder = d.IsAllowToOrder,
+        IsCallForPricing = d.IsCallForPricing, IsFeatured = d.IsFeatured,
+        StockTrackingIsEnabled = d.StockTrackingIsEnabled, StockQuantity = d.StockQuantity,
+        BrandId = d.BrandId,
+    };
+
+    private class FormModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Slug { get; set; } = string.Empty;
+        public string? Sku { get; set; }
+        public decimal Price { get; set; }
+        public decimal? OldPrice { get; set; }
+        public string? ShortDescription { get; set; }
+        public string? Description { get; set; }
+        public string? Specification { get; set; }
+        public bool IsPublished { get; set; } = true;
+        public bool IsAllowToOrder { get; set; } = true;
+        public bool IsCallForPricing { get; set; }
+        public bool IsFeatured { get; set; }
+        public bool StockTrackingIsEnabled { get; set; }
+        public int StockQuantity { get; set; }
+        public long? BrandId { get; set; }
+
+        public ProductInput ToInput() => new(
+            Name, Slug, Sku, Price, OldPrice,
+            ShortDescription, Description, Specification,
+            IsPublished, IsAllowToOrder, IsCallForPricing, IsFeatured,
+            StockTrackingIsEnabled, StockQuantity, BrandId);
+    }
+}

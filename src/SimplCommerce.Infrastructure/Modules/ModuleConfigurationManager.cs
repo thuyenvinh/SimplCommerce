@@ -39,6 +39,7 @@ namespace SimplCommerce.Infrastructure.Modules
             Bundled("SimplCommerce.Module.PaymentMomo"),
             Bundled("SimplCommerce.Module.PaymentNganLuong"),
             Bundled("SimplCommerce.Module.PaymentCashfree"),
+            Bundled("SimplCommerce.Module.PaymentVnpay"),
             Bundled("SimplCommerce.Module.Pricing"),
             Bundled("SimplCommerce.Module.ProductComparison"),
             Bundled("SimplCommerce.Module.ProductRecentlyViewed"),

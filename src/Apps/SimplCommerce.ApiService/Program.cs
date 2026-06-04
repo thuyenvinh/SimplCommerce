@@ -57,6 +57,7 @@ using SimplCommerce.Module.PaymentNganLuong;
 using SimplCommerce.Module.PaymentPaypalExpress;
 using SimplCommerce.Module.Payments;
 using SimplCommerce.Module.PaymentStripe;
+using SimplCommerce.Module.PaymentVnpay;
 using SimplCommerce.Module.Pricing;
 using SimplCommerce.Module.ProductComparison;
 using SimplCommerce.Module.ProductRecentlyViewed;
@@ -265,6 +266,7 @@ builder.Services
     .AddPaymentNganLuongModule()
     .AddPaymentPaypalExpressModule()
     .AddPaymentStripeModule()
+    .AddPaymentVnpayModule()
     .AddCommentsModule()
     .AddSampleDataModule()
     .AddEmailSenderSmtpModule()
@@ -319,6 +321,7 @@ app.MapSignalRModule();
 app.MapAuthEndpoints();
 app.MapMediaEndpoints();
 app.MapPaymentWebhookEndpoints();
+app.MapVnpayEndpoints();
 // Storefront
 app.MapCoreStorefrontEndpoints();
 app.MapCatalogStorefrontEndpoints();

@@ -270,7 +270,7 @@ Storefront endpoint groups đã tạo (9 groups):
 - [x] P3-53 | `POST /api/webhooks/stripe` — stub trả `202 Accepted`, signature verify TODO
 - [x] P3-54 | `POST /api/webhooks/paypal` — stub tương tự
 - [x] P3-55 | `POST /api/webhooks/momo` — stub tương tự
-- [-] P3-56 | `POST /api/webhooks/vnpay` — **SKIP** — module PaymentVnpay không tồn tại trong codebase (xem DECISION-007); thêm khi có VNPay module
+- [x] P3-56 | **VNPay module added** — new `src/Modules/SimplCommerce.Module.PaymentVnpay/` with `VnpaySignature` (HMAC-SHA512 over sorted vnp_* params, skips vnp_SecureHash/Type), `POST /api/payments/vnpay/start` (returns redirect URL), `GET /api/payments/vnpay/return` (browser-side after pay → creates order on resultCode=00), `GET /api/payments/vnpay/ipn` (S2S callback → canonical `{RspCode,Message}` body). 7 unit tests cover signature build/verify/tamper/missing/sort-invariance, plus FormatAmount in hundredths.
 - [x] P3-57 | Webhook signature verification implemented for Stripe (HMAC-SHA256 over `t=.&lt;body&gt;`, 5-min tolerance, rotating `v1=` list), MoMo (ordered-field HMAC-SHA256 per v3 spec), PayPal v2 (REST roundtrip to `/v1/notifications/verify-webhook-signature` with OAuth basic → bearer flow). `WebhookSignatureVerifier` pure-HMAC impls unit-tested with 11 canonical vectors (rotation, tampered body, replay window, malformed JSON, missing config). Endpoints return 401 on bad sig, 503 when not configured, 202 on verified. PayPal uses HttpClient behind `IPayPalWebhookVerifier` so integration tests can stub
 
 ### 3.8 Test integration — scaffold only
@@ -394,7 +394,7 @@ Storefront endpoint groups đã tạo (9 groups):
 
 **5.4.2 Catalog**
 - [x] P5-18 | `/products` list (DataGrid: id, name, sku, price, stock, published, delete action) + search + paging
-- [~] P5-19 | `/products/create` + `/products/edit/{id}` tabbed editor — **deferred follow-up**; backend POST/PUT endpoints need full product shape (media/attributes/variants) — sub-PR after backend surface solidifies
+- [x] P5-19 | `/products/create` + `/products/edit/{id}` live with backend `POST/PUT /api/admin/catalog/products` + `GET /api/admin/catalog/products/{id}` projected to `ProductEditDto`. Form covers general + pricing + inventory + status switches + brand select. Media/attributes/variants tabs are follow-up sub-PRs — endpoints/UI for those are deliberately separate (attribute editor + media picker are big components on their own)
 - [x] P5-20 | `/categories` list + add (flat form; tree view + drag-drop is follow-up)
 - [x] P5-21 | `/brands` list + add + delete
 - [ ] P5-22..P5-24 | options / attributes / product-templates — **deferred**; endpoints exist for some, UI is sub-PR

@@ -15,6 +15,22 @@ public record ProductListItem(long Id, string Name, string Slug, string? Sku, de
     int StockQuantity, bool IsPublished, bool IsAllowToOrder, DateTimeOffset CreatedOn);
 public record ProductsPage(int Total, int Page, int PageSize, IReadOnlyList<ProductListItem> Items);
 
+public record ProductInput(
+    string Name, string Slug, string? Sku,
+    decimal Price, decimal? OldPrice,
+    string? ShortDescription, string? Description, string? Specification,
+    bool IsPublished, bool IsAllowToOrder, bool IsCallForPricing, bool IsFeatured,
+    bool StockTrackingIsEnabled, int StockQuantity,
+    long? BrandId);
+
+public record ProductEditDto(
+    long Id, string Name, string Slug, string? Sku,
+    decimal Price, decimal? OldPrice,
+    string? ShortDescription, string? Description, string? Specification,
+    bool IsPublished, bool IsAllowToOrder, bool IsCallForPricing, bool IsFeatured,
+    bool StockTrackingIsEnabled, int StockQuantity,
+    long? BrandId, IReadOnlyList<long> CategoryIds);
+
 // --- Orders admin ---
 public record AdminCustomerSummary(long Id, string? FullName, string? Email);
 public record AdminOrderListItem(long Id, DateTimeOffset CreatedOn, decimal OrderTotal, int OrderStatus, AdminCustomerSummary Customer);

@@ -22,6 +22,22 @@ public static class CatalogAdminEndpoints
     public record BrandInput(string Name, string Slug, bool IsPublished);
     public record CategoryInput(string Name, string Slug, long? ParentId, int DisplayOrder, string? Description);
 
+    public record ProductInput(
+        string Name, string Slug, string? Sku,
+        decimal Price, decimal? OldPrice,
+        string? ShortDescription, string? Description, string? Specification,
+        bool IsPublished, bool IsAllowToOrder, bool IsCallForPricing, bool IsFeatured,
+        bool StockTrackingIsEnabled, int StockQuantity,
+        long? BrandId);
+
+    public record ProductEditDto(
+        long Id, string Name, string Slug, string? Sku,
+        decimal Price, decimal? OldPrice,
+        string? ShortDescription, string? Description, string? Specification,
+        bool IsPublished, bool IsAllowToOrder, bool IsCallForPricing, bool IsFeatured,
+        bool StockTrackingIsEnabled, int StockQuantity,
+        long? BrandId, System.Collections.Generic.IReadOnlyList<long> CategoryIds);
+
     public static IEndpointRouteBuilder MapCatalogAdminEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/admin/catalog")
@@ -139,7 +155,69 @@ public static class CatalogAdminEndpoints
             var product = await repo.Query()
                 .Include(p => p.Categories)
                 .FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
-            return product is null ? Results.NotFound() : Results.Ok(product);
+            if (product is null) return Results.NotFound();
+            var dto = new ProductEditDto(
+                product.Id, product.Name, product.Slug, product.Sku,
+                product.Price, product.OldPrice,
+                product.ShortDescription, product.Description, product.Specification,
+                product.IsPublished, product.IsAllowToOrder, product.IsCallForPricing, product.IsFeatured,
+                product.StockTrackingIsEnabled, product.StockQuantity,
+                product.BrandId,
+                product.Categories.Select(c => c.CategoryId).ToList());
+            return Results.Ok(dto);
+        });
+
+        group.MapPost("/products", async (ProductInput input, IRepository<Product> repo) =>
+        {
+            if (string.IsNullOrWhiteSpace(input.Name) || string.IsNullOrWhiteSpace(input.Slug))
+            {
+                return Results.BadRequest(new { error = "Name and slug are required." });
+            }
+            var product = new Product
+            {
+                Name = input.Name, Slug = input.Slug, Sku = input.Sku,
+                Price = input.Price, OldPrice = input.OldPrice,
+                ShortDescription = input.ShortDescription,
+                Description = input.Description,
+                Specification = input.Specification,
+                IsPublished = input.IsPublished,
+                IsAllowToOrder = input.IsAllowToOrder,
+                IsCallForPricing = input.IsCallForPricing,
+                IsFeatured = input.IsFeatured,
+                StockTrackingIsEnabled = input.StockTrackingIsEnabled,
+                StockQuantity = input.StockQuantity,
+                BrandId = input.BrandId,
+                IsVisibleIndividually = true,
+            };
+            repo.Add(product);
+            await repo.SaveChangesAsync();
+            return Results.Created($"/api/admin/catalog/products/{product.Id}", new { product.Id });
+        });
+
+        group.MapPut("/products/{id:long}", async (long id, ProductInput input, IRepository<Product> repo) =>
+        {
+            var product = await repo.Query().FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
+            if (product is null) return Results.NotFound();
+
+            product.Name = input.Name;
+            product.Slug = input.Slug;
+            product.Sku = input.Sku;
+            product.Price = input.Price;
+            product.OldPrice = input.OldPrice;
+            product.ShortDescription = input.ShortDescription;
+            product.Description = input.Description;
+            product.Specification = input.Specification;
+            product.IsPublished = input.IsPublished;
+            product.IsAllowToOrder = input.IsAllowToOrder;
+            product.IsCallForPricing = input.IsCallForPricing;
+            product.IsFeatured = input.IsFeatured;
+            product.StockTrackingIsEnabled = input.StockTrackingIsEnabled;
+            product.StockQuantity = input.StockQuantity;
+            product.BrandId = input.BrandId;
+            product.LatestUpdatedOn = System.DateTimeOffset.UtcNow;
+
+            await repo.SaveChangesAsync();
+            return Results.NoContent();
         });
 
         group.MapDelete("/products/{id:long}", async (long id, IRepository<Product> repo) =>
