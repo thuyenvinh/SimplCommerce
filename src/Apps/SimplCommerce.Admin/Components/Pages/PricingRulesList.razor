@@ -1,23 +1,35 @@
 @page "/pricing"
 @rendermode RenderMode.InteractiveServer
 @inject IAdminPricingApi Pricing
+@inject NavigationManager Nav
+@inject ISnackbar Snack
 
 <PageTitle>Pricing rules — Admin</PageTitle>
 <MudText Typo="Typo.h4" Class="mb-4">Pricing rules</MudText>
 
 <MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
     <MudTabPanel Text="Cart rules">
+        <MudStack Row="true" Class="mb-3">
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/pricing/cart-rules/create">New rule</MudButton>
+        </MudStack>
         @if (_cartRules is null) { <MudProgressCircular Indeterminate="true" /> }
+        else if (_cartRules.Count == 0) { <MudAlert Severity="Severity.Info">No cart rules yet.</MudAlert> }
         else
         {
-            <MudTable T="AdminCartRuleItem" Items="_cartRules" Hover="true" Dense="true">
-                <HeaderContent><MudTh>ID</MudTh><MudTh>Name</MudTh><MudTh>Window</MudTh><MudTh>Usage cap</MudTh><MudTh>Active</MudTh></HeaderContent>
+            <MudTable T="AdminCartRuleItem" Items="_cartRules" Hover="true" Dense="true"
+                      OnRowClick="@((TableRowClickEventArgs<AdminCartRuleItem> e) => Nav.NavigateTo($"/pricing/cart-rules/edit/{e.Item!.Id}"))">
+                <HeaderContent><MudTh>ID</MudTh><MudTh>Name</MudTh><MudTh>Window</MudTh><MudTh>Usage cap</MudTh><MudTh>Active</MudTh><MudTh>Actions</MudTh></HeaderContent>
                 <RowTemplate>
                     <MudTd>@context.Id</MudTd>
                     <MudTd>@context.Name</MudTd>
                     <MudTd>@context.StartOn?.ToString("d") — @context.EndOn?.ToString("d")</MudTd>
                     <MudTd>@context.UsageLimitPerCoupon</MudTd>
                     <MudTd>@(context.IsActive ? "✓" : "—")</MudTd>
+                    <MudTd @onclick:stopPropagation="true">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                       OnClick="@(() => DeleteCartRule(context.Id))" aria-label="Delete" />
+                    </MudTd>
                 </RowTemplate>
             </MudTable>
         }
@@ -38,15 +50,33 @@
         }
     </MudTabPanel>
     <MudTabPanel Text="Coupons">
+        <MudStack Row="true" Class="mb-3" AlignItems="AlignItems.End">
+            <MudSelect T="long" @bind-Value="_newCoupon.CartRuleId" Label="Cart rule" Style="min-width:240px">
+                @if (_cartRules is not null)
+                {
+                    @foreach (var r in _cartRules)
+                    {
+                        <MudSelectItem T="long" Value="@r.Id">#@r.Id @r.Name</MudSelectItem>
+                    }
+                }
+            </MudSelect>
+            <MudTextField @bind-Value="_newCoupon.Code" Label="Code" />
+            <MudButton OnClick="CreateCoupon" Variant="Variant.Filled" Color="Color.Primary">Add coupon</MudButton>
+        </MudStack>
         @if (_coupons is null) { <MudProgressCircular Indeterminate="true" /> }
+        else if (_coupons.Count == 0) { <MudAlert Severity="Severity.Info">No coupons yet.</MudAlert> }
         else
         {
             <MudTable T="AdminCouponItem" Items="_coupons" Hover="true" Dense="true">
-                <HeaderContent><MudTh>ID</MudTh><MudTh>Code</MudTh><MudTh>Cart rule</MudTh></HeaderContent>
+                <HeaderContent><MudTh>ID</MudTh><MudTh>Code</MudTh><MudTh>Cart rule</MudTh><MudTh>Actions</MudTh></HeaderContent>
                 <RowTemplate>
                     <MudTd>@context.Id</MudTd>
                     <MudTd>@context.Code</MudTd>
-                    <MudTd>@context.CartRuleId</MudTd>
+                    <MudTd>#@context.CartRuleId</MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                       OnClick="@(() => DeleteCoupon(context.Id))" aria-label="Delete" />
+                    </MudTd>
                 </RowTemplate>
             </MudTable>
         }
@@ -57,8 +87,11 @@
     private IReadOnlyList<AdminCartRuleItem>? _cartRules;
     private IReadOnlyList<AdminCatalogRuleItem>? _catalogRules;
     private IReadOnlyList<AdminCouponItem>? _coupons;
+    private NewCouponForm _newCoupon = new();
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync() => await ReloadAll();
+
+    private async Task ReloadAll()
     {
         var a = Pricing.ListCartRulesAsync();
         var b = Pricing.ListCatalogRulesAsync();
@@ -67,5 +100,43 @@
         _cartRules = a.Result;
         _catalogRules = b.Result;
         _coupons = c.Result;
+        StateHasChanged();
+    }
+
+    private async Task DeleteCartRule(long id)
+    {
+        using var resp = await Pricing.DeleteCartRuleAsync(id);
+        if (resp.IsSuccessStatusCode) { Snack.Add("Cart rule deleted.", Severity.Success); await ReloadAll(); }
+        else { Snack.Add($"Delete failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    private async Task CreateCoupon()
+    {
+        if (string.IsNullOrWhiteSpace(_newCoupon.Code) || _newCoupon.CartRuleId == 0)
+        {
+            Snack.Add("Pick a cart rule and a code.", Severity.Warning);
+            return;
+        }
+        using var resp = await Pricing.CreateCouponAsync(new AdminCouponInput(_newCoupon.CartRuleId, _newCoupon.Code));
+        if (resp.IsSuccessStatusCode)
+        {
+            _newCoupon = new();
+            await ReloadAll();
+            Snack.Add("Coupon created.", Severity.Success);
+        }
+        else { Snack.Add($"Create failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    private async Task DeleteCoupon(long id)
+    {
+        using var resp = await Pricing.DeleteCouponAsync(id);
+        if (resp.IsSuccessStatusCode) { await ReloadAll(); }
+        else { Snack.Add("Delete failed.", Severity.Error); }
+    }
+
+    private class NewCouponForm
+    {
+        public long CartRuleId { get; set; }
+        public string Code { get; set; } = string.Empty;
     }
 }

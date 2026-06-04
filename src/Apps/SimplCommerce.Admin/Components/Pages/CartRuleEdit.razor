@@ -1,0 +1,136 @@
+@page "/pricing/cart-rules/create"
+@page "/pricing/cart-rules/edit/{Id:long}"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminPricingApi Pricing
+@inject NavigationManager Nav
+@inject ISnackbar Snack
+
+<PageTitle>@(Id is null ? "New cart rule" : $"Edit cart rule #{Id}")</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Nav.NavigateTo("/pricing"))" aria-label="Back" />
+    <MudText Typo="Typo.h4">@(Id is null ? "New cart rule" : $"Edit cart rule #{Id}")</MudText>
+</MudStack>
+
+@if (_loading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <EditForm Model="_form" OnValidSubmit="Save">
+        <DataAnnotationsValidator />
+        <MudGrid>
+            <MudItem xs="12" md="7">
+                <MudPaper Class="pa-4 mb-3">
+                    <MudText Typo="Typo.h6" Class="mb-2">Basics</MudText>
+                    <MudTextField @bind-Value="_form.Name" Label="Name" Required="true" />
+                    <MudTextField @bind-Value="_form.Description" Label="Description" Lines="3" />
+                    <MudSwitch @bind-Value="_form.IsActive" Label="Active" Color="Color.Primary" />
+                </MudPaper>
+                <MudPaper Class="pa-4 mb-3">
+                    <MudText Typo="Typo.h6" Class="mb-2">Discount</MudText>
+                    <MudSelect T="string" @bind-Value="_form.RuleToApply" Label="Rule type" Variant="Variant.Outlined">
+                        <MudSelectItem T="string" Value="@("by_percentage")">By percentage</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("by_fixed_amount")">By fixed amount</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("for_cart_total")">For cart total</MudSelectItem>
+                    </MudSelect>
+                    <MudNumericField @bind-Value="_form.DiscountAmount" Label="Discount amount" Format="F2" />
+                    <MudNumericField @bind-Value="_form.MaxDiscountAmount" Label="Max discount (optional)" Format="F2" />
+                </MudPaper>
+                <MudPaper Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-2">Coupon</MudText>
+                    <MudSwitch @bind-Value="_form.IsCouponRequired" Label="Coupon required" Color="Color.Primary" />
+                    <MudNumericField @bind-Value="_form.UsageLimitPerCoupon" Label="Usage limit per coupon" />
+                    <MudNumericField @bind-Value="_form.UsageLimitPerCustomer" Label="Usage limit per customer" />
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="5">
+                <MudPaper Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-2">Window</MudText>
+                    <MudDatePicker @bind-Date="_form.StartOnDate" Label="Start on" Editable="true" />
+                    <MudDatePicker @bind-Date="_form.EndOnDate" Label="End on" Editable="true" />
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12">
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                           Disabled="_saving">@(_saving ? "Saving…" : "Save")</MudButton>
+                <MudButton OnClick="@(() => Nav.NavigateTo("/pricing"))" Class="ml-2">Cancel</MudButton>
+            </MudItem>
+        </MudGrid>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public long? Id { get; set; }
+
+    private FormModel _form = new();
+    private bool _loading = true;
+    private bool _saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Id is { } id)
+        {
+            var dto = await Pricing.GetCartRuleAsync(id);
+            if (dto is null)
+            {
+                Snack.Add("Cart rule not found.", Severity.Error);
+                Nav.NavigateTo("/pricing");
+                return;
+            }
+            _form = new FormModel
+            {
+                Name = dto.Name, Description = dto.Description, IsActive = dto.IsActive,
+                StartOnDate = dto.StartOn?.LocalDateTime, EndOnDate = dto.EndOn?.LocalDateTime,
+                IsCouponRequired = dto.IsCouponRequired, RuleToApply = dto.RuleToApply,
+                DiscountAmount = dto.DiscountAmount, MaxDiscountAmount = dto.MaxDiscountAmount,
+                UsageLimitPerCoupon = dto.UsageLimitPerCoupon, UsageLimitPerCustomer = dto.UsageLimitPerCustomer,
+            };
+        }
+        _loading = false;
+    }
+
+    private async Task Save()
+    {
+        _saving = true;
+        try
+        {
+            var input = new AdminCartRuleInput(
+                _form.Name, _form.Description, _form.IsActive,
+                _form.StartOnDate.HasValue ? new DateTimeOffset(_form.StartOnDate.Value) : null,
+                _form.EndOnDate.HasValue ? new DateTimeOffset(_form.EndOnDate.Value) : null,
+                _form.IsCouponRequired, _form.RuleToApply, _form.DiscountAmount, _form.MaxDiscountAmount,
+                _form.UsageLimitPerCoupon, _form.UsageLimitPerCustomer);
+            using var resp = Id is { } id
+                ? await Pricing.UpdateCartRuleAsync(id, input)
+                : await Pricing.CreateCartRuleAsync(input);
+            if (!resp.IsSuccessStatusCode)
+            {
+                Snack.Add($"Save failed (HTTP {(int)resp.StatusCode}).", Severity.Error);
+                return;
+            }
+            Snack.Add(Id is null ? "Cart rule created." : "Cart rule saved.", Severity.Success);
+            Nav.NavigateTo("/pricing");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private class FormModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public bool IsActive { get; set; } = true;
+        public DateTime? StartOnDate { get; set; }
+        public DateTime? EndOnDate { get; set; }
+        public bool IsCouponRequired { get; set; }
+        public string RuleToApply { get; set; } = "by_percentage";
+        public decimal DiscountAmount { get; set; }
+        public decimal? MaxDiscountAmount { get; set; }
+        public int? UsageLimitPerCoupon { get; set; }
+        public int? UsageLimitPerCustomer { get; set; }
+    }
+}

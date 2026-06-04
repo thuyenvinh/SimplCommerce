@@ -424,7 +424,7 @@ Storefront endpoint groups đã tạo (9 groups):
 - [x] P5-42..P5-43 | **Stock adjustments + history** live: `POST /api/admin/inventory/stock-adjustments` increments/decrements stock and writes a StockHistory row attributed to the current admin, `GET /stock-history` returns paginated history with product/warehouse names. `/inventory/stock-adjustments` page splits into "New adjustment" form + recent history table
 
 **5.4.8 Pricing & Promotions**
-- [x] P5-44 + P5-45 + P5-46 | `/pricing` — tabbed view (cart rules / catalog rules / coupons) GET list for each. CRUD forms are follow-up.
+- [x] P5-44 + P5-45 + P5-46 | `/pricing` — tabbed view (cart rules / catalog rules / coupons). **Cart-rule CRUD live** (`/pricing/cart-rules/create` + `/edit/{id}` with discount type, window, usage caps). **Coupon create + delete inline** on the Coupons tab. Catalog rules still list-only (form pending — needs richer condition editor)
 
 **5.4.9 Shipping & Tax**
 - [x] P5-47 | `/shipping-providers` — list providers (GET); config form is follow-up
@@ -437,7 +437,7 @@ Storefront endpoint groups đã tạo (9 groups):
 
 **5.4.11 Vendors**
 - [x] P5-53 | `/vendors` — list + inline create
-- [ ] P5-54 | `/vendors/{id}/products` — deferred (backend endpoint pending)
+- [x] P5-54 | **Vendors detail/edit/delete live** (`/vendors`, `/vendors/create`, `/vendors/edit/{id}`). Backend GET /{id} + PUT + DELETE added with `VendorDetail/VendorInput` records, fields: Name/Slug/Email/Description/IsActive. Vendor-specific product list endpoint still follow-up
 
 **5.4.12 Localization**
 - [ ] P5-55..P5-56 | Languages + translations — deferred (translation editor UI is complex sub-PR)

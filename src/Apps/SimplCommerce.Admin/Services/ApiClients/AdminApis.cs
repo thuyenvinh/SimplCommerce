@@ -178,7 +178,10 @@ public sealed class AdminActivityApi(HttpClient http) : IAdminActivityApi
 public interface IAdminVendorsApi
 {
     Task<IReadOnlyList<AdminVendorItem>?> ListAsync(CancellationToken ct = default);
+    Task<AdminVendorDetail?> GetAsync(long id, CancellationToken ct = default);
     Task<HttpResponseMessage> CreateAsync(AdminVendorInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> UpdateAsync(long id, AdminVendorInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> DeleteAsync(long id, CancellationToken ct = default);
 }
 
 public sealed class AdminVendorsApi(HttpClient http) : IAdminVendorsApi
@@ -186,8 +189,17 @@ public sealed class AdminVendorsApi(HttpClient http) : IAdminVendorsApi
     public async Task<IReadOnlyList<AdminVendorItem>?> ListAsync(CancellationToken ct) =>
         await http.GetFromJsonAsync<List<AdminVendorItem>>("/api/admin/vendors/", ct);
 
+    public Task<AdminVendorDetail?> GetAsync(long id, CancellationToken ct) =>
+        http.GetFromJsonAsync<AdminVendorDetail>($"/api/admin/vendors/{id}", ct);
+
     public Task<HttpResponseMessage> CreateAsync(AdminVendorInput input, CancellationToken ct) =>
         http.PostAsJsonAsync("/api/admin/vendors/", input, ct);
+
+    public Task<HttpResponseMessage> UpdateAsync(long id, AdminVendorInput input, CancellationToken ct) =>
+        http.PutAsJsonAsync($"/api/admin/vendors/{id}", input, ct);
+
+    public Task<HttpResponseMessage> DeleteAsync(long id, CancellationToken ct) =>
+        http.DeleteAsync($"/api/admin/vendors/{id}", ct);
 }
 
 public interface IAdminTaxApi
@@ -242,8 +254,16 @@ public sealed class AdminPaymentsApi(HttpClient http) : IAdminPaymentsApi
 public interface IAdminPricingApi
 {
     Task<IReadOnlyList<AdminCartRuleItem>?> ListCartRulesAsync(CancellationToken ct = default);
+    Task<AdminCartRuleDetail?> GetCartRuleAsync(long id, CancellationToken ct = default);
+    Task<HttpResponseMessage> CreateCartRuleAsync(AdminCartRuleInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> UpdateCartRuleAsync(long id, AdminCartRuleInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> DeleteCartRuleAsync(long id, CancellationToken ct = default);
+
     Task<IReadOnlyList<AdminCatalogRuleItem>?> ListCatalogRulesAsync(CancellationToken ct = default);
+
     Task<IReadOnlyList<AdminCouponItem>?> ListCouponsAsync(CancellationToken ct = default);
+    Task<HttpResponseMessage> CreateCouponAsync(AdminCouponInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> DeleteCouponAsync(long id, CancellationToken ct = default);
 }
 
 public sealed class AdminPricingApi(HttpClient http) : IAdminPricingApi
@@ -251,11 +271,29 @@ public sealed class AdminPricingApi(HttpClient http) : IAdminPricingApi
     public async Task<IReadOnlyList<AdminCartRuleItem>?> ListCartRulesAsync(CancellationToken ct) =>
         await http.GetFromJsonAsync<List<AdminCartRuleItem>>("/api/admin/pricing/cart-rules", ct);
 
+    public Task<AdminCartRuleDetail?> GetCartRuleAsync(long id, CancellationToken ct) =>
+        http.GetFromJsonAsync<AdminCartRuleDetail>($"/api/admin/pricing/cart-rules/{id}", ct);
+
+    public Task<HttpResponseMessage> CreateCartRuleAsync(AdminCartRuleInput input, CancellationToken ct) =>
+        http.PostAsJsonAsync("/api/admin/pricing/cart-rules", input, ct);
+
+    public Task<HttpResponseMessage> UpdateCartRuleAsync(long id, AdminCartRuleInput input, CancellationToken ct) =>
+        http.PutAsJsonAsync($"/api/admin/pricing/cart-rules/{id}", input, ct);
+
+    public Task<HttpResponseMessage> DeleteCartRuleAsync(long id, CancellationToken ct) =>
+        http.DeleteAsync($"/api/admin/pricing/cart-rules/{id}", ct);
+
     public async Task<IReadOnlyList<AdminCatalogRuleItem>?> ListCatalogRulesAsync(CancellationToken ct) =>
         await http.GetFromJsonAsync<List<AdminCatalogRuleItem>>("/api/admin/pricing/catalog-rules", ct);
 
     public async Task<IReadOnlyList<AdminCouponItem>?> ListCouponsAsync(CancellationToken ct) =>
         await http.GetFromJsonAsync<List<AdminCouponItem>>("/api/admin/pricing/coupons", ct);
+
+    public Task<HttpResponseMessage> CreateCouponAsync(AdminCouponInput input, CancellationToken ct) =>
+        http.PostAsJsonAsync("/api/admin/pricing/coupons", input, ct);
+
+    public Task<HttpResponseMessage> DeleteCouponAsync(long id, CancellationToken ct) =>
+        http.DeleteAsync($"/api/admin/pricing/coupons/{id}", ct);
 }
 
 public interface IAdminCmsApi

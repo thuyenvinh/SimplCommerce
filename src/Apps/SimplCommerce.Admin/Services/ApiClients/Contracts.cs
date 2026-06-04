@@ -67,8 +67,9 @@ public record AdminActivityItem(long Id, long ActivityTypeId, long UserId, long 
 public record AdminActivityPage(int Total, int Page, int PageSize, IReadOnlyList<AdminActivityItem> Items);
 
 // --- Vendors admin ---
-public record AdminVendorItem(long Id, string Name, string Slug, string? Description);
-public record AdminVendorInput(string Name, string Slug, string? Description);
+public record AdminVendorItem(long Id, string Name, string Slug, string? Description, bool IsActive);
+public record AdminVendorDetail(long Id, string Name, string Slug, string? Description, string? Email, bool IsActive, DateTimeOffset CreatedOn);
+public record AdminVendorInput(string Name, string Slug, string? Description, string? Email, bool IsActive);
 
 // --- Tax admin ---
 public record AdminTaxClassItem(long Id, string Name);
@@ -101,5 +102,14 @@ public record AdminContactStatusInput(int Status);
 
 // --- Pricing admin ---
 public record AdminCartRuleItem(long Id, string Name, DateTimeOffset? StartOn, DateTimeOffset? EndOn, int? UsageLimitPerCoupon, bool IsActive);
+public record AdminCartRuleDetail(long Id, string Name, string? Description, bool IsActive,
+    DateTimeOffset? StartOn, DateTimeOffset? EndOn, bool IsCouponRequired,
+    string RuleToApply, decimal DiscountAmount, decimal? MaxDiscountAmount,
+    int? UsageLimitPerCoupon, int? UsageLimitPerCustomer);
+public record AdminCartRuleInput(string Name, string? Description, bool IsActive,
+    DateTimeOffset? StartOn, DateTimeOffset? EndOn, bool IsCouponRequired,
+    string RuleToApply, decimal DiscountAmount, decimal? MaxDiscountAmount,
+    int? UsageLimitPerCoupon, int? UsageLimitPerCustomer);
 public record AdminCatalogRuleItem(long Id, string Name, DateTimeOffset? StartOn, DateTimeOffset? EndOn, bool IsActive);
 public record AdminCouponItem(long Id, string Code, long CartRuleId);
+public record AdminCouponInput(long CartRuleId, string Code);
