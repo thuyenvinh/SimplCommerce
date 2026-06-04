@@ -345,6 +345,7 @@ app.MapPricingAdminEndpoints();
 app.MapCmsAdminEndpoints();
 app.MapCommentsAdminEndpoints();
 app.MapContactsAdminEndpoints();
+app.MapNewsAdminEndpoints();
 app.MapShippingAdminEndpoints();
 app.MapTaxAdminEndpoints();
 app.MapPaymentsAdminEndpoints();

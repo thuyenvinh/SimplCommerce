@@ -407,12 +407,13 @@ Storefront endpoint groups đã tạo (9 groups):
 **5.4.4 Customers**
 - [~] P5-30..P5-31 | `/customers/*` — the list IS surfaced as `/users` (Core admin endpoint returns Identity users). Customer/vendor role split + detail page deferred
 - [x] P5-33 | `/users` — page list with paging + search (existing AdminUserListItem DTO)
-- [ ] P5-32 | customer-groups — deferred
+- [x] P5-32 | **Customer groups CRUD** live at `/customer-groups`. Backend `GET /api/admin/core/customer-groups` + `POST/PUT/DELETE` added; inline add row + per-row Save/Delete in the admin grid
 - [ ] role permission matrix — deferred
 
 **5.4.5 Content / CMS / News**
 - [~] P5-34 | **CMS pages** live: list (`/cms/pages`) + create/edit (`/cms/pages/{create,edit/{id}}`). Backend GET/POST/PUT/DELETE wired with `AdminCmsPageInput`/`AdminCmsPageDetail` DTO, `IAdminCmsApi` typed client. Menus/widgets/news/media still follow-up
 - [~] P5-35..P5-39 | menus / widgets / media library / block editor — **deferred** per-feature sub-PRs
+- [x] **News admin** | `/news/items` list + `/news/items/create` + `/news/items/edit/{id}` (Name/Slug/ShortContent/FullContent/IsPublished). Backend `GET/POST/PUT/DELETE /api/admin/news/items` + `GET /{id}` + categories CRUD. Pagination on list page
 - [x] **Comments moderation admin** | `/comments` page + backend `GET /api/admin/comments` (paginated, status filter) + `PATCH /{id}/status` + `DELETE /{id}`. Inline Approve / Reject / Delete buttons, status chip per row
 - [x] **Contacts inbox admin** | `/contacts` page + backend `GET /api/admin/contacts` (paginated, open/handled filter), `GET /{id}`, `PATCH /{id}/status`. Mark-handled toggle, mailto reply action
 
@@ -443,7 +444,7 @@ Storefront endpoint groups đã tạo (9 groups):
 - [ ] P5-55..P5-56 | Languages + translations — deferred (translation editor UI is complex sub-PR)
 
 **5.4.13 Settings**
-- [ ] P5-57..P5-60 | Settings panels — deferred (per-concern forms)
+- [~] P5-57..P5-60 | **App settings panel** live at `/settings`: GET `/api/admin/core/app-settings` (optional `?module=` filter) + PUT `/{id}` upsert. Inline edit per row + add-new row. Per-concern settings forms (general / email SMTP / payment-provider config / SEO etc.) are sub-PRs on top of this generic store
 
 **5.4.14 Activity & Notifications**
 - [x] P5-61 | `/activity-log` paged list

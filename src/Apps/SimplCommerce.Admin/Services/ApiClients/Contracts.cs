@@ -85,6 +85,20 @@ public record AdminPaymentProviderItem(string Id, string Name, bool IsEnabled);
 public record AdminPaymentItem(long Id, long OrderId, string? PaymentMethod, decimal PaymentFee, decimal Amount, int Status, DateTimeOffset CreatedOn);
 public record AdminPaymentsPage(int Total, int Page, int PageSize, IReadOnlyList<AdminPaymentItem> Items);
 
+// --- News admin ---
+public record AdminNewsItemListItem(long Id, string Name, string Slug, bool IsPublished, DateTimeOffset CreatedOn);
+public record AdminNewsItemsPage(int Total, int Page, int PageSize, IReadOnlyList<AdminNewsItemListItem> Items);
+public record AdminNewsItemDetail(long Id, string Name, string Slug, string? ShortContent, string? FullContent, bool IsPublished, DateTimeOffset CreatedOn);
+public record AdminNewsItemInput(string Name, string Slug, string? ShortContent, string? FullContent, bool IsPublished);
+public record AdminNewsCategoryItem(long Id, string Name, string Slug, bool IsPublished);
+public record AdminNewsCategoryInput(string Name, string Slug, bool IsPublished);
+
+// --- Core: app settings + customer groups ---
+public record AdminAppSettingItem(string Id, string Value, string? Module);
+public record AdminAppSettingInput(string Value);
+public record AdminCustomerGroupItem(long Id, string Name);
+public record AdminCustomerGroupInput(string Name);
+
 // --- Cms admin ---
 public record AdminCmsPageListItem(long Id, string Name, string Slug, bool IsPublished, DateTimeOffset CreatedOn);
 public record AdminCmsPageDetail(long Id, string Name, string Slug, string? Body, bool IsPublished, DateTimeOffset CreatedOn);

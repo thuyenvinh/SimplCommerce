@@ -98,6 +98,12 @@ public interface IAdminCoreApi
 {
     Task<MeResponse?> GetMeAsync(CancellationToken ct = default);
     Task<AdminUsersPage?> ListUsersAsync(int page = 1, int pageSize = 20, string? search = null, CancellationToken ct = default);
+    Task<IReadOnlyList<AdminAppSettingItem>?> ListAppSettingsAsync(string? module = null, CancellationToken ct = default);
+    Task<HttpResponseMessage> UpsertAppSettingAsync(string id, AdminAppSettingInput input, CancellationToken ct = default);
+    Task<IReadOnlyList<AdminCustomerGroupItem>?> ListCustomerGroupsAsync(CancellationToken ct = default);
+    Task<HttpResponseMessage> CreateCustomerGroupAsync(AdminCustomerGroupInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> UpdateCustomerGroupAsync(long id, AdminCustomerGroupInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> DeleteCustomerGroupAsync(long id, CancellationToken ct = default);
 }
 
 public sealed class AdminCoreApi(HttpClient http) : IAdminCoreApi
@@ -111,6 +117,71 @@ public sealed class AdminCoreApi(HttpClient http) : IAdminCoreApi
         if (!string.IsNullOrWhiteSpace(search)) url += $"&search={Uri.EscapeDataString(search)}";
         return http.GetFromJsonAsync<AdminUsersPage>(url, ct);
     }
+
+    public async Task<IReadOnlyList<AdminAppSettingItem>?> ListAppSettingsAsync(string? module, CancellationToken ct)
+    {
+        var url = "/api/admin/core/app-settings";
+        if (!string.IsNullOrWhiteSpace(module)) url += $"?module={Uri.EscapeDataString(module)}";
+        return await http.GetFromJsonAsync<List<AdminAppSettingItem>>(url, ct);
+    }
+
+    public Task<HttpResponseMessage> UpsertAppSettingAsync(string id, AdminAppSettingInput input, CancellationToken ct) =>
+        http.PutAsJsonAsync($"/api/admin/core/app-settings/{Uri.EscapeDataString(id)}", input, ct);
+
+    public async Task<IReadOnlyList<AdminCustomerGroupItem>?> ListCustomerGroupsAsync(CancellationToken ct) =>
+        await http.GetFromJsonAsync<List<AdminCustomerGroupItem>>("/api/admin/core/customer-groups", ct);
+
+    public Task<HttpResponseMessage> CreateCustomerGroupAsync(AdminCustomerGroupInput input, CancellationToken ct) =>
+        http.PostAsJsonAsync("/api/admin/core/customer-groups", input, ct);
+
+    public Task<HttpResponseMessage> UpdateCustomerGroupAsync(long id, AdminCustomerGroupInput input, CancellationToken ct) =>
+        http.PutAsJsonAsync($"/api/admin/core/customer-groups/{id}", input, ct);
+
+    public Task<HttpResponseMessage> DeleteCustomerGroupAsync(long id, CancellationToken ct) =>
+        http.DeleteAsync($"/api/admin/core/customer-groups/{id}", ct);
+}
+
+public interface IAdminNewsApi
+{
+    Task<AdminNewsItemsPage?> ListItemsAsync(int page = 1, int pageSize = 20, CancellationToken ct = default);
+    Task<AdminNewsItemDetail?> GetItemAsync(long id, CancellationToken ct = default);
+    Task<HttpResponseMessage> CreateItemAsync(AdminNewsItemInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> UpdateItemAsync(long id, AdminNewsItemInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> DeleteItemAsync(long id, CancellationToken ct = default);
+    Task<IReadOnlyList<AdminNewsCategoryItem>?> ListCategoriesAsync(CancellationToken ct = default);
+    Task<HttpResponseMessage> CreateCategoryAsync(AdminNewsCategoryInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> UpdateCategoryAsync(long id, AdminNewsCategoryInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> DeleteCategoryAsync(long id, CancellationToken ct = default);
+}
+
+public sealed class AdminNewsApi(HttpClient http) : IAdminNewsApi
+{
+    public Task<AdminNewsItemsPage?> ListItemsAsync(int page, int pageSize, CancellationToken ct) =>
+        http.GetFromJsonAsync<AdminNewsItemsPage>($"/api/admin/news/items?page={page}&pageSize={pageSize}", ct);
+
+    public Task<AdminNewsItemDetail?> GetItemAsync(long id, CancellationToken ct) =>
+        http.GetFromJsonAsync<AdminNewsItemDetail>($"/api/admin/news/items/{id}", ct);
+
+    public Task<HttpResponseMessage> CreateItemAsync(AdminNewsItemInput input, CancellationToken ct) =>
+        http.PostAsJsonAsync("/api/admin/news/items", input, ct);
+
+    public Task<HttpResponseMessage> UpdateItemAsync(long id, AdminNewsItemInput input, CancellationToken ct) =>
+        http.PutAsJsonAsync($"/api/admin/news/items/{id}", input, ct);
+
+    public Task<HttpResponseMessage> DeleteItemAsync(long id, CancellationToken ct) =>
+        http.DeleteAsync($"/api/admin/news/items/{id}", ct);
+
+    public async Task<IReadOnlyList<AdminNewsCategoryItem>?> ListCategoriesAsync(CancellationToken ct) =>
+        await http.GetFromJsonAsync<List<AdminNewsCategoryItem>>("/api/admin/news/categories", ct);
+
+    public Task<HttpResponseMessage> CreateCategoryAsync(AdminNewsCategoryInput input, CancellationToken ct) =>
+        http.PostAsJsonAsync("/api/admin/news/categories", input, ct);
+
+    public Task<HttpResponseMessage> UpdateCategoryAsync(long id, AdminNewsCategoryInput input, CancellationToken ct) =>
+        http.PutAsJsonAsync($"/api/admin/news/categories/{id}", input, ct);
+
+    public Task<HttpResponseMessage> DeleteCategoryAsync(long id, CancellationToken ct) =>
+        http.DeleteAsync($"/api/admin/news/categories/{id}", ct);
 }
 
 public interface IAdminReviewsApi

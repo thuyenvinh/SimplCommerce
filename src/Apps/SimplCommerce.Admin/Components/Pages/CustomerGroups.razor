@@ -1,0 +1,85 @@
+@page "/customer-groups"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminCoreApi Core
+@inject ISnackbar Snack
+
+<PageTitle>Customer groups — Admin</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Customer groups</MudText>
+
+<MudPaper Class="pa-4">
+    <MudStack Row="true" AlignItems="AlignItems.End" Class="mb-3">
+        <MudTextField @bind-Value="_newName" Label="New group name" />
+        <MudButton OnClick="Create" Variant="Variant.Filled" Color="Color.Primary">Add</MudButton>
+    </MudStack>
+
+    @if (_groups is null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (_groups.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">No groups yet.</MudAlert>
+    }
+    else
+    {
+        <MudTable T="EditRow" Items="_editRows" Hover="true" Dense="true">
+            <HeaderContent>
+                <MudTh>ID</MudTh><MudTh>Name</MudTh><MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Id</MudTd>
+                <MudTd>
+                    <MudTextField @bind-Value="context.Name" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudTd>
+                <MudTd>
+                    <MudButton OnClick="@(() => Save(context))" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary">Save</MudButton>
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                   OnClick="@(() => Delete(context.Id))" aria-label="Delete" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private IReadOnlyList<AdminCustomerGroupItem>? _groups;
+    private List<EditRow> _editRows = new();
+    private string _newName = string.Empty;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        _groups = await Core.ListCustomerGroupsAsync();
+        _editRows = _groups?.Select(g => new EditRow { Id = g.Id, Name = g.Name }).ToList() ?? new();
+        StateHasChanged();
+    }
+
+    private async Task Create()
+    {
+        if (string.IsNullOrWhiteSpace(_newName)) return;
+        using var resp = await Core.CreateCustomerGroupAsync(new AdminCustomerGroupInput(_newName));
+        if (resp.IsSuccessStatusCode) { _newName = ""; await Reload(); }
+        else { Snack.Add($"Create failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    private async Task Save(EditRow row)
+    {
+        using var resp = await Core.UpdateCustomerGroupAsync(row.Id, new AdminCustomerGroupInput(row.Name));
+        if (resp.IsSuccessStatusCode) { Snack.Add($"Saved.", Severity.Success); }
+        else { Snack.Add($"Save failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    private async Task Delete(long id)
+    {
+        using var resp = await Core.DeleteCustomerGroupAsync(id);
+        if (resp.IsSuccessStatusCode) { await Reload(); }
+        else { Snack.Add($"Delete failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    private class EditRow
+    {
+        public long Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+    }
+}
