@@ -59,6 +59,8 @@ public record ModerationRequest(int Status);
 // --- Inventory admin ---
 public record AdminWarehouseItem(long Id, string Name, long? VendorId);
 public record AdminStockItem(long Id, long ProductId, long WarehouseId, int Quantity);
+public record AdminStockHistoryItem(long Id, long ProductId, string ProductName, long WarehouseId, string WarehouseName, long AdjustedQuantity, string? Note, DateTimeOffset CreatedOn);
+public record AdminStockAdjustmentInput(long ProductId, long WarehouseId, long AdjustedQuantity, string? Note);
 
 // --- Activity log admin ---
 public record AdminActivityItem(long Id, long ActivityTypeId, long UserId, long EntityId, string? EntityTypeId, DateTimeOffset CreatedOn);
@@ -81,6 +83,21 @@ public record AdminShippingProviderItem(string Id, string Name, bool IsEnabled);
 public record AdminPaymentProviderItem(string Id, string Name, bool IsEnabled);
 public record AdminPaymentItem(long Id, long OrderId, string? PaymentMethod, decimal PaymentFee, decimal Amount, int Status, DateTimeOffset CreatedOn);
 public record AdminPaymentsPage(int Total, int Page, int PageSize, IReadOnlyList<AdminPaymentItem> Items);
+
+// --- Cms admin ---
+public record AdminCmsPageListItem(long Id, string Name, string Slug, bool IsPublished, DateTimeOffset CreatedOn);
+public record AdminCmsPageDetail(long Id, string Name, string Slug, string? Body, bool IsPublished, DateTimeOffset CreatedOn);
+public record AdminCmsPageInput(string Name, string Slug, string? Body, bool IsPublished);
+
+// --- Comments admin ---
+public record AdminCommentItem(long Id, string CommenterName, string CommenterEmail, string CommentText, int Status, DateTimeOffset CreatedOn, string EntityTypeId, long EntityId);
+public record AdminCommentsPage(int Total, int Page, int PageSize, IReadOnlyList<AdminCommentItem> Items);
+public record AdminCommentStatusInput(int Status);
+
+// --- Contacts admin ---
+public record AdminContactItem(long Id, string Name, string Email, string Message, int Status, long? ContactAreaId, DateTimeOffset CreatedOn);
+public record AdminContactsPage(int Total, int Page, int PageSize, IReadOnlyList<AdminContactItem> Items);
+public record AdminContactStatusInput(int Status);
 
 // --- Pricing admin ---
 public record AdminCartRuleItem(long Id, string Name, DateTimeOffset? StartOn, DateTimeOffset? EndOn, int? UsageLimitPerCoupon, bool IsActive);

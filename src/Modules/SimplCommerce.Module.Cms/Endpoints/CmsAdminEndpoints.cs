@@ -13,6 +13,8 @@ namespace SimplCommerce.Module.Cms.Endpoints;
 public static class CmsAdminEndpoints
 {
     public record PageInput(string Name, string Slug, string? Body, bool IsPublished);
+    public record PageDetail(long Id, string Name, string Slug, string? Body, bool IsPublished, System.DateTimeOffset CreatedOn);
+    public record PageListItem(long Id, string Name, string Slug, bool IsPublished, System.DateTimeOffset CreatedOn);
 
     public static IEndpointRouteBuilder MapCmsAdminEndpoints(this IEndpointRouteBuilder app)
     {
@@ -23,8 +25,17 @@ public static class CmsAdminEndpoints
         group.MapGet("/pages", async (IRepository<Page> repo) =>
         {
             var list = await repo.Query().Where(p => !p.IsDeleted)
-                .Select(p => new { p.Id, p.Name, p.Slug, p.IsPublished, p.CreatedOn }).ToListAsync();
+                .OrderByDescending(p => p.CreatedOn)
+                .Select(p => new PageListItem(p.Id, p.Name, p.Slug, p.IsPublished, p.CreatedOn)).ToListAsync();
             return Results.Ok(list);
+        });
+
+        group.MapGet("/pages/{id:long}", async (long id, IRepository<Page> repo) =>
+        {
+            var page = await repo.Query().FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
+            return page is null
+                ? Results.NotFound()
+                : Results.Ok(new PageDetail(page.Id, page.Name, page.Slug, page.Body, page.IsPublished, page.CreatedOn));
         });
 
         group.MapPost("/pages", (PageInput input, IRepository<Page> repo) =>

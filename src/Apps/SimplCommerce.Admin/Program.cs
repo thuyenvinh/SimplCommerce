@@ -82,6 +82,12 @@ builder.Services.AddHttpClient<IAdminPaymentsApi, AdminPaymentsApi>(c => c.BaseA
     .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
 builder.Services.AddHttpClient<IAdminPricingApi, AdminPricingApi>(c => c.BaseAddress = new Uri(apiBase))
     .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
+builder.Services.AddHttpClient<IAdminCmsApi, AdminCmsApi>(c => c.BaseAddress = new Uri(apiBase))
+    .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
+builder.Services.AddHttpClient<IAdminCommentsApi, AdminCommentsApi>(c => c.BaseAddress = new Uri(apiBase))
+    .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
+builder.Services.AddHttpClient<IAdminContactsApi, AdminContactsApi>(c => c.BaseAddress = new Uri(apiBase))
+    .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
 
 builder.Services.AddScoped<CookieAuthStateService>();
 builder.Services.AddResponseCompression(o => o.EnableForHttps = true);

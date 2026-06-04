@@ -1,0 +1,70 @@
+@page "/cms/pages"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminCmsApi Cms
+@inject NavigationManager Nav
+@inject ISnackbar Snack
+
+<PageTitle>CMS pages — Admin</PageTitle>
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">CMS pages</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/cms/pages/create">New page</MudButton>
+</MudStack>
+
+<MudPaper Class="pa-4">
+    @if (_rows is null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (_rows.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">No CMS pages yet.</MudAlert>
+    }
+    else
+    {
+        <MudTable T="AdminCmsPageListItem" Items="_rows" Hover="true" Dense="true"
+                  OnRowClick="@((TableRowClickEventArgs<AdminCmsPageListItem> e) => Nav.NavigateTo($"/cms/pages/edit/{e.Item!.Id}"))">
+            <HeaderContent>
+                <MudTh>ID</MudTh><MudTh>Name</MudTh><MudTh>Slug</MudTh>
+                <MudTh>Published</MudTh><MudTh>Created</MudTh><MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Id</MudTd>
+                <MudTd>@context.Name</MudTd>
+                <MudTd>@context.Slug</MudTd>
+                <MudTd>@(context.IsPublished ? "✓" : "—")</MudTd>
+                <MudTd>@context.CreatedOn.LocalDateTime.ToString("g")</MudTd>
+                <MudTd @onclick:stopPropagation="true">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                   OnClick="@(() => Delete(context.Id))" aria-label="Delete" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private IReadOnlyList<AdminCmsPageListItem>? _rows;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        _rows = await Cms.ListPagesAsync();
+        StateHasChanged();
+    }
+
+    private async Task Delete(long id)
+    {
+        using var resp = await Cms.DeletePageAsync(id);
+        if (resp.IsSuccessStatusCode)
+        {
+            Snack.Add("Page deleted.", Severity.Success);
+            await Reload();
+        }
+        else
+        {
+            Snack.Add($"Delete failed (HTTP {(int)resp.StatusCode}).", Severity.Error);
+        }
+    }
+}

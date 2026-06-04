@@ -1,0 +1,115 @@
+@page "/comments"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminCommentsApi Comments
+@inject ISnackbar Snack
+
+<PageTitle>Comment moderation — Admin</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Comment moderation</MudText>
+
+<MudPaper Class="pa-4">
+    <MudStack Row="true" AlignItems="AlignItems.End" Class="mb-3">
+        <MudSelect T="int?" @bind-Value="_status" Label="Status" Variant="Variant.Outlined" Dense="true" Style="max-width:200px" Clearable="true">
+            <MudSelectItem T="int?" Value="@((int?)1)">Pending</MudSelectItem>
+            <MudSelectItem T="int?" Value="@((int?)5)">Approved</MudSelectItem>
+            <MudSelectItem T="int?" Value="@((int?)8)">Not approved</MudSelectItem>
+        </MudSelect>
+        <MudButton OnClick="Reload" Variant="Variant.Outlined">Apply</MudButton>
+        <MudSpacer />
+        <MudText Typo="Typo.caption">@(_page?.Total.ToString() ?? "—") result(s)</MudText>
+    </MudStack>
+
+    @if (_page is null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (_page.Items.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">No comments match.</MudAlert>
+    }
+    else
+    {
+        <MudTable T="AdminCommentItem" Items="_page.Items" Hover="true" Dense="true">
+            <HeaderContent>
+                <MudTh>ID</MudTh><MudTh>Author</MudTh><MudTh>Text</MudTh>
+                <MudTh>On</MudTh><MudTh>Status</MudTh><MudTh>Created</MudTh><MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Id</MudTd>
+                <MudTd>@context.CommenterName<br /><MudText Typo="Typo.caption">@context.CommenterEmail</MudText></MudTd>
+                <MudTd Style="max-width:380px"><MudText Typo="Typo.body2">@context.CommentText</MudText></MudTd>
+                <MudTd><MudText Typo="Typo.caption">@context.EntityTypeId / @context.EntityId</MudText></MudTd>
+                <MudTd>
+                    <MudChip T="string" Color="@StatusColor(context.Status)" Size="Size.Small">@StatusLabel(context.Status)</MudChip>
+                </MudTd>
+                <MudTd>@context.CreatedOn.LocalDateTime.ToString("g")</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small"
+                                   Disabled="@(context.Status == 5)" OnClick="@(() => SetStatus(context.Id, 5))" aria-label="Approve" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Block" Color="Color.Warning" Size="Size.Small"
+                                   Disabled="@(context.Status == 8)" OnClick="@(() => SetStatus(context.Id, 8))" aria-label="Reject" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                   OnClick="@(() => Delete(context.Id))" aria-label="Delete" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+        <MudPagination Count="@((int)Math.Ceiling(_page.Total / (double)_pageSize))"
+                       Selected="_pageNum"
+                       SelectedChanged="OnPage" Class="mt-3" />
+    }
+</MudPaper>
+
+@code {
+    private AdminCommentsPage? _page;
+    private int? _status = 1;
+    private int _pageNum = 1;
+    private const int _pageSize = 20;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        _page = await Comments.ListAsync(_status, _pageNum, _pageSize);
+        StateHasChanged();
+    }
+
+    private async Task OnPage(int p) { _pageNum = p; await Reload(); }
+
+    private async Task SetStatus(long id, int next)
+    {
+        using var resp = await Comments.SetStatusAsync(id, new AdminCommentStatusInput(next));
+        if (!resp.IsSuccessStatusCode)
+        {
+            Snack.Add($"Status update failed (HTTP {(int)resp.StatusCode}).", Severity.Error);
+            return;
+        }
+        await Reload();
+    }
+
+    private async Task Delete(long id)
+    {
+        using var resp = await Comments.DeleteAsync(id);
+        if (!resp.IsSuccessStatusCode)
+        {
+            Snack.Add($"Delete failed (HTTP {(int)resp.StatusCode}).", Severity.Error);
+            return;
+        }
+        Snack.Add("Comment deleted.", Severity.Success);
+        await Reload();
+    }
+
+    private static Color StatusColor(int status) => status switch
+    {
+        1 => Color.Warning,
+        5 => Color.Success,
+        8 => Color.Error,
+        _ => Color.Default,
+    };
+
+    private static string StatusLabel(int status) => status switch
+    {
+        1 => "Pending",
+        5 => "Approved",
+        8 => "Not approved",
+        _ => status.ToString(),
+    };
+}

@@ -1,0 +1,112 @@
+@page "/inventory/stock-adjustments"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminInventoryApi Inventory
+@inject ISnackbar Snack
+
+<PageTitle>Stock adjustments — Admin</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Stock adjustments</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="5">
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-3">New adjustment</MudText>
+            <EditForm Model="_form" OnValidSubmit="Submit">
+                <DataAnnotationsValidator />
+                <MudNumericField @bind-Value="_form.ProductId" Label="Product ID" Required="true" Min="1L" />
+                <MudSelect T="long" @bind-Value="_form.WarehouseId" Label="Warehouse" Required="true">
+                    @if (_warehouses is not null)
+                    {
+                        @foreach (var w in _warehouses)
+                        {
+                            <MudSelectItem T="long" Value="@w.Id">@w.Name</MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+                <MudNumericField @bind-Value="_form.AdjustedQuantity" Label="Adjusted quantity (+ in, − out)" Required="true" HelperText="Negative numbers reduce stock, e.g. -10 for damaged units." />
+                <MudTextField @bind-Value="_form.Note" Label="Note (optional)" Lines="2" />
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Class="mt-3" Disabled="_submitting">
+                    @(_submitting ? "Submitting…" : "Submit")
+                </MudButton>
+            </EditForm>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="7">
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-3">Recent history</MudText>
+            @if (_history is null)
+            {
+                <MudProgressCircular Indeterminate="true" />
+            }
+            else if (_history.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info">No adjustments yet.</MudAlert>
+            }
+            else
+            {
+                <MudTable T="AdminStockHistoryItem" Items="_history" Dense="true" Hover="true">
+                    <HeaderContent>
+                        <MudTh>When</MudTh><MudTh>Product</MudTh><MudTh>Warehouse</MudTh>
+                        <MudTh>Δ qty</MudTh><MudTh>Note</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.CreatedOn.LocalDateTime.ToString("g")</MudTd>
+                        <MudTd>@context.ProductName <MudText Typo="Typo.caption">#@context.ProductId</MudText></MudTd>
+                        <MudTd>@context.WarehouseName</MudTd>
+                        <MudTd><MudText Color="@(context.AdjustedQuantity >= 0 ? Color.Success : Color.Error)">@context.AdjustedQuantity</MudText></MudTd>
+                        <MudTd>@context.Note</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private IReadOnlyList<AdminWarehouseItem>? _warehouses;
+    private IReadOnlyList<AdminStockHistoryItem>? _history;
+    private FormModel _form = new();
+    private bool _submitting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _warehouses = await Inventory.ListWarehousesAsync();
+        if (_warehouses is { Count: > 0 }) _form.WarehouseId = _warehouses[0].Id;
+        await ReloadHistory();
+    }
+
+    private async Task ReloadHistory()
+    {
+        _history = await Inventory.ListStockHistoryAsync(pageSize: 50);
+        StateHasChanged();
+    }
+
+    private async Task Submit()
+    {
+        _submitting = true;
+        try
+        {
+            using var resp = await Inventory.AdjustStockAsync(new AdminStockAdjustmentInput(
+                _form.ProductId, _form.WarehouseId, _form.AdjustedQuantity, _form.Note));
+            if (!resp.IsSuccessStatusCode)
+            {
+                Snack.Add($"Adjustment failed (HTTP {(int)resp.StatusCode}).", Severity.Error);
+                return;
+            }
+            Snack.Add("Stock adjusted.", Severity.Success);
+            _form = new FormModel { WarehouseId = _form.WarehouseId };
+            await ReloadHistory();
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private class FormModel
+    {
+        public long ProductId { get; set; }
+        public long WarehouseId { get; set; }
+        public long AdjustedQuantity { get; set; }
+        public string? Note { get; set; }
+    }
+}

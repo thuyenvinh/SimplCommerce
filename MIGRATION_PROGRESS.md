@@ -411,14 +411,17 @@ Storefront endpoint groups đã tạo (9 groups):
 - [ ] role permission matrix — deferred
 
 **5.4.5 Content / CMS / News**
-- [~] P5-34..P5-39 | CMS pages/menus/widgets/news/media — **deferred**, endpoint scaffold exists per-module but UI is follow-up
+- [~] P5-34 | **CMS pages** live: list (`/cms/pages`) + create/edit (`/cms/pages/{create,edit/{id}}`). Backend GET/POST/PUT/DELETE wired with `AdminCmsPageInput`/`AdminCmsPageDetail` DTO, `IAdminCmsApi` typed client. Menus/widgets/news/media still follow-up
+- [~] P5-35..P5-39 | menus / widgets / media library / block editor — **deferred** per-feature sub-PRs
+- [x] **Comments moderation admin** | `/comments` page + backend `GET /api/admin/comments` (paginated, status filter) + `PATCH /{id}/status` + `DELETE /{id}`. Inline Approve / Reject / Delete buttons, status chip per row
+- [x] **Contacts inbox admin** | `/contacts` page + backend `GET /api/admin/contacts` (paginated, open/handled filter), `GET /{id}`, `PATCH /{id}/status`. Mark-handled toggle, mailto reply action
 
 **5.4.6 Reviews**
 - [x] P5-40 | `/reviews` moderation queue — filter by status + Approve / Reject actions
 
 **5.4.7 Inventory**
 - [x] P5-41 | `/warehouses` — GET list
-- [ ] P5-42..P5-43 | stock history + adjustments — deferred
+- [x] P5-42..P5-43 | **Stock adjustments + history** live: `POST /api/admin/inventory/stock-adjustments` increments/decrements stock and writes a StockHistory row attributed to the current admin, `GET /stock-history` returns paginated history with product/warehouse names. `/inventory/stock-adjustments` page splits into "New adjustment" form + recent history table
 
 **5.4.8 Pricing & Promotions**
 - [x] P5-44 + P5-45 + P5-46 | `/pricing` — tabbed view (cart rules / catalog rules / coupons) GET list for each. CRUD forms are follow-up.

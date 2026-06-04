@@ -136,6 +136,8 @@ public interface IAdminInventoryApi
 {
     Task<IReadOnlyList<AdminWarehouseItem>?> ListWarehousesAsync(CancellationToken ct = default);
     Task<IReadOnlyList<AdminStockItem>?> ListStocksAsync(long? warehouseId = null, CancellationToken ct = default);
+    Task<IReadOnlyList<AdminStockHistoryItem>?> ListStockHistoryAsync(long? productId = null, long? warehouseId = null, int page = 1, int pageSize = 50, CancellationToken ct = default);
+    Task<HttpResponseMessage> AdjustStockAsync(AdminStockAdjustmentInput input, CancellationToken ct = default);
 }
 
 public sealed class AdminInventoryApi(HttpClient http) : IAdminInventoryApi
@@ -149,6 +151,17 @@ public sealed class AdminInventoryApi(HttpClient http) : IAdminInventoryApi
         if (warehouseId.HasValue) url += $"?warehouseId={warehouseId}";
         return await http.GetFromJsonAsync<List<AdminStockItem>>(url, ct);
     }
+
+    public async Task<IReadOnlyList<AdminStockHistoryItem>?> ListStockHistoryAsync(long? productId, long? warehouseId, int page, int pageSize, CancellationToken ct)
+    {
+        var url = $"/api/admin/inventory/stock-history?page={page}&pageSize={pageSize}";
+        if (productId.HasValue) url += $"&productId={productId}";
+        if (warehouseId.HasValue) url += $"&warehouseId={warehouseId}";
+        return await http.GetFromJsonAsync<List<AdminStockHistoryItem>>(url, ct);
+    }
+
+    public Task<HttpResponseMessage> AdjustStockAsync(AdminStockAdjustmentInput input, CancellationToken ct) =>
+        http.PostAsJsonAsync("/api/admin/inventory/stock-adjustments", input, ct);
 }
 
 public interface IAdminActivityApi
@@ -243,4 +256,77 @@ public sealed class AdminPricingApi(HttpClient http) : IAdminPricingApi
 
     public async Task<IReadOnlyList<AdminCouponItem>?> ListCouponsAsync(CancellationToken ct) =>
         await http.GetFromJsonAsync<List<AdminCouponItem>>("/api/admin/pricing/coupons", ct);
+}
+
+public interface IAdminCmsApi
+{
+    Task<IReadOnlyList<AdminCmsPageListItem>?> ListPagesAsync(CancellationToken ct = default);
+    Task<AdminCmsPageDetail?> GetPageAsync(long id, CancellationToken ct = default);
+    Task<HttpResponseMessage> CreatePageAsync(AdminCmsPageInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> UpdatePageAsync(long id, AdminCmsPageInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> DeletePageAsync(long id, CancellationToken ct = default);
+}
+
+public sealed class AdminCmsApi(HttpClient http) : IAdminCmsApi
+{
+    public async Task<IReadOnlyList<AdminCmsPageListItem>?> ListPagesAsync(CancellationToken ct) =>
+        await http.GetFromJsonAsync<List<AdminCmsPageListItem>>("/api/admin/cms/pages", ct);
+
+    public Task<AdminCmsPageDetail?> GetPageAsync(long id, CancellationToken ct) =>
+        http.GetFromJsonAsync<AdminCmsPageDetail>($"/api/admin/cms/pages/{id}", ct);
+
+    public Task<HttpResponseMessage> CreatePageAsync(AdminCmsPageInput input, CancellationToken ct) =>
+        http.PostAsJsonAsync("/api/admin/cms/pages", input, ct);
+
+    public Task<HttpResponseMessage> UpdatePageAsync(long id, AdminCmsPageInput input, CancellationToken ct) =>
+        http.PutAsJsonAsync($"/api/admin/cms/pages/{id}", input, ct);
+
+    public Task<HttpResponseMessage> DeletePageAsync(long id, CancellationToken ct) =>
+        http.DeleteAsync($"/api/admin/cms/pages/{id}", ct);
+}
+
+public interface IAdminCommentsApi
+{
+    Task<AdminCommentsPage?> ListAsync(int? status = null, int page = 1, int pageSize = 20, CancellationToken ct = default);
+    Task<HttpResponseMessage> SetStatusAsync(long id, AdminCommentStatusInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> DeleteAsync(long id, CancellationToken ct = default);
+}
+
+public sealed class AdminCommentsApi(HttpClient http) : IAdminCommentsApi
+{
+    public Task<AdminCommentsPage?> ListAsync(int? status, int page, int pageSize, CancellationToken ct)
+    {
+        var url = $"/api/admin/comments?page={page}&pageSize={pageSize}";
+        if (status.HasValue) url += $"&status={status}";
+        return http.GetFromJsonAsync<AdminCommentsPage>(url, ct);
+    }
+
+    public Task<HttpResponseMessage> SetStatusAsync(long id, AdminCommentStatusInput input, CancellationToken ct) =>
+        http.PatchAsJsonAsync($"/api/admin/comments/{id}/status", input, ct);
+
+    public Task<HttpResponseMessage> DeleteAsync(long id, CancellationToken ct) =>
+        http.DeleteAsync($"/api/admin/comments/{id}", ct);
+}
+
+public interface IAdminContactsApi
+{
+    Task<AdminContactsPage?> ListAsync(int? status = null, int page = 1, int pageSize = 20, CancellationToken ct = default);
+    Task<AdminContactItem?> GetAsync(long id, CancellationToken ct = default);
+    Task<HttpResponseMessage> SetStatusAsync(long id, AdminContactStatusInput input, CancellationToken ct = default);
+}
+
+public sealed class AdminContactsApi(HttpClient http) : IAdminContactsApi
+{
+    public Task<AdminContactsPage?> ListAsync(int? status, int page, int pageSize, CancellationToken ct)
+    {
+        var url = $"/api/admin/contacts?page={page}&pageSize={pageSize}";
+        if (status.HasValue) url += $"&status={status}";
+        return http.GetFromJsonAsync<AdminContactsPage>(url, ct);
+    }
+
+    public Task<AdminContactItem?> GetAsync(long id, CancellationToken ct) =>
+        http.GetFromJsonAsync<AdminContactItem>($"/api/admin/contacts/{id}", ct);
+
+    public Task<HttpResponseMessage> SetStatusAsync(long id, AdminContactStatusInput input, CancellationToken ct) =>
+        http.PatchAsJsonAsync($"/api/admin/contacts/{id}/status", input, ct);
 }
