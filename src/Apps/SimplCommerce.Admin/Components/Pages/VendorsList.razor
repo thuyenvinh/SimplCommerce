@@ -1,0 +1,64 @@
+@page "/vendors"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminVendorsApi Vendors
+@inject NavigationManager Nav
+@inject ISnackbar Snack
+
+<PageTitle>Vendors — Admin</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Vendors</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/vendors/create">New vendor</MudButton>
+</MudStack>
+
+<MudPaper Class="pa-4">
+    @if (_list is null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (_list.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">No vendors yet.</MudAlert>
+    }
+    else
+    {
+        <MudTable T="AdminVendorItem" Items="_list" Hover="true" Dense="true"
+                  OnRowClick="@((TableRowClickEventArgs<AdminVendorItem> e) => Nav.NavigateTo($"/vendors/edit/{e.Item!.Id}"))">
+            <HeaderContent>
+                <MudTh>ID</MudTh><MudTh>Name</MudTh><MudTh>Slug</MudTh>
+                <MudTh>Description</MudTh><MudTh>Active</MudTh><MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Id</MudTd>
+                <MudTd>@context.Name</MudTd>
+                <MudTd>@context.Slug</MudTd>
+                <MudTd>@context.Description</MudTd>
+                <MudTd>@(context.IsActive ? "✓" : "—")</MudTd>
+                <MudTd @onclick:stopPropagation="true">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                   OnClick="@(() => Delete(context.Id))" aria-label="Delete" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private IReadOnlyList<AdminVendorItem>? _list;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload() { _list = await Vendors.ListAsync(); StateHasChanged(); }
+
+    private async Task Delete(long id)
+    {
+        using var resp = await Vendors.DeleteAsync(id);
+        if (resp.IsSuccessStatusCode)
+        {
+            Snack.Add("Vendor deleted.", Severity.Success);
+            await Reload();
+        }
+        else { Snack.Add($"Delete failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+}

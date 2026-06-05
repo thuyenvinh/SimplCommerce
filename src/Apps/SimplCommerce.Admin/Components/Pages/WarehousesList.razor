@@ -1,0 +1,31 @@
+@page "/warehouses"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminInventoryApi Inventory
+
+<PageTitle>Warehouses — Admin</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Warehouses</MudText>
+
+<MudPaper Class="pa-4">
+    @if (_warehouses is null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else
+    {
+        <MudTable T="AdminWarehouseItem" Items="_warehouses" Hover="true">
+            <HeaderContent>
+                <MudTh>ID</MudTh><MudTh>Name</MudTh><MudTh>Vendor</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Id</MudTd>
+                <MudTd>@context.Name</MudTd>
+                <MudTd>@(context.VendorId?.ToString() ?? "—")</MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private IReadOnlyList<AdminWarehouseItem>? _warehouses;
+    protected override async Task OnInitializedAsync() => _warehouses = await Inventory.ListWarehousesAsync();
+}

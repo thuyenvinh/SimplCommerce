@@ -22,14 +22,18 @@ using SimplCommerce.Module.Localization.TagHelpers;
 using SimplCommerce.WebHost.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddServiceDefaults();
 ConfigureService();
 var app = builder.Build();
 Configure();
 app.Run();
 
-void ConfigureService() 
+void ConfigureService()
 {
-    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    // Phase 1: Aspire injects ConnectionStrings__SimplCommerce; fall back to the legacy
+    // "DefaultConnection" key so the WebHost still runs standalone without AppHost.
+    var connectionString = builder.Configuration.GetConnectionString("SimplCommerce")
+        ?? builder.Configuration.GetConnectionString("DefaultConnection");
     builder.Configuration.AddEntityFrameworkConfig(options =>
     {
         options.UseSqlServer(connectionString);
@@ -92,6 +96,7 @@ void Configure()
     app.UseHttpsRedirection();
     app.UseCustomizedStaticFiles(builder.Environment);
     app.UseRouting();
+    app.MapDefaultEndpoints();
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
@@ -100,16 +105,13 @@ void Configure()
     app.UseCookiePolicy();
     app.UseCustomizedIdentity();
     app.UseCustomizedRequestLocalization();
-    app.UseEndpoints(endpoints =>
-    {
-        endpoints.MapDynamicControllerRoute<SlugRouteValueTransformer>("/{**slug}");
-        endpoints.MapControllerRoute(
-            name: "areas",
-            pattern: "{area:exists}/{controller=Home}/{action=Index}/{id?}");
-        endpoints.MapControllerRoute(
-            name: "default",
-            pattern: "{controller=Home}/{action=Index}/{id?}");
-    });
+    app.MapDynamicControllerRoute<SlugRouteValueTransformer>("/{**slug}");
+    app.MapControllerRoute(
+        name: "areas",
+        pattern: "{area:exists}/{controller=Home}/{action=Index}/{id?}");
+    app.MapControllerRoute(
+        name: "default",
+        pattern: "{controller=Home}/{action=Index}/{id?}");
 
     var moduleInitializers = app.Services.GetServices<IModuleInitializer>();
     foreach (var moduleInitializer in moduleInitializers)

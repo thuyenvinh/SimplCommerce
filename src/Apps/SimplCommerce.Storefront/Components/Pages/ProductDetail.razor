@@ -1,0 +1,140 @@
+@page "/product/{Slug}"
+@rendermode RenderMode.InteractiveAuto
+@inject ICatalogApi Catalog
+@inject ICartApi Cart
+@inject ISnackbar Snack
+@inject NavigationManager Nav
+
+<PageTitle>@(_product?.Name ?? Slug) — SimplCommerce</PageTitle>
+<HeadContent>
+    @if (_product is not null)
+    {
+        <meta name="description" content="@(TrimTo(_product.Description ?? _product.Name, 160))" />
+        <meta property="og:title" content="@_product.Name" />
+        <meta property="og:type" content="product" />
+        @if (_product.ThumbnailUrl is { } thumb)
+        {
+            <meta property="og:image" content="@thumb" />
+        }
+        <script type="application/ld+json">@((MarkupString)_jsonLd)</script>
+    }
+</HeadContent>
+
+@if (_product is null && !_loaded)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else if (_product is null)
+{
+    <MudAlert Severity="Severity.Warning">Product not found.</MudAlert>
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="5">
+            <MudImage Src="@(_product.ThumbnailUrl ?? "/images/placeholder.png")" Fluid="true" />
+            @if (_product.Images.Count > 0)
+            {
+                <MudStack Row="true" Class="mt-3">
+                    @foreach (var img in _product.Images.Take(5))
+                    {
+                        <MudImage Src="@img" Style="width: 80px; height: 80px; object-fit: cover;" />
+                    }
+                </MudStack>
+            }
+        </MudItem>
+        <MudItem xs="12" md="7">
+            @if (_product.Brand is not null)
+            {
+                <MudChip T="string" Size="Size.Small">@_product.Brand.Name</MudChip>
+            }
+            <MudText Typo="Typo.h4">@_product.Name</MudText>
+            <MudText Typo="Typo.h5" Color="Color.Primary" Class="my-2">
+                @if (_product.IsCallForPricing)
+                {
+                    <text>Call for pricing</text>
+                }
+                else
+                {
+                    @_product.Price.ToString("C")
+                }
+                @if (_product.OldPrice.HasValue)
+                {
+                    <MudText Inline="true" Color="Color.Default" Class="ml-3" Style="text-decoration: line-through;">
+                        @_product.OldPrice.Value.ToString("C")
+                    </MudText>
+                }
+            </MudText>
+            @if (!string.IsNullOrWhiteSpace(_product.Description))
+            {
+                <MudText Typo="Typo.body1">@_product.Description</MudText>
+            }
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="my-4">
+                <MudNumericField T="int" @bind-Value="_qty" Min="1" Max="99" Variant="Variant.Outlined" Style="width: 100px" />
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AddShoppingCart"
+                           Disabled="@(!_product.IsAllowToOrder)" OnClick="AddToCart">
+                    Add to cart
+                </MudButton>
+            </MudStack>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public string Slug { get; set; } = default!;
+    private ProductDetailResponse? _product;
+    private bool _loaded;
+    private int _qty = 1;
+    private string _jsonLd = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loaded = false;
+        _product = await Catalog.GetProductBySlugAsync(Slug);
+        _loaded = true;
+        _jsonLd = BuildJsonLd();
+    }
+
+    private async Task AddToCart()
+    {
+        if (_product is null) return;
+        var resp = await Cart.AddAsync(new AddToCartRequest(_product.Id, _qty));
+        if (resp.IsSuccessStatusCode)
+        {
+            Snack.Add($"Added {_product.Name} to cart", Severity.Success);
+        }
+        else if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Nav.NavigateTo($"/account/login?returnUrl={Uri.EscapeDataString($"/product/{Slug}")}", forceLoad: true);
+        }
+        else
+        {
+            Snack.Add("Couldn't add to cart. Please try again.", Severity.Error);
+        }
+    }
+
+    private static string TrimTo(string value, int max) =>
+        value.Length <= max ? value : value.Substring(0, max - 1) + "…";
+
+    private string BuildJsonLd()
+    {
+        if (_product is null) return string.Empty;
+        var payload = new
+        {
+            context = "https://schema.org",
+            type = "Product",
+            name = _product.Name,
+            description = _product.Description ?? _product.Name,
+            offers = new
+            {
+                type = "Offer",
+                priceCurrency = "USD",
+                price = _product.Price,
+                availability = _product.IsAllowToOrder
+                    ? "https://schema.org/InStock"
+                    : "https://schema.org/OutOfStock"
+            }
+        };
+        return System.Text.Json.JsonSerializer.Serialize(payload);
+    }
+}

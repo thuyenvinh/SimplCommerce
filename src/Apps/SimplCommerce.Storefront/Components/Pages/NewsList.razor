@@ -1,0 +1,45 @@
+@page "/news"
+@rendermode RenderMode.InteractiveAuto
+@inject INewsApi News
+
+<PageTitle>News — SimplCommerce</PageTitle>
+<HeadContent>
+    <meta name="description" content="Latest news and announcements from SimplCommerce." />
+</HeadContent>
+
+<MudText Typo="Typo.h4" Class="mb-4">News</MudText>
+
+@if (_items is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_items.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">No news published yet.</MudAlert>
+}
+else
+{
+    <MudGrid>
+        @foreach (var item in _items)
+        {
+            <MudItem xs="12" md="6">
+                <MudCard>
+                    <MudCardContent>
+                        <MudLink Href="@($"/news/{item.Slug}")" Underline="Underline.Hover">
+                            <MudText Typo="Typo.h6">@item.Name</MudText>
+                        </MudLink>
+                        @if (!string.IsNullOrWhiteSpace(item.ShortContent))
+                        {
+                            <MudText Typo="Typo.body2">@item.ShortContent</MudText>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private IReadOnlyList<NewsSummary>? _items;
+    protected override async Task OnInitializedAsync() => _items = await News.ListAsync();
+}

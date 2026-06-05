@@ -1,29 +1,19 @@
-﻿using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
+using System;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using MediatR;
+using Microsoft.Extensions.DependencyInjection;
 using SimplCommerce.Infrastructure.Modules;
-using SimplCommerce.Module.Core.Events;
-using SimplCommerce.Module.Localization.Events;
-using SimplCommerce.Module.Localization.Services;
-using SimplCommerce.Module.Core.Services;
-using SimplCommerce.Infrastructure;
 
 namespace SimplCommerce.Module.Localization
 {
+    [Obsolete("Call services.AddLocalizationModule() in your composition root.")]
     public class ModuleInitializer : IModuleInitializer
     {
-        public void ConfigureServices(IServiceCollection services)
-        {
-            services.AddTransient<INotificationHandler<UserSignedIn>, UserSignedInHandler>();
-            services.AddTransient<IContentLocalizationService, ContentLocalizationService>();
-
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.localization");
-        }
+        public void ConfigureServices(IServiceCollection services) =>
+            services.AddLocalizationModule();
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-
         }
     }
 }

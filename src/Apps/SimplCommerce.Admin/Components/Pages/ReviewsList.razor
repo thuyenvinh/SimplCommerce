@@ -1,0 +1,66 @@
+@page "/reviews"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminReviewsApi Reviews
+@inject ISnackbar Snack
+
+<PageTitle>Reviews — Admin</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Reviews moderation</MudText>
+
+<MudPaper Class="pa-4">
+    <MudStack Row="true" AlignItems="AlignItems.End" Class="mb-3">
+        <MudSelect T="int?" @bind-Value="_status" Label="Status" Style="max-width: 240px" AnchorOrigin="Origin.BottomCenter">
+            <MudSelectItem T="int?" Value="@((int?)null)">Any</MudSelectItem>
+            <MudSelectItem T="int?" Value="@((int?)0)">Pending</MudSelectItem>
+            <MudSelectItem T="int?" Value="@((int?)1)">Approved</MudSelectItem>
+            <MudSelectItem T="int?" Value="@((int?)2)">Rejected</MudSelectItem>
+        </MudSelect>
+        <MudButton OnClick="Reload" Variant="Variant.Outlined">Apply</MudButton>
+        <MudSpacer />
+        <MudText Typo="Typo.caption">@(_page?.Total.ToString() ?? "—") review(s)</MudText>
+    </MudStack>
+
+    @if (_page is null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else
+    {
+        <MudTable T="AdminReviewItem" Items="_page.Items" Hover="true" Dense="true">
+            <HeaderContent>
+                <MudTh>ID</MudTh><MudTh>Rating</MudTh><MudTh>Title</MudTh>
+                <MudTh>Author</MudTh><MudTh>Status</MudTh><MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Id</MudTd>
+                <MudTd>@context.Rating</MudTd>
+                <MudTd>@context.Title</MudTd>
+                <MudTd>@context.ReviewerName</MudTd>
+                <MudTd>@context.Status</MudTd>
+                <MudTd>
+                    <MudButton Size="Size.Small" Color="Color.Success" OnClick="@(() => Moderate(context.Id, 1))">Approve</MudButton>
+                    <MudButton Size="Size.Small" Color="Color.Error" OnClick="@(() => Moderate(context.Id, 2))">Reject</MudButton>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private int? _status;
+    private AdminReviewsPage? _page;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload() { _page = await Reviews.ListAsync(_status); StateHasChanged(); }
+
+    private async Task Moderate(long id, int newStatus)
+    {
+        var resp = await Reviews.ModerateAsync(id, new ModerationRequest(newStatus));
+        if (resp.IsSuccessStatusCode)
+        {
+            Snack.Add("Review updated.", Severity.Success);
+            await Reload();
+        }
+        else { Snack.Add("Moderation failed.", Severity.Error); }
+    }
+}

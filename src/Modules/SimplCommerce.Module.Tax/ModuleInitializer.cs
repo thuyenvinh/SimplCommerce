@@ -1,20 +1,16 @@
-﻿using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
+using System;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using SimplCommerce.Infrastructure.Modules;
-using SimplCommerce.Module.Tax.Services;
-using SimplCommerce.Infrastructure;
 
 namespace SimplCommerce.Module.Tax
 {
+    [Obsolete("Call services.AddTaxModule() in your composition root.")]
     public class ModuleInitializer : IModuleInitializer
     {
-        public void ConfigureServices(IServiceCollection serviceCollection)
-        {
-            serviceCollection.AddTransient<ITaxService, TaxService>();
-
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.tax");
-        }
+        public void ConfigureServices(IServiceCollection services) =>
+            services.AddTaxModule();
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {

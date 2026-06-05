@@ -1,0 +1,84 @@
+@page "/category/{Slug}"
+@rendermode RenderMode.InteractiveAuto
+@inject ICatalogApi Catalog
+
+<PageTitle>@(_category?.Name ?? Slug) — SimplCommerce</PageTitle>
+
+@if (_category is null && !_loaded)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else if (_category is null)
+{
+    <MudAlert Severity="Severity.Warning">Category not found.</MudAlert>
+}
+else
+{
+    <MudBreadcrumbs Items="_breadcrumbs" />
+    <MudText Typo="Typo.h4" Class="my-4">@_category.Name</MudText>
+
+    @if (_products is null)
+    {
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var p in _products.Items)
+            {
+                <MudItem xs="12" sm="6" md="4" lg="3">
+                    <MudCard>
+                        <MudCardMedia Image="@(p.ThumbnailUrl ?? "/images/placeholder.png")" Height="180" />
+                        <MudCardContent>
+                            <MudLink Href="@($"/product/{p.Slug}")" Underline="Underline.Hover">
+                                <MudText Typo="Typo.subtitle1">@p.Name</MudText>
+                            </MudLink>
+                            <MudText Typo="Typo.h6" Color="Color.Primary">@p.Price.ToString("C")</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+        <MudPagination Count="@((int)Math.Ceiling(_products.TotalCount / (double)_pageSize))"
+                       Selected="_page"
+                       SelectedChanged="OnPageChange"
+                       Class="my-4" />
+    }
+}
+
+@code {
+    [Parameter] public string Slug { get; set; } = default!;
+
+    private CategoryItem? _category;
+    private bool _loaded;
+    private PagedResult<ProductListItem>? _products;
+    private List<BreadcrumbItem> _breadcrumbs = new();
+    private int _page = 1;
+    private const int _pageSize = 24;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loaded = false;
+        var categories = await Catalog.ListCategoriesAsync() ?? new List<CategoryItem>();
+        _category = categories.FirstOrDefault(c => c.Slug == Slug);
+        _loaded = true;
+        if (_category is not null)
+        {
+            _breadcrumbs = new() { new("Home", "/"), new(_category.Name, $"/category/{_category.Slug}") };
+            await LoadPageAsync();
+        }
+    }
+
+    private Task OnPageChange(int page)
+    {
+        _page = page;
+        return LoadPageAsync();
+    }
+
+    private async Task LoadPageAsync()
+    {
+        if (_category is null) return;
+        _products = await Catalog.ListProductsAsync(categoryId: _category.Id, page: _page, pageSize: _pageSize);
+        StateHasChanged();
+    }
+}

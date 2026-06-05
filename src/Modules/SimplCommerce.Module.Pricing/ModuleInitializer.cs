@@ -1,24 +1,19 @@
-﻿using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
+using System;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using SimplCommerce.Infrastructure.Modules;
-using SimplCommerce.Module.Pricing.Services;
-using SimplCommerce.Infrastructure;
 
 namespace SimplCommerce.Module.Pricing
 {
+    [Obsolete("Call services.AddPricingModule() in your composition root.")]
     public class ModuleInitializer : IModuleInitializer
     {
-        public void ConfigureServices(IServiceCollection services)
-        {
-            services.AddTransient<ICouponService, CouponService>();
-
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.pricing");
-        }
+        public void ConfigureServices(IServiceCollection services) =>
+            services.AddPricingModule();
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-
         }
     }
 }

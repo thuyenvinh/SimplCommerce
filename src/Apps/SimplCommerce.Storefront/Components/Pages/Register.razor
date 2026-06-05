@@ -1,0 +1,49 @@
+@page "/account/register"
+@rendermode RenderMode.InteractiveServer
+@inject CookieAuthStateService AuthState
+@inject NavigationManager Nav
+
+<PageTitle>Create an account — SimplCommerce</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small">
+    <MudText Typo="Typo.h4" Class="mb-4">Create an account</MudText>
+
+    <EditForm Model="_input" OnValidSubmit="HandleRegister" FormName="registerForm">
+        <DataAnnotationsValidator />
+        <MudTextField @bind-Value="_input.FullName" Label="Full name" Required="true" />
+        <MudTextField @bind-Value="_input.Email" Label="Email" Required="true" Class="mt-2" />
+        <MudTextField @bind-Value="_input.Password" Label="Password" InputType="InputType.Password" Required="true" Class="mt-2" />
+        @if (_error is not null) { <MudAlert Severity="Severity.Error" Class="mt-3">@_error</MudAlert> }
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy" Class="mt-4">
+            Create account
+        </MudButton>
+    </EditForm>
+</MudContainer>
+
+@code {
+    private RegisterInput _input = new();
+    private string? _error;
+    private bool _busy;
+
+    private async Task HandleRegister()
+    {
+        _busy = true;
+        _error = null;
+        var (ok, err) = await AuthState.RegisterAsync(_input.Email, _input.Password, _input.FullName);
+        _busy = false;
+        if (ok) Nav.NavigateTo("/", forceLoad: true);
+        else _error = err;
+    }
+
+    public sealed class RegisterInput
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string FullName { get; set; } = string.Empty;
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string Email { get; set; } = string.Empty;
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.MinLength(4)]
+        public string Password { get; set; } = string.Empty;
+    }
+}

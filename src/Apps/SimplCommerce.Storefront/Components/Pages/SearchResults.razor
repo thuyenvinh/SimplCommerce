@@ -1,0 +1,53 @@
+@page "/search"
+@rendermode RenderMode.InteractiveAuto
+@inject ISearchApi Search
+
+<PageTitle>Search results — SimplCommerce</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Search results for "@Q"</MudText>
+
+@if (string.IsNullOrWhiteSpace(Q))
+{
+    <MudAlert Severity="Severity.Info">Enter a search query in the header.</MudAlert>
+}
+else if (_result is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_result.TotalCount == 0)
+{
+    <MudAlert Severity="Severity.Info">No products matched "@Q".</MudAlert>
+}
+else
+{
+    <MudText Typo="Typo.caption" Class="mb-2">@_result.TotalCount results</MudText>
+    <MudGrid>
+        @foreach (var p in _result.Items)
+        {
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudCard>
+                    <MudCardMedia Image="@(p.ThumbnailUrl ?? "/images/placeholder.png")" Height="180" />
+                    <MudCardContent>
+                        <MudLink Href="@($"/product/{p.Slug}")">
+                            <MudText Typo="Typo.subtitle1">@p.Name</MudText>
+                        </MudLink>
+                        <MudText Typo="Typo.h6" Color="Color.Primary">@p.Price.ToString("C")</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "q")] public string? Q { get; set; }
+    private SearchResponse? _result;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(Q))
+        {
+            _result = await Search.SearchAsync(Q);
+        }
+    }
+}

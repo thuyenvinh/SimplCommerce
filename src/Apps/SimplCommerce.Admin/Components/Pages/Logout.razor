@@ -1,0 +1,17 @@
+@page "/logout"
+@rendermode RenderMode.InteractiveServer
+@inject CookieAuthStateService AuthState
+@inject NavigationManager Nav
+
+<MudProgressCircular Indeterminate="true" />
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await AuthState.SignOutAsync();
+            Nav.NavigateTo("/login", forceLoad: true);
+        }
+    }
+}

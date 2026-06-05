@@ -1,0 +1,94 @@
+@page "/news/items/create"
+@page "/news/items/edit/{Id:long}"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminNewsApi News
+@inject NavigationManager Nav
+@inject ISnackbar Snack
+
+<PageTitle>@(Id is null ? "New article" : $"Edit article #{Id}")</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Nav.NavigateTo("/news/items"))" aria-label="Back" />
+    <MudText Typo="Typo.h4">@(Id is null ? "New article" : $"Edit article #{Id}")</MudText>
+</MudStack>
+
+@if (_loading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <EditForm Model="_form" OnValidSubmit="Save">
+        <DataAnnotationsValidator />
+        <MudPaper Class="pa-4 mb-3">
+            <MudTextField @bind-Value="_form.Name" Label="Title" Required="true" />
+            <MudTextField @bind-Value="_form.Slug" Label="Slug" Required="true" />
+            <MudSwitch @bind-Value="_form.IsPublished" Label="Published" Color="Color.Primary" />
+        </MudPaper>
+        <MudPaper Class="pa-4 mb-3">
+            <MudTextField @bind-Value="_form.ShortContent" Label="Short content (excerpt)" Lines="3" />
+        </MudPaper>
+        <MudPaper Class="pa-4 mb-3">
+            <MudTextField @bind-Value="_form.FullContent" Label="Full content (HTML or plain text)" Lines="20" />
+        </MudPaper>
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                   Disabled="_saving">@(_saving ? "Saving…" : "Save")</MudButton>
+        <MudButton OnClick="@(() => Nav.NavigateTo("/news/items"))" Class="ml-2">Cancel</MudButton>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public long? Id { get; set; }
+
+    private FormModel _form = new();
+    private bool _loading = true;
+    private bool _saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Id is { } id)
+        {
+            var dto = await News.GetItemAsync(id);
+            if (dto is null) { Snack.Add("Article not found.", Severity.Error); Nav.NavigateTo("/news/items"); return; }
+            _form = new FormModel
+            {
+                Name = dto.Name, Slug = dto.Slug,
+                ShortContent = dto.ShortContent, FullContent = dto.FullContent,
+                IsPublished = dto.IsPublished,
+            };
+        }
+        _loading = false;
+    }
+
+    private async Task Save()
+    {
+        _saving = true;
+        try
+        {
+            var input = new AdminNewsItemInput(_form.Name, _form.Slug, _form.ShortContent, _form.FullContent, _form.IsPublished);
+            using var resp = Id is { } id
+                ? await News.UpdateItemAsync(id, input)
+                : await News.CreateItemAsync(input);
+            if (!resp.IsSuccessStatusCode)
+            {
+                Snack.Add($"Save failed (HTTP {(int)resp.StatusCode}).", Severity.Error);
+                return;
+            }
+            Snack.Add(Id is null ? "Article created." : "Article saved.", Severity.Success);
+            Nav.NavigateTo("/news/items");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private class FormModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Slug { get; set; } = string.Empty;
+        public string? ShortContent { get; set; }
+        public string? FullContent { get; set; }
+        public bool IsPublished { get; set; } = true;
+    }
+}

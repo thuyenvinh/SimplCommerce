@@ -1,0 +1,129 @@
+@page "/categories"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminCatalogApi Catalog
+@inject ISnackbar Snack
+
+<PageTitle>Categories — Admin</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Categories</MudText>
+
+<MudPaper Class="pa-4">
+    <EditForm Model="_input" OnValidSubmit="Create" FormName="newCategory">
+        <DataAnnotationsValidator />
+        <MudStack Row="true" AlignItems="AlignItems.End" Spacing="2">
+            <MudTextField @bind-Value="_input.Name" Label="Name" Required="true" />
+            <MudTextField @bind-Value="_input.Slug" Label="Slug" Required="true" />
+            <MudSelect T="long?" @bind-Value="_input.ParentId" Label="Parent" Clearable="true" Style="min-width:180px">
+                @if (_categories is not null)
+                {
+                    @foreach (var c in _categories)
+                    {
+                        <MudSelectItem T="long?" Value="@((long?)c.Id)">@c.Name</MudSelectItem>
+                    }
+                }
+            </MudSelect>
+            <MudNumericField T="int" @bind-Value="_input.DisplayOrder" Label="Order" Min="0" Max="9999" />
+            <MudButton ButtonType="ButtonType.Submit" Color="Color.Primary" Variant="Variant.Filled">Add</MudButton>
+        </MudStack>
+    </EditForm>
+    <MudDivider Class="my-3" />
+
+    @if (_categories is null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (_categories.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">No categories yet.</MudAlert>
+    }
+    else
+    {
+        <MudTable T="EditRow" Items="_editRows" Hover="true" Dense="true">
+            <HeaderContent>
+                <MudTh>ID</MudTh><MudTh>Name</MudTh><MudTh>Slug</MudTh><MudTh>Parent</MudTh><MudTh>Order</MudTh><MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Id</MudTd>
+                <MudTd><MudTextField @bind-Value="context.Name" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudTd>
+                <MudTd><MudTextField @bind-Value="context.Slug" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudTd>
+                <MudTd>
+                    <MudSelect T="long?" @bind-Value="context.ParentId" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense">
+                        @foreach (var c in _categories!.Where(x => x.Id != context.Id))
+                        {
+                            <MudSelectItem T="long?" Value="@((long?)c.Id)">@c.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudTd>
+                <MudTd><MudNumericField T="int" @bind-Value="context.DisplayOrder" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" /></MudTd>
+                <MudTd>
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => Save(context))">Save</MudButton>
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                   OnClick="@(() => Delete(context.Id))" aria-label="Delete" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private IReadOnlyList<CategoryItem>? _categories;
+    private List<EditRow> _editRows = new();
+    private NewCategoryInput _input = new();
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        _categories = await Catalog.ListCategoriesAsync();
+        _editRows = _categories?.Select(c => new EditRow
+        {
+            Id = c.Id, Name = c.Name, Slug = c.Slug, ParentId = c.ParentId, DisplayOrder = c.DisplayOrder,
+        }).ToList() ?? new();
+        StateHasChanged();
+    }
+
+    private async Task Create()
+    {
+        using var resp = await Catalog.CreateCategoryAsync(new CategoryInput(_input.Name, _input.Slug, _input.ParentId, _input.DisplayOrder, null));
+        if (resp.IsSuccessStatusCode)
+        {
+            Snack.Add("Category added.", Severity.Success);
+            _input = new();
+            await Reload();
+        }
+        else
+        {
+            Snack.Add($"Create failed (HTTP {(int)resp.StatusCode}).", Severity.Error);
+        }
+    }
+
+    private async Task Save(EditRow row)
+    {
+        using var resp = await Catalog.UpdateCategoryAsync(row.Id, new CategoryInput(row.Name, row.Slug, row.ParentId, row.DisplayOrder, null));
+        if (resp.IsSuccessStatusCode) { Snack.Add("Saved.", Severity.Success); }
+        else { Snack.Add($"Save failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    private async Task Delete(long id)
+    {
+        using var resp = await Catalog.DeleteCategoryAsync(id);
+        if (resp.IsSuccessStatusCode) { Snack.Add("Category deleted.", Severity.Success); await Reload(); }
+        else { Snack.Add($"Delete failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    public sealed class NewCategoryInput
+    {
+        [System.ComponentModel.DataAnnotations.Required] public string Name { get; set; } = string.Empty;
+        [System.ComponentModel.DataAnnotations.Required] public string Slug { get; set; } = string.Empty;
+        public long? ParentId { get; set; }
+        public int DisplayOrder { get; set; }
+    }
+
+    private class EditRow
+    {
+        public long Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Slug { get; set; } = string.Empty;
+        public long? ParentId { get; set; }
+        public int DisplayOrder { get; set; }
+    }
+}

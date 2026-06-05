@@ -1,0 +1,40 @@
+@page "/account/addresses"
+@attribute [Authorize]
+@rendermode RenderMode.InteractiveServer
+@inject IAccountApi AccountClient
+
+<PageTitle>Addresses — SimplCommerce</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Saved addresses</MudText>
+
+@if (_addresses is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_addresses.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">No saved addresses yet. Add one during checkout.</MudAlert>
+}
+else
+{
+    <MudGrid>
+        @foreach (var a in _addresses)
+        {
+            <MudItem xs="12" md="6">
+                <MudCard>
+                    <MudCardContent>
+                        <MudText Typo="Typo.subtitle1">@a.ContactName</MudText>
+                        <MudText Typo="Typo.body2">@a.AddressLine1</MudText>
+                        <MudText Typo="Typo.body2">@a.City @a.ZipCode</MudText>
+                        <MudText Typo="Typo.caption">@a.Phone</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private IReadOnlyList<AddressDto>? _addresses;
+    protected override async Task OnInitializedAsync() =>
+        _addresses = await AccountClient.GetAddressesAsync();
+}

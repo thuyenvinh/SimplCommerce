@@ -1,0 +1,17 @@
+@page "/checkout/{OrderId:long}/success"
+@attribute [Authorize]
+
+<PageTitle>Thanks for your order — SimplCommerce</PageTitle>
+
+<MudPaper Class="pa-6" Elevation="1">
+    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" />
+    <MudText Typo="Typo.h4" Class="mt-2">Thanks for your order!</MudText>
+    <MudText Class="mt-2">Order <strong>#@OrderId</strong> has been received. You'll get a confirmation email shortly.</MudText>
+    <MudButton Href="@($"/account/orders")" Variant="Variant.Filled" Color="Color.Primary" Class="mt-4">
+        View my orders
+    </MudButton>
+</MudPaper>
+
+@code {
+    [Parameter] public long OrderId { get; set; }
+}

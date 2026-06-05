@@ -1,0 +1,89 @@
+# Production-like local stack without Aspire — good for smoke-testing the
+# Dockerfiles the same way a plain Docker Compose prod box would.
+#
+# Start:   docker compose up --build
+# Tear:    docker compose down -v
+#
+# Uses bind-mounted secrets via `.env`; copy `.env.sample` (to be added in a
+# follow-up) and fill in your own values before `compose up`.
+
+name: simplcommerce
+
+services:
+  sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${SQL_SA_PASSWORD:-ChangeMe!Strong1}
+    ports: ["1433:1433"]
+    volumes: [sqldata:/var/opt/mssql]
+    healthcheck:
+      test: /opt/mssql-tools/bin/sqlcmd -U sa -P "$$MSSQL_SA_PASSWORD" -Q "SELECT 1" || exit 1
+      interval: 10s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 10s, retries: 5 }
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    ports: ["10000:10000", "10001:10001", "10002:10002"]
+    volumes: [blobdata:/data]
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports: ["1025:1025", "8025:8025"]
+
+  seq:
+    image: datalust/seq:latest
+    environment:
+      ACCEPT_EULA: "Y"
+    ports: ["5341:80"]
+    volumes: [seqdata:/data]
+
+  api:
+    build:
+      context: .
+      dockerfile: src/Apps/SimplCommerce.ApiService/Dockerfile
+    depends_on:
+      sql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      azurite: { condition: service_started }
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__SimplCommerce: "Server=sql;Database=SimplCommerce;User Id=sa;Password=${SQL_SA_PASSWORD:-ChangeMe!Strong1};TrustServerCertificate=true"
+      ConnectionStrings__redis: "redis:6379"
+      ConnectionStrings__blobs: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:-dev-only-change-me-32-bytes-minimum!!}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://seq/ingest/otlp
+    ports: ["7001:8080"]
+
+  storefront:
+    build:
+      context: .
+      dockerfile: src/Apps/SimplCommerce.Storefront/Dockerfile
+    depends_on: [api]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      services__api__https__0: http://api:8080
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://seq/ingest/otlp
+    ports: ["7100:8080"]
+
+  admin:
+    build:
+      context: .
+      dockerfile: src/Apps/SimplCommerce.Admin/Dockerfile
+    depends_on: [api, redis]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      services__api__https__0: http://api:8080
+      ConnectionStrings__redis: "redis:6379"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://seq/ingest/otlp
+    ports: ["7200:8080"]
+
+volumes:
+  sqldata:
+  blobdata:
+  seqdata:

@@ -1,0 +1,47 @@
+@page "/page/{Slug}"
+@rendermode RenderMode.InteractiveAuto
+@inject ICmsApi Cms
+
+<PageTitle>@(_page?.Name ?? Slug) — SimplCommerce</PageTitle>
+<HeadContent>
+    @if (_page is not null)
+    {
+        <meta name="description" content="@_page.Name" />
+    }
+</HeadContent>
+
+@if (_page is null && !_loaded)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_page is null)
+{
+    <MudAlert Severity="Severity.Warning">Page not found.</MudAlert>
+}
+else
+{
+    <MudText Typo="Typo.h3" Class="mb-4">@_page.Name</MudText>
+    <MudPaper Class="pa-4">
+        @if (!string.IsNullOrWhiteSpace(_page.Body))
+        {
+            @((MarkupString)_page.Body)
+        }
+        else
+        {
+            <MudText>(No content.)</MudText>
+        }
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public string Slug { get; set; } = default!;
+    private CmsPageDto? _page;
+    private bool _loaded;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loaded = false;
+        _page = await Cms.GetPageAsync(Slug);
+        _loaded = true;
+    }
+}

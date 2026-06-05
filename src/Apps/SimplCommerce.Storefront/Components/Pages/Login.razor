@@ -1,0 +1,58 @@
+@page "/account/login"
+@rendermode RenderMode.InteractiveServer
+@inject CookieAuthStateService AuthState
+@inject NavigationManager Nav
+
+<PageTitle>Sign in — SimplCommerce</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small">
+    <MudText Typo="Typo.h4" Class="mb-4">Sign in</MudText>
+
+    <EditForm Model="_input" OnValidSubmit="HandleLogin" FormName="loginForm">
+        <DataAnnotationsValidator />
+        <MudTextField @bind-Value="_input.Email" Label="Email" Required="true" />
+        <MudTextField @bind-Value="_input.Password" Label="Password" InputType="InputType.Password" Required="true" Class="mt-2" />
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-3">@_error</MudAlert>
+        }
+        <MudStack Row="true" Class="mt-4">
+            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy">Sign in</MudButton>
+            <MudButton Href="/account/register" Variant="Variant.Text">Create an account</MudButton>
+        </MudStack>
+    </EditForm>
+</MudContainer>
+
+@code {
+    [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
+
+    private LoginInput _input = new();
+    private string? _error;
+    private bool _busy;
+
+    private async Task HandleLogin()
+    {
+        _busy = true;
+        _error = null;
+        var (ok, err) = await AuthState.SignInAsync(_input.Email, _input.Password);
+        _busy = false;
+        if (ok)
+        {
+            Nav.NavigateTo(string.IsNullOrWhiteSpace(ReturnUrl) ? "/" : "/" + ReturnUrl.TrimStart('/'), forceLoad: true);
+        }
+        else
+        {
+            _error = err;
+        }
+    }
+
+    public sealed class LoginInput
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Password { get; set; } = string.Empty;
+    }
+}

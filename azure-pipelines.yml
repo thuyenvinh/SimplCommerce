@@ -1,144 +1,72 @@
-# ASP.NET Core
-# Build and test ASP.NET Core projects targeting .NET Core.
-# Add steps that run tests, create a NuGet package, deploy, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
+# Azure DevOps pipeline for SimplCommerce on .NET 9 + Aspire.
+# Replaces the legacy 4-matrix (Linux/macOS/Windows/LinuxRelease) setup that
+# still targeted .NET 8 + the old test layout. For Phase 8, CI focuses on
+# one fast Linux build + containerised publish; the GitHub Actions
+# equivalent lives at .github/workflows/ci.yml.
 
 trigger:
-- master
+  branches:
+    include:
+      - master
+      - aspire-migration/*
 
-jobs:
-- job: Linux
-  pool:
-    vmImage: 'ubuntu-latest'
-  steps:
-  - task: UseDotNet@2
-    displayName: 'Use .NET Core sdk'
-    inputs:
-      packageType: 'sdk'
-      version: '8.0.100'
-  - script: dotnet build ./SimplCommerce.sln
-    displayName: 'dotnet build'
-  - task: DotNetCoreCLI@2
-    displayName: 'run tests'
-    inputs:
-      command: test
-      arguments:  '--logger trx /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:Exclude=[xunit.*]*%2c[System.*]*'
-      projects: 'test/**/*.csproj'
-      nobuild: true
-  - task: DotNetCoreCLI@2
-    inputs:
-      command: custom
-      custom: tool
-      arguments: install --tool-path . dotnet-reportgenerator-globaltool
-      displayName: Install ReportGenerator tool
-  - script: ./reportgenerator "-reports:$(Build.SourcesDirectory)/test/**/coverage.cobertura.xml" "-targetdir:$(Build.SourcesDirectory)/coverlet/reports" "-reporttypes:HtmlInline_AzurePipelines;Cobertura"
-    displayName: Create reports
-  - task: PublishCodeCoverageResults@1
-    displayName: 'Publish code coverage'
-    inputs:
-      codeCoverageTool: Cobertura
-      summaryFileLocation: $(Build.SourcesDirectory)/coverlet/reports/Cobertura.xml  
+variables:
+  buildConfiguration: Release
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_NOLOGO: 1
 
-- job: macOS
-  pool:
-    vmImage: 'macOS-latest'
-  steps:
-  - task: UseDotNet@2
-    displayName: 'Use .NET Core sdk'
-    inputs:
-      packageType: 'sdk'
-      version: '8.0.100'
-  - script: dotnet build ./SimplCommerce.sln
-    displayName: 'dotnet build'
-  - task: DotNetCoreCLI@2
-    displayName: 'run tests'
-    inputs:
-      command: test
-      arguments:  '--logger trx /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:Exclude=[xunit.*]*%2c[System.*]*'
-      projects: 'test/**/*.csproj'
-      nobuild: true
-  - task: DotNetCoreCLI@2
-    inputs:
-      command: custom
-      custom: tool
-      arguments: install --tool-path . dotnet-reportgenerator-globaltool
-      displayName: Install ReportGenerator tool
-  - script: ./reportgenerator -reports:$(Build.SourcesDirectory)/test/**/coverage.cobertura.xml -targetdir:$(Build.SourcesDirectory)/coverlet/reports -reporttypes:"HtmlInline_AzurePipelines;Cobertura"
-    displayName: Create reports
-  - task: PublishCodeCoverageResults@1
-    displayName: 'Publish code coverage'
-    inputs:
-      codeCoverageTool: Cobertura
-      summaryFileLocation: $(Build.SourcesDirectory)/coverlet/reports/Cobertura.xml  
+stages:
+  - stage: build
+    jobs:
+      - job: BuildAndTest
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: UseDotNet@2
+            inputs:
+              packageType: sdk
+              useGlobalJson: true
 
-- job: Windows
-  pool:
-    vmImage: 'windows-latest'
-  steps:
-  - task: UseDotNet@2
-    displayName: 'Use .NET Core sdk'
-    inputs:
-      packageType: 'sdk'
-      version: '8.0.100'
-  - task: DotNetCoreCLI@2
-    displayName: 'Restoring code using dotnet restore'
-    inputs: 
-      command: 'restore'
-      projects: '**/*/*.csproj'
-      includeNuGetOrg: true
-  - script: dotnet build ./SimplCommerce.sln
-    displayName: 'dotnet build'
-  - task: DotNetCoreCLI@2
-    displayName: 'run tests'
-    inputs:
-      command: test
-      arguments:  '--logger trx /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:Exclude=[xunit.*]*%2c[System.*]*'
-      projects: 'test/**/*.csproj'
-      nobuild: true
-  - task: DotNetCoreCLI@2
-    inputs:
-      command: custom
-      custom: tool
-      arguments: install --tool-path . dotnet-reportgenerator-globaltool
-      displayName: Install ReportGenerator tool
-  - script: .\reportgenerator -reports:$(Build.SourcesDirectory)\test\**\coverage.cobertura.xml -targetdir:$(Build.SourcesDirectory)\coverlet\reports -reporttypes:"HtmlInline_AzurePipelines;Cobertura"
-    displayName: Create reports 
-  - task: PublishCodeCoverageResults@1
-    displayName: 'Publish code coverage'
-    inputs:
-      codeCoverageTool: Cobertura
-      summaryFileLocation: $(Build.SourcesDirectory)/coverlet/reports/Cobertura.xml  
+          - script: dotnet restore SimplCommerce.sln
+            displayName: Restore
 
-- job: LinuxRelease
-  pool:
-    vmImage: 'ubuntu-latest'
-  variables:
-    buildConfiguration: 'Release'
-  steps:
-  - task: UseDotNet@2
-    displayName: 'Use .NET Core sdk'
-    inputs:
-      packageType: 'sdk'
-      version: '8.0.100'
-  - script: dotnet build --configuration $(buildConfiguration)
-    displayName: 'dotnet build $(buildConfiguration)'
-  - task: DotNetCoreCLI@2
-    displayName: 'run tests'
-    inputs:
-      command: test
-      arguments:  '--configuration $(buildConfiguration) --logger trx /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:Exclude=[xunit.*]*%2c[System.*]*'
-      projects: 'test/**/*.csproj'
-      nobuild: true
-  - task: DotNetCoreCLI@2
-    inputs:
-      command: custom
-      custom: tool
-      arguments: install --tool-path . dotnet-reportgenerator-globaltool
-      displayName: Install ReportGenerator tool
-  - script: ./reportgenerator -reports:$(Build.SourcesDirectory)/test/**/coverage.cobertura.xml -targetdir:$(Build.SourcesDirectory)/coverlet/reports -reporttypes:"HtmlInline_AzurePipelines;Cobertura"
-    displayName: Create reports   
-  - task: PublishCodeCoverageResults@1
-    displayName: 'Publish code coverage'
-    inputs:
-      codeCoverageTool: Cobertura
-      summaryFileLocation: $(Build.SourcesDirectory)/coverlet/reports/Cobertura.xml  
+          - script: dotnet build SimplCommerce.sln --no-restore -c $(buildConfiguration) -p:TreatWarningsAsErrors=true
+            displayName: Build
+
+          - script: dotnet test SimplCommerce.sln --no-build -c $(buildConfiguration) --logger trx --results-directory $(Agent.TempDirectory)/tests
+            displayName: Test
+
+          - task: PublishTestResults@2
+            condition: always()
+            inputs:
+              testResultsFormat: VSTest
+              testResultsFiles: '$(Agent.TempDirectory)/tests/*.trx'
+
+  - stage: images
+    dependsOn: build
+    condition: and(succeeded(), in(variables['Build.SourceBranch'], 'refs/heads/master'))
+    jobs:
+      - job: Publish
+        pool:
+          vmImage: ubuntu-latest
+        strategy:
+          matrix:
+            api:
+              dockerfile: src/Apps/SimplCommerce.ApiService/Dockerfile
+              imageName: simpl-api
+            storefront:
+              dockerfile: src/Apps/SimplCommerce.Storefront/Dockerfile
+              imageName: simpl-storefront
+            admin:
+              dockerfile: src/Apps/SimplCommerce.Admin/Dockerfile
+              imageName: simpl-admin
+        steps:
+          - task: Docker@2
+            inputs:
+              command: buildAndPush
+              repository: $(imageName)
+              dockerfile: $(dockerfile)
+              buildContext: '.'
+              tags: |
+                $(Build.SourceVersion)
+                $(Build.SourceBranchName)

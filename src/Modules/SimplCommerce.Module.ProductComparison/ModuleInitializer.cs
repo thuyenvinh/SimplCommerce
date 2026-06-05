@@ -1,21 +1,19 @@
-﻿using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
+using System;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using SimplCommerce.Infrastructure.Modules;
-using SimplCommerce.Module.ProductComparison.Services;
 
 namespace SimplCommerce.Module.ProductComparison
 {
+    [Obsolete("Call services.AddProductComparisonModule() in your composition root.")]
     public class ModuleInitializer : IModuleInitializer
     {
-        public void ConfigureServices(IServiceCollection services)
-        {
-            services.AddTransient<IComparingProductService, ComparingProductService>();
-        }
+        public void ConfigureServices(IServiceCollection services) =>
+            services.AddProductComparisonModule();
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-
         }
     }
 }

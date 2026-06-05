@@ -1,0 +1,65 @@
+@page "/news/items"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminNewsApi News
+@inject NavigationManager Nav
+@inject ISnackbar Snack
+
+<PageTitle>News articles — Admin</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">News articles</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/news/items/create">New article</MudButton>
+</MudStack>
+
+<MudPaper Class="pa-4">
+    @if (_page is null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (_page.Items.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">No articles yet.</MudAlert>
+    }
+    else
+    {
+        <MudTable T="AdminNewsItemListItem" Items="_page.Items" Hover="true" Dense="true"
+                  OnRowClick="@((TableRowClickEventArgs<AdminNewsItemListItem> e) => Nav.NavigateTo($"/news/items/edit/{e.Item!.Id}"))">
+            <HeaderContent>
+                <MudTh>ID</MudTh><MudTh>Title</MudTh><MudTh>Slug</MudTh>
+                <MudTh>Published</MudTh><MudTh>Created</MudTh><MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Id</MudTd>
+                <MudTd>@context.Name</MudTd>
+                <MudTd>@context.Slug</MudTd>
+                <MudTd>@(context.IsPublished ? "✓" : "—")</MudTd>
+                <MudTd>@context.CreatedOn.LocalDateTime.ToString("g")</MudTd>
+                <MudTd @onclick:stopPropagation="true">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                   OnClick="@(() => Delete(context.Id))" aria-label="Delete" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+        <MudPagination Count="@((int)Math.Ceiling(_page.Total / (double)_pageSize))"
+                       Selected="_pageNum" SelectedChanged="OnPage" Class="mt-3" />
+    }
+</MudPaper>
+
+@code {
+    private AdminNewsItemsPage? _page;
+    private int _pageNum = 1;
+    private const int _pageSize = 20;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload() { _page = await News.ListItemsAsync(_pageNum, _pageSize); StateHasChanged(); }
+    private async Task OnPage(int p) { _pageNum = p; await Reload(); }
+
+    private async Task Delete(long id)
+    {
+        using var resp = await News.DeleteItemAsync(id);
+        if (resp.IsSuccessStatusCode) { Snack.Add("Article deleted.", Severity.Success); await Reload(); }
+        else { Snack.Add($"Delete failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+}

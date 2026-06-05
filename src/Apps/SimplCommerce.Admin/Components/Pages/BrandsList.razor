@@ -1,0 +1,104 @@
+@page "/brands"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminCatalogApi Catalog
+@inject ISnackbar Snack
+
+<PageTitle>Brands — Admin</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Brands</MudText>
+
+<MudPaper Class="pa-4">
+    <EditForm Model="_input" OnValidSubmit="Create" FormName="newBrand">
+        <DataAnnotationsValidator />
+        <MudStack Row="true" AlignItems="AlignItems.End">
+            <MudTextField @bind-Value="_input.Name" Label="Name" Required="true" />
+            <MudTextField @bind-Value="_input.Slug" Label="Slug" Required="true" />
+            <MudCheckBox T="bool" @bind-Value="_input.IsPublished" Label="Published" />
+            <MudButton ButtonType="ButtonType.Submit" Color="Color.Primary" Variant="Variant.Filled">Add</MudButton>
+        </MudStack>
+    </EditForm>
+    <MudDivider Class="my-3" />
+
+    @if (_brands is null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (_brands.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">No brands yet.</MudAlert>
+    }
+    else
+    {
+        <MudTable T="EditRow" Items="_editRows" Hover="true" Dense="true">
+            <HeaderContent>
+                <MudTh>ID</MudTh><MudTh>Name</MudTh><MudTh>Slug</MudTh><MudTh>Published</MudTh><MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Id</MudTd>
+                <MudTd><MudTextField @bind-Value="context.Name" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudTd>
+                <MudTd><MudTextField @bind-Value="context.Slug" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudTd>
+                <MudTd><MudSwitch T="bool" @bind-Value="context.IsPublished" Color="Color.Primary" /></MudTd>
+                <MudTd>
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => Save(context))">Save</MudButton>
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                   OnClick="@(() => Delete(context.Id))" aria-label="Delete" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private IReadOnlyList<BrandItem>? _brands;
+    private List<EditRow> _editRows = new();
+    private NewBrandInput _input = new();
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        _brands = await Catalog.ListBrandsAsync();
+        _editRows = _brands?.Select(b => new EditRow { Id = b.Id, Name = b.Name, Slug = b.Slug, IsPublished = b.IsPublished }).ToList() ?? new();
+        StateHasChanged();
+    }
+
+    private async Task Create()
+    {
+        using var resp = await Catalog.CreateBrandAsync(new BrandInput(_input.Name, _input.Slug, _input.IsPublished));
+        if (resp.IsSuccessStatusCode)
+        {
+            Snack.Add("Brand added.", Severity.Success);
+            _input = new();
+            await Reload();
+        }
+        else { Snack.Add($"Create failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    private async Task Save(EditRow row)
+    {
+        using var resp = await Catalog.UpdateBrandAsync(row.Id, new BrandInput(row.Name, row.Slug, row.IsPublished));
+        if (resp.IsSuccessStatusCode) { Snack.Add("Saved.", Severity.Success); }
+        else { Snack.Add($"Save failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    private async Task Delete(long id)
+    {
+        using var resp = await Catalog.DeleteBrandAsync(id);
+        if (resp.IsSuccessStatusCode) { Snack.Add("Brand deleted.", Severity.Success); await Reload(); }
+        else { Snack.Add($"Delete failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    public sealed class NewBrandInput
+    {
+        [System.ComponentModel.DataAnnotations.Required] public string Name { get; set; } = string.Empty;
+        [System.ComponentModel.DataAnnotations.Required] public string Slug { get; set; } = string.Empty;
+        public bool IsPublished { get; set; } = true;
+    }
+
+    private class EditRow
+    {
+        public long Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Slug { get; set; } = string.Empty;
+        public bool IsPublished { get; set; }
+    }
+}

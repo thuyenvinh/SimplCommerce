@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <Sdk Name="Aspire.AppHost.Sdk" Version="13.2.2" />
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsAspireHost>true</IsAspireHost>
+    <UserSecretsId>simplcommerce-apphost-dev</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" Version="13.2.2" />
+    <PackageReference Include="Aspire.Hosting.SqlServer" Version="13.2.2" />
+    <PackageReference Include="Aspire.Hosting.Redis" Version="13.2.2" />
+    <PackageReference Include="Aspire.Hosting.Azure.Storage" Version="13.2.2" />
+    <PackageReference Include="Aspire.Hosting.Seq" Version="13.2.2" />
+    <PackageReference Include="CommunityToolkit.Aspire.Hosting.MailPit" Version="13.1.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\SimplCommerce.WebHost\SimplCommerce.WebHost.csproj" IsAspireProjectResource="true" />
+    <ProjectReference Include="..\..\Apps\SimplCommerce.ApiService\SimplCommerce.ApiService.csproj" IsAspireProjectResource="true" />
+    <ProjectReference Include="..\..\Apps\SimplCommerce.Storefront\SimplCommerce.Storefront.csproj" IsAspireProjectResource="true" />
+    <ProjectReference Include="..\..\Apps\SimplCommerce.Admin\SimplCommerce.Admin.csproj" IsAspireProjectResource="true" />
+  </ItemGroup>
+
+</Project>

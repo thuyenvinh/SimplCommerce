@@ -1,0 +1,30 @@
+@page "/account"
+@attribute [Authorize]
+@rendermode RenderMode.InteractiveServer
+@inject IAccountApi AccountClient
+
+<PageTitle>My account — SimplCommerce</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">My account</MudText>
+
+@if (_me is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudPaper Class="pa-4">
+        <MudText Typo="Typo.subtitle1">@_me.FullName</MudText>
+        <MudText Typo="Typo.body2">@_me.Email</MudText>
+        <MudText Typo="Typo.caption">Roles: @string.Join(", ", _me.Roles.DefaultIfEmpty("customer"))</MudText>
+    </MudPaper>
+    <MudStack Row="true" Class="mt-4">
+        <MudButton Href="/account/orders" Variant="Variant.Outlined">My orders</MudButton>
+        <MudButton Href="/account/logout" Variant="Variant.Text" Color="Color.Secondary">Sign out</MudButton>
+    </MudStack>
+}
+
+@code {
+    private MeResponse? _me;
+    protected override async Task OnInitializedAsync() => _me = await AccountClient.GetMeAsync();
+}

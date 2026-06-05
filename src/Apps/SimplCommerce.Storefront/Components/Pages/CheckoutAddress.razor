@@ -1,0 +1,116 @@
+@page "/checkout/{CheckoutId:guid}/address"
+@attribute [Authorize]
+@rendermode RenderMode.InteractiveServer
+@inject ICheckoutApi CheckoutClient
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Checkout — Shipping address</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Shipping address</MudText>
+
+@if (_summary is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="7">
+            <MudPaper Class="pa-4">
+                <EditForm Model="_form" OnValidSubmit="Submit">
+                    <DataAnnotationsValidator />
+                    <MudTextField @bind-Value="_form.ContactName" Label="Full name" Required="true" />
+                    <MudTextField @bind-Value="_form.Phone" Label="Phone" Required="true" />
+                    <MudTextField @bind-Value="_form.AddressLine1" Label="Street address" Required="true" />
+                    <MudTextField @bind-Value="_form.AddressLine2" Label="Apartment / suite (optional)" />
+                    <MudTextField @bind-Value="_form.City" Label="City" />
+                    <MudTextField @bind-Value="_form.ZipCode" Label="Postal code" />
+                    <MudTextField @bind-Value="_form.CountryId" Label="Country code (e.g. VN, US)" Required="true" />
+                    <MudNumericField @bind-Value="_form.StateOrProvinceId" Label="State / Province ID" Required="true" Min="0" />
+                    <MudTextField @bind-Value="_form.OrderNote" Label="Order notes (optional)" Lines="2" />
+
+                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                               Class="mt-4" Disabled="_submitting">
+                        @(_submitting ? "Saving…" : "Continue to payment")
+                    </MudButton>
+                </EditForm>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="5">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6">Order summary</MudText>
+                @foreach (var line in _summary.Items)
+                {
+                    <MudText Typo="Typo.body2">
+                        @line.Quantity × @line.ProductName — @line.ProductPrice.ToString("C")
+                    </MudText>
+                }
+                <MudDivider Class="my-2" />
+                <MudText><strong>Subtotal:</strong> @_summary.SubTotal.ToString("C")</MudText>
+                @if (_summary.Discount > 0)
+                {
+                    <MudText><strong>Discount:</strong> -@_summary.Discount.ToString("C")</MudText>
+                }
+                <MudText Typo="Typo.h6"><strong>Total:</strong> @_summary.OrderTotal.ToString("C")</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public Guid CheckoutId { get; set; }
+
+    private CheckoutSummaryDto? _summary;
+    private FormModel _form = new();
+    private bool _submitting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _summary = await CheckoutClient.GetAsync(CheckoutId);
+        if (_summary is null)
+        {
+            Snackbar.Add("Checkout not found.", Severity.Error);
+            Nav.NavigateTo("/cart");
+        }
+    }
+
+    private async Task Submit()
+    {
+        _submitting = true;
+        try
+        {
+            var req = new CheckoutAddressRequest(
+                _form.ContactName, _form.Phone, _form.AddressLine1, _form.AddressLine2,
+                _form.CountryId, _form.StateOrProvinceId, null,
+                _form.City, _form.ZipCode,
+                UseShippingAddressAsBillingAddress: true,
+                ShippingMethod: null,
+                OrderNote: _form.OrderNote);
+            using var resp = await CheckoutClient.SaveShippingAsync(CheckoutId, req);
+            if (!resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add($"Could not save address (HTTP {(int)resp.StatusCode}).", Severity.Error);
+                return;
+            }
+            Nav.NavigateTo($"/checkout/{CheckoutId}/payment");
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private class FormModel
+    {
+        public string ContactName { get; set; } = string.Empty;
+        public string Phone { get; set; } = string.Empty;
+        public string AddressLine1 { get; set; } = string.Empty;
+        public string? AddressLine2 { get; set; }
+        public string CountryId { get; set; } = "VN";
+        public long StateOrProvinceId { get; set; }
+        public string? City { get; set; }
+        public string? ZipCode { get; set; }
+        public string? OrderNote { get; set; }
+    }
+}

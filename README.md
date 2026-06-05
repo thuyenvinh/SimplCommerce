@@ -1,119 +1,134 @@
-# A simple, cross platform, modulith ecommerce system built on .NET Core [![Join the chat at https://gitter.im/simplcommerce/SimplCommerce](https://badges.gitter.im/simplcommerce/SimplCommerce.svg)](https://gitter.im/simplcommerce/SimplCommerce?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fsimplcommerce%2FSimplCommerce.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fsimplcommerce%2FSimplCommerce?ref=badge_shield)
+# SimplCommerce — .NET 9 + Aspire + Blazor
 
-## High level architecture
+> A cross-platform, modulith ecommerce system. The codebase is mid-migration
+> from ASP.NET Core 8 MVC + AngularJS (1.x) onto .NET 9 + Aspire 13 + Blazor
+> (2.0). See `CHANGELOG.md` for the release summary, `MIGRATION_PROGRESS.md`
+> for phase-by-phase status, `docs/architecture.md` for the target
+> architecture.
 
 ![SimpleCommerce - Modulith architecture](https://raw.githubusercontent.com/simplcommerce/SimplCommerce/master/modular-architecture.png)
 
-## Build Status
-| Build server    | Platform       | Status      |
-|-----------------|----------------|-------------|
-| Azure Pipelines | All            |[![Build Status](https://simplcommerce.visualstudio.com/simplcommerce/_apis/build/status/simplcommerce.SimplCommerce?branchName=master)](https://simplcommerce.visualstudio.com/simplcommerce/_build/latest?definitionId=1&branchName=master)
-|Travis           | Linux / MacOS  |[![Build Status](https://travis-ci.org/simplcommerce/SimplCommerce.svg?branch=master)](https://travis-ci.org/simplcommerce/SimplCommerce) |
+## Quick start (Aspire — recommended)
 
-## Online demo (Azure Website)
-- Store front: http://demo.simplcommerce.com
-- Administration: http://demo.simplcommerce.com/admin Email: admin@simplcommerce.com Password: 1qazZAQ!
+```bash
+# one-time
+dotnet tool install --global dotnet-ef --version 9.0.0
 
-## Docker
+# run the whole stack: SQL, Redis, Azurite, MailPit, Seq + ApiService +
+# Storefront + Admin + the legacy WebHost (still included for cutover parity)
+dotnet run --project src/AppHost/SimplCommerce.AppHost
+```
 
-For testing purpose only `docker run -p 5000:80 simplcommerce/ci-build`
+Aspire dashboard: `https://localhost:17001`.
 
-Continuous deployment: https://ci.simplcommerce.com
+Default URLs once everything is healthy:
 
-## Visual Studio 2022 and SQL Server
+| Surface | URL |
+|---|---|
+| Storefront | `https://localhost:7100` |
+| Admin | `https://localhost:7200` |
+| ApiService + Scalar UI | `https://localhost:7001/scalar/v1` |
+| Seq (logs) | exposed by Aspire, shown in dashboard |
 
-#### Prerequisites
+Default admin credentials (unchanged from 1.x):
+`admin@simplcommerce.com` / `1qazZAQ!`
 
-- SQL Server
-- Visual Studio 2022 and .NET 8
+### Prerequisites
 
-#### Steps to run
+- .NET 9 SDK (`global.json` pins `9.0.100` + `latestMinor`)
+- Docker / Podman Desktop (Aspire spins up SQL/Redis/Azurite/MailPit/Seq
+  as containers)
 
-- Update the connection string: Open appsettings.json in src/SimplCommerce.WebHost. 
-  The default is configured for a local SQL Server
-    ```json
-    {
-      "DefaultConnection": "Server=.;Database=SimplCommerce;Trusted_Connection=True;TrustServerCertificate=true"
-    }
-    ```
-  If you are using Visual Studio LocalDB, change it to
-    ```json
-    {
-      "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=SimplCommerce;Trusted_Connection=True;TrustServerCertificate=true;MultipleActiveResultSets=true"
-    }
-    ```
-- Ensure you have a database named `SimplCommerce` created in your SQL instance, or change the `Database` name in the connection string to match your environment.
-- Build the whole solution.
-- In Solution Explorer, make sure that SimplCommerce.WebHost is selected as the Startup Project
-- Open the Package Manager Console Window and make sure that SimplCommerce.WebHost is selected as the Default project. Then type "Update-Database" then press "Enter". This action will create the database schema.
-- In Visual Studio, press "Control + F5".
-- The back-office can be accessed via /Admin using the following built-in account: admin@simplcommerce.com, 1qazZAQ!
+That's it — no SQL Server install, no PostgreSQL setup, no manual
+connection-string editing. Aspire injects every connection string at
+runtime.
 
-## Mac/Linux with PostgreSQL
+## Quick start (without Aspire — self-hosted Docker)
 
-#### Prerequisite
+```bash
+cp .env.sample .env             # fill in SQL_SA_PASSWORD + JWT_SIGNING_KEY
+docker compose up --build
+```
 
-- PostgreSQL
-- [.NET Core SDK 8.0](https://www.microsoft.com/net/download/all)
-- Entity Framework Core Tools (`dotnet tool install --global dotnet-ef`)
+Ports: `7001` (api), `7100` (storefront), `7200` (admin), `1433` (sql),
+`6379` (redis), `8025` (mailpit UI), `5341` (Seq).
 
-#### Steps to run
+## Repository layout
 
-- Update the connection string in appsettings.json in SimplCommerce.WebHost.
-- Run the simpl-build.sh file by issuing the following command: "sudo ./simpl-build.sh". For ubuntu 18: "sudo bash simpl-build.sh"
-- In the terminal, navigate to "src/SimplCommerce.WebHost" and type "dotnet run" and then hit "Enter".
-- Open http://localhost:49206 in the browser. The back-office can be accessed via /Admin using the following built-in account: admin@simplcommerce.com, 1qazZAQ!
+```
+src/
+  AppHost/                 Aspire orchestrator
+  ServiceDefaults/         OTel + health + service discovery shared by every app
+  Migrations/              Consolidated EF Core migrations (target for dotnet ef)
+  Apps/
+    SimplCommerce.ApiService          Minimal-API JWT backend (OpenAPI /scalar/v1)
+    SimplCommerce.Storefront          Blazor Web App, Interactive Auto + WASM client
+    SimplCommerce.Storefront.Client   WASM companion to Storefront
+    SimplCommerce.Admin               Blazor Web App, Interactive Server
+  Modules/                  43 domain modules (Clean-architecture-lite layout)
+  SimplCommerce.Infrastructure/
+  SimplCommerce.WebHost/    Legacy ASP.NET Core 8 MVC host — kept during cutover
 
-## Technologies and frameworks used:
+tests/
+  SimplCommerce.ApiService.IntegrationTests  Integration test scaffold
+test/                       Existing unit test projects (Infrastructure + 6 modules)
 
-- ASP.NET Core
-- Entity Framework Core
-- ASP.NET Identity Core
-- Angular 1.6.3
-- MediatR 7.0.0 for domain event
+tools/
+  migrate-data.ps1          PowerShell data-migration helper (see runbook)
+  loadtest/storefront.js    k6 load scenario (p95 < 500ms @ 50 VU target)
 
-## Docs
+docs/
+  architecture.md           Topology + trace path
+  deployment.md             Aspire / Azure Container Apps / k8s / Compose
+  development.md            How to add a module or endpoint
+  migration/                Phase 0–8 inventory + runbooks
+```
 
-https://docs.simplcommerce.com/
+## Build & test
 
-## Roadmap
+```bash
+dotnet build SimplCommerce.sln
+dotnet test SimplCommerce.sln
+```
 
-https://github.com/simplcommerce/SimplCommerce/wiki/Roadmap
+CI: `.github/workflows/ci.yml` (GitHub Actions) + `azure-pipelines.yml`
+(Azure DevOps). Both build with `TreatWarningsAsErrors=true`; CI on
+`master` pushes container images to `ghcr.io/<owner>/simpl-{api,
+storefront, admin}:<sha>`.
+
+## Online demo (v1.x)
+
+- Store front: `http://demo.simplcommerce.com` (legacy build)
+- Admin: `http://demo.simplcommerce.com/admin`
+
+A v2.0 demo will replace the v1.x demo after Phase 8 cutover completes.
+
+## Technologies
+
+- .NET 9, Aspire 13, Blazor Web App (Interactive Auto + Server)
+- MudBlazor 7 UI
+- EF Core 9, SQL Server 2022, Redis 7, Azurite (Azure Blob emulator)
+- ASP.NET Identity Core + JWT (Bearer on API) + cookie BFF (Blazor hosts)
+- MediatR 12 for domain events
+- OpenTelemetry + Seq for logs/metrics/traces
+- k6 for load tests, xUnit + FluentAssertions for the suite
 
 ## How to contribute
 
-- Star this project on GitHub.
-- Report bugs or suggest features by creating new issues or adding comments to issues
-- Submit pull requests
-- Spread the word by blogging about SimplCommerce or sharing it on social networks
-- Donate to us
+- Star the project on GitHub
+- Report bugs / suggest features by creating issues
+- Submit pull requests against `master`
+- Spread the word — blog, tweet, link
 
 ## Contributors
 
-This project exists thanks to all the people who contribute.
-
 <a href="https://github.com/simplcommerce/SimplCommerce/graphs/contributors"><img src="https://opencollective.com/simplcommerce/contributors.svg?width=890" title="contributors" alt="contributors" /></a>
 
-## Backers
+## Backers & sponsors
 
-Love our work and help us continue our activities? [[Become a backer](https://opencollective.com/simplcommerce#backer)]
-
-<a href="https://opencollective.com/simplcommerce#backers" target="_blank"><img src="https://opencollective.com/simplcommerce/backers.svg?width=890"></a>
-
-## Sponsors
-
-Become a sponsor and get your logo on our README on Github with a link to your site. [[Become a sponsor](https://opencollective.com/simplcommerce#sponsor)]
-
-<a href="https://opencollective.com/simplcommerce/sponsor/0/website" target="_blank"><img src="https://opencollective.com/simplcommerce/sponsor/0/avatar.svg"></a>
-<a href="https://opencollective.com/simplcommerce/sponsor/1/website" target="_blank"><img src="https://opencollective.com/simplcommerce/sponsor/1/avatar.svg"></a>
-<a href="https://opencollective.com/simplcommerce/sponsor/2/website" target="_blank"><img src="https://opencollective.com/simplcommerce/sponsor/2/avatar.svg"></a>
-<a href="https://opencollective.com/simplcommerce/sponsor/3/website" target="_blank"><img src="https://opencollective.com/simplcommerce/sponsor/3/avatar.svg"></a>
-<a href="https://opencollective.com/simplcommerce/sponsor/4/website" target="_blank"><img src="https://opencollective.com/simplcommerce/sponsor/4/avatar.svg"></a>
+- [Become a backer](https://opencollective.com/simplcommerce#backer)
+- [Become a sponsor](https://opencollective.com/simplcommerce#sponsor)
 
 ## License
 
-SimplCommerce is licensed under the Apache 2.0 license.
-
-
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fsimplcommerce%2FSimplCommerce.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fsimplcommerce%2FSimplCommerce?ref=badge_large)
+SimplCommerce is licensed under the Apache 2.0 license. See `License.txt`.

@@ -1,0 +1,48 @@
+@page "/users"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminCoreApi Core
+
+<PageTitle>Users — Admin</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Users</MudText>
+
+<MudPaper Class="pa-4">
+    <MudStack Row="true" AlignItems="AlignItems.End" Class="mb-3">
+        <MudTextField T="string" @bind-Value="_search" Label="Name / email" DebounceInterval="400" OnDebounceIntervalElapsed="Reload" Style="max-width: 320px" />
+        <MudSpacer />
+        <MudText Typo="Typo.caption">@(_page?.Total.ToString() ?? "—") user(s)</MudText>
+    </MudStack>
+
+    @if (_page is null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else
+    {
+        <MudTable T="AdminUserListItem" Items="_page.Items" Hover="true" Dense="true">
+            <HeaderContent>
+                <MudTh>ID</MudTh><MudTh>Email</MudTh><MudTh>Name</MudTh><MudTh>Joined</MudTh><MudTh>Lockout</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Id</MudTd>
+                <MudTd>@context.Email</MudTd>
+                <MudTd>@context.FullName</MudTd>
+                <MudTd>@context.CreatedOn.ToLocalTime().ToString("d")</MudTd>
+                <MudTd>@(context.LockoutEnabled ? "Locked" : "Active")</MudTd>
+            </RowTemplate>
+        </MudTable>
+        <MudPagination Count="@((int)Math.Ceiling(_page.Total / (double)_pageSize))"
+                       Selected="_pageNum" SelectedChanged="OnPageChange" Class="mt-3" />
+    }
+</MudPaper>
+
+@code {
+    private string _search = string.Empty;
+    private int _pageNum = 1;
+    private const int _pageSize = 20;
+    private AdminUsersPage? _page;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload() { _page = await Core.ListUsersAsync(_pageNum, _pageSize, _search); StateHasChanged(); }
+    private async Task OnPageChange(int p) { _pageNum = p; await Reload(); }
+}

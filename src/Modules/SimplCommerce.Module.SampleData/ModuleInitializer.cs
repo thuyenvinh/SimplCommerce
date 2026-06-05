@@ -1,23 +1,19 @@
-﻿using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
+using System;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using SimplCommerce.Infrastructure.Modules;
-using SimplCommerce.Module.SampleData.Data;
-using SimplCommerce.Module.SampleData.Services;
 
 namespace SimplCommerce.Module.SampleData
 {
+    [Obsolete("Call services.AddSampleDataModule() in your composition root.")]
     public class ModuleInitializer : IModuleInitializer
     {
-        public void ConfigureServices(IServiceCollection services)
-        {
-            services.AddTransient<ISqlRepository, SqlRepository>();
-            services.AddTransient<ISampleDataService, SampleDataService>();
-        }
+        public void ConfigureServices(IServiceCollection services) =>
+            services.AddSampleDataModule();
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-
         }
     }
 }

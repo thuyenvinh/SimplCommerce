@@ -1,0 +1,100 @@
+@page "/checkout/{CheckoutId:guid}/payment"
+@attribute [Authorize]
+@rendermode RenderMode.InteractiveServer
+@inject ICheckoutApi CheckoutClient
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Checkout — Payment</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Choose payment method</MudText>
+
+@if (_summary is null || _methods is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_methods.Count == 0)
+{
+    <MudAlert Severity="Severity.Warning">
+        No payment methods are enabled. Ask an administrator to enable at least one provider.
+    </MudAlert>
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="7">
+            <MudPaper Class="pa-4">
+                <MudRadioGroup T="string" @bind-Value="_selected">
+                    @foreach (var m in _methods)
+                    {
+                        <MudRadio T="string" Value="@m.Id" Color="Color.Primary">@m.Name</MudRadio>
+                    }
+                </MudRadioGroup>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           Class="mt-4" OnClick="PlaceOrder"
+                           Disabled="_submitting || string.IsNullOrEmpty(_selected)">
+                    @(_submitting ? "Placing order…" : "Place order")
+                </MudButton>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="5">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6">Order summary</MudText>
+                @foreach (var line in _summary.Items)
+                {
+                    <MudText Typo="Typo.body2">@line.Quantity × @line.ProductName</MudText>
+                }
+                <MudDivider Class="my-2" />
+                <MudText><strong>Subtotal:</strong> @_summary.SubTotal.ToString("C")</MudText>
+                @if (_summary.ShippingAmount.HasValue)
+                {
+                    <MudText><strong>Shipping:</strong> @_summary.ShippingAmount.Value.ToString("C")</MudText>
+                }
+                @if (_summary.TaxAmount.HasValue)
+                {
+                    <MudText><strong>Tax:</strong> @_summary.TaxAmount.Value.ToString("C")</MudText>
+                }
+                <MudText Typo="Typo.h6"><strong>Total:</strong> @_summary.OrderTotal.ToString("C")</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public Guid CheckoutId { get; set; }
+
+    private CheckoutSummaryDto? _summary;
+    private IReadOnlyList<PaymentMethodOption>? _methods;
+    private string _selected = string.Empty;
+    private bool _submitting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _summary = await CheckoutClient.GetAsync(CheckoutId);
+        _methods = await CheckoutClient.ListPaymentMethodsAsync();
+        if (_methods is { Count: > 0 } && string.IsNullOrEmpty(_selected))
+        {
+            _selected = _methods[0].Id;
+        }
+    }
+
+    private async Task PlaceOrder()
+    {
+        _submitting = true;
+        try
+        {
+            var resp = await CheckoutClient.PlaceOrderAsync(CheckoutId,
+                new PlaceOrderRequest(_selected, PaymentFeeAmount: 0));
+            if (resp is null)
+            {
+                Snackbar.Add("Order could not be created.", Severity.Error);
+                return;
+            }
+            Nav.NavigateTo($"/checkout/{resp.OrderId}/success");
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

@@ -1,0 +1,93 @@
+@implements IAsyncDisposable
+@inject NavigationManager Nav
+@inject IHttpContextAccessor HttpCtx
+@rendermode RenderMode.InteractiveServer
+
+<MudMenu Icon="@Icons.Material.Filled.Notifications" Color="Color.Inherit" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+    <ActivatorContent>
+        <MudBadge Content="@_unread" Color="Color.Error" Overlap="true" Visible="@(_unread > 0)">
+            <MudIconButton Icon="@Icons.Material.Filled.Notifications" Color="Color.Inherit" aria-label="Notifications" />
+        </MudBadge>
+    </ActivatorContent>
+    <ChildContent>
+        @if (_items.Count == 0)
+        {
+            <MudText Class="px-4 py-2" Typo="Typo.body2">No notifications yet.</MudText>
+        }
+        else
+        {
+            @foreach (var n in _items)
+            {
+                <MudMenuItem OnClick="@(() => Open(n))">
+                    <MudText Typo="Typo.subtitle2">@n.Title</MudText>
+                    <MudText Typo="Typo.caption">@n.Message</MudText>
+                </MudMenuItem>
+            }
+            <MudDivider />
+            <MudMenuItem OnClick="Clear">Clear all</MudMenuItem>
+        }
+    </ChildContent>
+</MudMenu>
+
+@code {
+    private HubConnection? _hub;
+    private readonly List<AdminNotificationVm> _items = new();
+    private int _unread;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var baseUri = Nav.BaseUri.TrimEnd('/');
+        var hubUrl = $"{baseUri}/hubs/admin-notifications";
+
+        _hub = new HubConnectionBuilder()
+            .WithUrl(hubUrl, options =>
+            {
+                // Forward the auth cookie so the [Authorize] on AdminNotificationHub passes.
+                if (HttpCtx.HttpContext?.Request.Cookies is { } cookies)
+                {
+                    foreach (var c in cookies)
+                    {
+                        options.Cookies.Add(new System.Net.Cookie(c.Key, c.Value, "/", new Uri(baseUri).Host));
+                    }
+                }
+            })
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hub.On<AdminNotificationVm>("Notification", n =>
+        {
+            _items.Insert(0, n);
+            if (_items.Count > 25) _items.RemoveAt(_items.Count - 1);
+            _unread++;
+            InvokeAsync(StateHasChanged);
+        });
+
+        try { await _hub.StartAsync(); }
+        catch { /* hub might be unavailable during dev; degrade silently */ }
+    }
+
+    private void Open(AdminNotificationVm n)
+    {
+        _unread = Math.Max(0, _unread - 1);
+        if (!string.IsNullOrEmpty(n.Link))
+        {
+            Nav.NavigateTo(n.Link);
+        }
+    }
+
+    private void Clear()
+    {
+        _items.Clear();
+        _unread = 0;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hub is not null)
+        {
+            await _hub.DisposeAsync();
+        }
+    }
+
+    public record AdminNotificationVm(string Kind, string Title, string Message, string? Link, DateTimeOffset CreatedAt);
+}

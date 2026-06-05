@@ -1,0 +1,92 @@
+@page "/contacts"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminContactsApi Contacts
+@inject ISnackbar Snack
+
+<PageTitle>Contact inbox — Admin</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Contact inbox</MudText>
+
+<MudPaper Class="pa-4">
+    <MudStack Row="true" AlignItems="AlignItems.End" Class="mb-3">
+        <MudSelect T="int?" @bind-Value="_status" Label="Status" Variant="Variant.Outlined" Dense="true" Style="max-width:200px" Clearable="true">
+            <MudSelectItem T="int?" Value="@((int?)0)">Open</MudSelectItem>
+            <MudSelectItem T="int?" Value="@((int?)1)">Handled</MudSelectItem>
+        </MudSelect>
+        <MudButton OnClick="Reload" Variant="Variant.Outlined">Apply</MudButton>
+        <MudSpacer />
+        <MudText Typo="Typo.caption">@(_page?.Total.ToString() ?? "—") result(s)</MudText>
+    </MudStack>
+
+    @if (_page is null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (_page.Items.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">Inbox is empty.</MudAlert>
+    }
+    else
+    {
+        <MudTable T="AdminContactItem" Items="_page.Items" Hover="true" Dense="true">
+            <HeaderContent>
+                <MudTh>ID</MudTh><MudTh>Name</MudTh><MudTh>Email</MudTh>
+                <MudTh>Message</MudTh><MudTh>Status</MudTh><MudTh>Created</MudTh><MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Id</MudTd>
+                <MudTd>@context.Name</MudTd>
+                <MudTd>@context.Email</MudTd>
+                <MudTd Style="max-width:380px"><MudText Typo="Typo.body2">@context.Message</MudText></MudTd>
+                <MudTd>
+                    <MudChip T="string" Color="@(context.Status == 1 ? Color.Default : Color.Warning)" Size="Size.Small">
+                        @(context.Status == 1 ? "Handled" : "Open")
+                    </MudChip>
+                </MudTd>
+                <MudTd>@context.CreatedOn.LocalDateTime.ToString("g")</MudTd>
+                <MudTd>
+                    @if (context.Status == 0)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small"
+                                       OnClick="@(() => SetStatus(context.Id, 1))" aria-label="Mark handled" />
+                    }
+                    else
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.MarkEmailUnread" Color="Color.Warning" Size="Size.Small"
+                                       OnClick="@(() => SetStatus(context.Id, 0))" aria-label="Reopen" />
+                    }
+                    <MudIconButton Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" Href="@($"mailto:{context.Email}")" aria-label="Reply" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+        <MudPagination Count="@((int)Math.Ceiling(_page.Total / (double)_pageSize))"
+                       Selected="_pageNum" SelectedChanged="OnPage" Class="mt-3" />
+    }
+</MudPaper>
+
+@code {
+    private AdminContactsPage? _page;
+    private int? _status = 0;
+    private int _pageNum = 1;
+    private const int _pageSize = 20;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        _page = await Contacts.ListAsync(_status, _pageNum, _pageSize);
+        StateHasChanged();
+    }
+
+    private async Task OnPage(int p) { _pageNum = p; await Reload(); }
+
+    private async Task SetStatus(long id, int next)
+    {
+        using var resp = await Contacts.SetStatusAsync(id, new AdminContactStatusInput(next));
+        if (!resp.IsSuccessStatusCode)
+        {
+            Snack.Add($"Update failed (HTTP {(int)resp.StatusCode}).", Severity.Error);
+            return;
+        }
+        await Reload();
+    }
+}
