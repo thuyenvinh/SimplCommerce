@@ -10,7 +10,6 @@ namespace SimplCommerce.Module.Reviews
         {
             services.AddTransient<IReplyRepository, ReplyRepository>();
             services.AddTransient<IReviewRepository, ReviewRepository>();
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.reviews");
             return services;
         }
     }

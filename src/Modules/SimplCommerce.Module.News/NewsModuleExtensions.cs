@@ -10,7 +10,6 @@ namespace SimplCommerce.Module.News
         {
             services.AddTransient<INewsItemService, NewsItemService>();
             services.AddTransient<INewsCategoryService, NewsCategoryService>();
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.news");
             return services;
         }
     }

@@ -7,7 +7,6 @@ namespace SimplCommerce.Module.PaymentStripe
     {
         public static IServiceCollection AddPaymentStripeModule(this IServiceCollection services)
         {
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.paymentStripe");
             return services;
         }
     }

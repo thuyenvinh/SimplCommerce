@@ -9,7 +9,6 @@ namespace SimplCommerce.Module.Vendors
         public static IServiceCollection AddVendorsModule(this IServiceCollection services)
         {
             services.AddTransient<IVendorService, VendorService>();
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.vendors");
             return services;
         }
     }

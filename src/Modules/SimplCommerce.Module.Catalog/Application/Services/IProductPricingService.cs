@@ -1,5 +1,4 @@
 ﻿using System;
-using SimplCommerce.Module.Catalog.Areas.Catalog.ViewModels;
 using SimplCommerce.Module.Catalog.Models;
 
 namespace SimplCommerce.Module.Catalog.Services

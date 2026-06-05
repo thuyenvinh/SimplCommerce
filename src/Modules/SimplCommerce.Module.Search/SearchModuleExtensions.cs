@@ -7,7 +7,6 @@ namespace SimplCommerce.Module.Search
     {
         public static IServiceCollection AddSearchModule(this IServiceCollection services)
         {
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.search");
             return services;
         }
     }

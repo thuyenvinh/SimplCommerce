@@ -7,7 +7,6 @@ namespace SimplCommerce.Module.PaymentPaypalExpress
     {
         public static IServiceCollection AddPaymentPaypalExpressModule(this IServiceCollection services)
         {
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.paymentPaypalExpress");
             return services;
         }
     }

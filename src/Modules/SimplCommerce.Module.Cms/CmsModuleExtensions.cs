@@ -13,7 +13,6 @@ namespace SimplCommerce.Module.Cms
         {
             services.AddTransient<INotificationHandler<EntityDeleting>, EntityDeletingHandler>();
             services.AddTransient<IPageService, PageService>();
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.cms");
             return services;
         }
     }

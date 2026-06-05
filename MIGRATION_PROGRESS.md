@@ -540,10 +540,10 @@ Storefront endpoint groups đã tạo (9 groups):
 - [~] P8-02 | Production DB backup — user responsibility; reminder đã có trong `tools/migrate-data.ps1` + `docs/migration/data-migration-runbook.md`
 
 ### 8.2 Xoá WebHost cũ — **DEFERRED to user**
-- [~] P8-03..P8-05 | Xoá `src/SimplCommerce.WebHost/`, unhook khỏi AppHost, xoá legacy `Dockerfile` / `Dockerfile-sqlite` / `docker-entrypoint.sh` — **không thực hiện tự động vì destructive + runtime của stack mới chưa verified BLOCKED-Docker**. Runbook từng bước trong `docs/migration/phase8-cutover-checklist.md` §1
+- [x] P8-03..P8-05 | **Done** — `src/SimplCommerce.WebHost/` removed (1234 files), unhooked from AppHost (Program.cs + csproj ProjectReference), removed from `SimplCommerce.sln`. Baseline tagged at `pre-cutover-backup` for rollback. Branch `claude/phase-8-destructive`
 
 ### 8.3 Xoá legacy code trong modules — **DEFERRED to user**
-- [~] P8-06..P8-10 | Xoá `wwwroot/admin/` (98 files AngularJS), `Views/` (181 files cshtml), `Controllers/` (104 files), bundling, `modules.json` — tất cả **destructive**, defer đến sau runtime verification. `modules.json` đã xử lý ở Phase 2 (archived). `CustomAssemblyLoadContextProvider` không tồn tại trong codebase (đã verify Phase 2). Checklist đầy đủ trong `phase8-cutover-checklist.md` §2-§6
+- [x] P8-06..P8-10 | **Done** — Xóa toàn bộ legacy code khỏi modules: 33 `Areas/` directories (455 files Controllers+Views), 41 `wwwroot/admin/` AngularJS folders, 27 `bundleconfig.json`, tất cả `module.json` manifest files, tất cả `ModuleInitializer.cs` + interface `IModuleInitializer`. 44 module csproj chuyển từ `Microsoft.NET.Sdk.Razor` → `Microsoft.NET.Sdk`. `AddRazorSupportForMvc` + `GlobalConfiguration.RegisterAngularModule` đã xóa. Legacy `ThemeService` + `ICategoryService` + `ISampleDataService` (chỉ dùng bởi WebHost) đã xóa cùng. Tổng cộng **~892 files deleted**. Build clean (0 warning / 0 error), 180/180 tests pass
 
 ### 8.4 Generate deployment artifacts — **DONE**
 - [~] P8-11 | `aspire publish` — **BLOCKED-Docker** để chạy lệnh, nhưng csproj đã sẵn sàng; runbook `docs/deployment.md` §Azure Container Apps carries the exact command
@@ -561,7 +561,7 @@ Storefront endpoint groups đã tạo (9 groups):
 - [x] P8-17 | `dotnet test SimplCommerce.sln --no-build` PASS — 42/42
 - [~] P8-18 | `aspire run` — BLOCKED-Docker
 - [~] P8-19 | Runtime smoke test — BLOCKED-Docker
-- [~] P8-20 | Solution chỉ còn project mới — chưa, vì destructive steps 8.2/8.3 defer đến user
+- [x] P8-20 | Solution chỉ còn project mới (ApiService, Admin, Storefront, AppHost, Migrations, Infrastructure, RealTime, ServiceDefaults + 41 modules). WebHost gone
 
 ### 8.6 Release — **Partial**
 - [x] P8-21 | MIGRATION_PROGRESS.md updated (this commit)

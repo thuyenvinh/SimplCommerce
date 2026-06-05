@@ -8,7 +8,6 @@ using SimplCommerce.Infrastructure.Data;
 using SimplCommerce.Module.ShoppingCart.Models;
 using SimplCommerce.Module.Core.Services;
 using SimplCommerce.Module.Pricing.Services;
-using SimplCommerce.Module.ShoppingCart.Areas.ShoppingCart.ViewModels;
 using Microsoft.Extensions.Localization;
 using SimplCommerce.Module.Catalog.Services;
 

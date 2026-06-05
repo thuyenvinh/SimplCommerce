@@ -9,7 +9,6 @@ namespace SimplCommerce.Module.Pricing
         public static IServiceCollection AddPricingModule(this IServiceCollection services)
         {
             services.AddTransient<ICouponService, CouponService>();
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.pricing");
             return services;
         }
     }

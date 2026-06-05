@@ -13,7 +13,6 @@ namespace SimplCommerce.Module.ActivityLog
         {
             services.AddTransient<IActivityTypeRepository, ActivityRepository>();
             services.AddTransient<INotificationHandler<EntityViewed>, EntityViewedHandler>();
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.activityLog");
             return services;
         }
     }

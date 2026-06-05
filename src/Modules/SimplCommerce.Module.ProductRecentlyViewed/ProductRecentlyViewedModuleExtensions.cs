@@ -13,7 +13,6 @@ namespace SimplCommerce.Module.ProductRecentlyViewed
         {
             services.AddTransient<IRecentlyViewedProductRepository, RecentlyViewedProductRepository>();
             services.AddTransient<INotificationHandler<EntityViewed>, EntityViewedHandler>();
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.recentlyViewed");
             return services;
         }
     }
