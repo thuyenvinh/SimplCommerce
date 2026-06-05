@@ -72,7 +72,11 @@ namespace SimplCommerce.Module.Orders.Services
                 return Result.Fail<Order>($"Checkout id {checkoutId} cannot be found");
             }
 
-            var shippingData = JsonConvert.DeserializeObject<DeliveryInformationVm>(checkout.ShippingData);
+            var shippingData = JsonConvert.DeserializeObject<DeliveryInformationVm>(checkout.ShippingData ?? string.Empty);
+            if (shippingData == null)
+            {
+                return Result.Fail<Order>($"Checkout id {checkoutId} has no shipping data; address step was skipped.");
+            }
             Address billingAddress;
             Address shippingAddress;
             if (shippingData.ShippingAddressId == 0)
@@ -103,7 +107,11 @@ namespace SimplCommerce.Module.Orders.Services
             }
             else
             {
-                shippingAddress = _userAddressRepository.Query().Where(x => x.Id == shippingData.ShippingAddressId).Select(x => x.Address).First();
+                shippingAddress = _userAddressRepository.Query().Where(x => x.Id == shippingData.ShippingAddressId).Select(x => x.Address).FirstOrDefault();
+                if (shippingAddress == null)
+                {
+                    return Result.Fail<Order>($"Shipping address id {shippingData.ShippingAddressId} no longer exists.");
+                }
             }
 
             if (shippingData.UseShippingAddressAsBillingAddress)
@@ -138,7 +146,11 @@ namespace SimplCommerce.Module.Orders.Services
             }
             else
             {
-                billingAddress = _userAddressRepository.Query().Where(x => x.Id == shippingData.BillingAddressId).Select(x => x.Address).First();
+                billingAddress = _userAddressRepository.Query().Where(x => x.Id == shippingData.BillingAddressId).Select(x => x.Address).FirstOrDefault();
+                if (billingAddress == null)
+                {
+                    return Result.Fail<Order>($"Billing address id {shippingData.BillingAddressId} no longer exists.");
+                }
             }
 
             return await CreateOrder(checkoutId, paymentMethod, paymentFeeAmount, shippingData.ShippingMethod, billingAddress, shippingAddress, orderStatus);
@@ -419,7 +431,7 @@ namespace SimplCommerce.Module.Orders.Services
             var shippingMethod = applicableShippingPrices.FirstOrDefault(x => x.Name == shippingMethodName);
             if (shippingMethod == null)
             {
-                return Result.Fail<ShippingPrice>($"Invalid shipping method {shippingMethod}");
+                return Result.Fail<ShippingPrice>($"Invalid shipping method '{shippingMethodName}'");
             }
 
             return Result.Ok(shippingMethod);
