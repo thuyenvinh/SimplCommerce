@@ -323,12 +323,37 @@ public sealed class AdminTaxApi(HttpClient http) : IAdminTaxApi
 public interface IAdminShippingApi
 {
     Task<IReadOnlyList<AdminShippingProviderItem>?> ListProvidersAsync(CancellationToken ct = default);
+    Task<AdminShippingProviderDetail?> GetProviderAsync(string id, CancellationToken ct = default);
+    Task<HttpResponseMessage> UpdateProviderAsync(string id, AdminShippingProviderInput input, CancellationToken ct = default);
+
+    Task<IReadOnlyList<AdminTableRateItem>?> ListTableRatesAsync(CancellationToken ct = default);
+    Task<HttpResponseMessage> CreateTableRateAsync(AdminTableRateInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> UpdateTableRateAsync(long id, AdminTableRateInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> DeleteTableRateAsync(long id, CancellationToken ct = default);
 }
 
 public sealed class AdminShippingApi(HttpClient http) : IAdminShippingApi
 {
     public async Task<IReadOnlyList<AdminShippingProviderItem>?> ListProvidersAsync(CancellationToken ct) =>
         await http.GetFromJsonAsync<List<AdminShippingProviderItem>>("/api/admin/shipping/providers", ct);
+
+    public Task<AdminShippingProviderDetail?> GetProviderAsync(string id, CancellationToken ct) =>
+        http.GetFromJsonAsync<AdminShippingProviderDetail>($"/api/admin/shipping/providers/{Uri.EscapeDataString(id)}", ct);
+
+    public Task<HttpResponseMessage> UpdateProviderAsync(string id, AdminShippingProviderInput input, CancellationToken ct) =>
+        http.PutAsJsonAsync($"/api/admin/shipping/providers/{Uri.EscapeDataString(id)}", input, ct);
+
+    public async Task<IReadOnlyList<AdminTableRateItem>?> ListTableRatesAsync(CancellationToken ct) =>
+        await http.GetFromJsonAsync<List<AdminTableRateItem>>("/api/admin/shipping/table-rates/", ct);
+
+    public Task<HttpResponseMessage> CreateTableRateAsync(AdminTableRateInput input, CancellationToken ct) =>
+        http.PostAsJsonAsync("/api/admin/shipping/table-rates/", input, ct);
+
+    public Task<HttpResponseMessage> UpdateTableRateAsync(long id, AdminTableRateInput input, CancellationToken ct) =>
+        http.PutAsJsonAsync($"/api/admin/shipping/table-rates/{id}", input, ct);
+
+    public Task<HttpResponseMessage> DeleteTableRateAsync(long id, CancellationToken ct) =>
+        http.DeleteAsync($"/api/admin/shipping/table-rates/{id}", ct);
 }
 
 public interface IAdminPaymentsApi

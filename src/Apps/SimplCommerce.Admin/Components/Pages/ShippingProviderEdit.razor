@@ -1,0 +1,104 @@
+@page "/shipping-providers/{Id}"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminShippingApi Shipping
+@inject NavigationManager Nav
+@inject ISnackbar Snack
+
+<PageTitle>Configure @Id — Shipping</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Nav.NavigateTo("/shipping-providers"))" aria-label="Back" />
+    <MudText Typo="Typo.h4">Configure @(_detail?.Name ?? Id)</MudText>
+</MudStack>
+
+@if (_detail is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudPaper Class="pa-4 mb-3">
+        <MudSwitch @bind-Value="_form.IsEnabled" Label="Enabled" Color="Color.Primary" />
+    </MudPaper>
+    <MudPaper Class="pa-4 mb-3">
+        <MudText Typo="Typo.h6" Class="mb-2">Where this provider ships</MudText>
+        <MudSwitch @bind-Value="_form.ToAllShippingEnabledCountries" Label="All shipping-enabled countries" Color="Color.Primary" />
+        <MudTextField @bind-Value="_form.OnlyCountryIdsString" Label="Or only these country IDs (comma-separated)"
+                      Disabled="_form.ToAllShippingEnabledCountries" />
+        <MudSwitch @bind-Value="_form.ToAllShippingEnabledStatesOrProvinces" Label="All shipping-enabled states/provinces" Color="Color.Primary" />
+        <MudTextField @bind-Value="_form.OnlyStateOrProvinceIdsString" Label="Or only these state/province IDs (comma-separated)"
+                      Disabled="_form.ToAllShippingEnabledStatesOrProvinces" />
+    </MudPaper>
+    <MudPaper Class="pa-4 mb-3">
+        <MudText Typo="Typo.h6" Class="mb-2">Provider config (JSON)</MudText>
+        <MudText Typo="Typo.body2" Class="mb-2" Color="Color.Secondary">
+            Provider-specific settings; the exact JSON shape depends on the provider
+            (e.g. FedEx API key, DHL account number).
+        </MudText>
+        <MudTextField @bind-Value="_form.AdditionalSettings" Label="AdditionalSettings (raw JSON)" Lines="10" Variant="Variant.Outlined" />
+    </MudPaper>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="_saving">@(_saving ? "Saving…" : "Save")</MudButton>
+    <MudButton OnClick="@(() => Nav.NavigateTo("/shipping-providers"))" Class="ml-2">Cancel</MudButton>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = string.Empty;
+
+    private AdminShippingProviderDetail? _detail;
+    private FormModel _form = new();
+    private bool _saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _detail = await Shipping.GetProviderAsync(Id);
+        if (_detail is null)
+        {
+            Snack.Add("Provider not found.", Severity.Error);
+            Nav.NavigateTo("/shipping-providers");
+            return;
+        }
+        _form = new FormModel
+        {
+            IsEnabled = _detail.IsEnabled,
+            ToAllShippingEnabledCountries = _detail.ToAllShippingEnabledCountries,
+            OnlyCountryIdsString = _detail.OnlyCountryIdsString ?? string.Empty,
+            ToAllShippingEnabledStatesOrProvinces = _detail.ToAllShippingEnabledStatesOrProvinces,
+            OnlyStateOrProvinceIdsString = _detail.OnlyStateOrProvinceIdsString ?? string.Empty,
+            AdditionalSettings = _detail.AdditionalSettings ?? string.Empty,
+        };
+    }
+
+    private async Task Save()
+    {
+        _saving = true;
+        try
+        {
+            using var resp = await Shipping.UpdateProviderAsync(Id, new AdminShippingProviderInput(
+                _form.IsEnabled,
+                _form.ToAllShippingEnabledCountries, _form.OnlyCountryIdsString,
+                _form.ToAllShippingEnabledStatesOrProvinces, _form.OnlyStateOrProvinceIdsString,
+                _form.AdditionalSettings));
+            if (!resp.IsSuccessStatusCode)
+            {
+                Snack.Add($"Save failed (HTTP {(int)resp.StatusCode}).", Severity.Error);
+                return;
+            }
+            Snack.Add("Provider saved.", Severity.Success);
+            Nav.NavigateTo("/shipping-providers");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private class FormModel
+    {
+        public bool IsEnabled { get; set; }
+        public bool ToAllShippingEnabledCountries { get; set; }
+        public string OnlyCountryIdsString { get; set; } = string.Empty;
+        public bool ToAllShippingEnabledStatesOrProvinces { get; set; }
+        public string OnlyStateOrProvinceIdsString { get; set; } = string.Empty;
+        public string AdditionalSettings { get; set; } = string.Empty;
+    }
+}

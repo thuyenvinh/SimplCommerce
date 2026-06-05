@@ -1,0 +1,98 @@
+@page "/shipping/table-rates"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminShippingApi Shipping
+@inject ISnackbar Snack
+
+<PageTitle>Shipping zones & rates — Admin</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Shipping zones & rates</MudText>
+<MudText Typo="Typo.body2" Class="mb-3" Color="Color.Secondary">
+    One row per (country, optional state/province/ZIP, minimum cart subtotal) → shipping price.
+    At checkout the cheapest matching row wins.
+</MudText>
+
+<MudPaper Class="pa-4">
+    <MudStack Row="true" AlignItems="AlignItems.End" Class="mb-3" Spacing="2">
+        <MudTextField @bind-Value="_new.CountryId" Label="Country ID" Required="true" Style="max-width:120px" />
+        <MudNumericField T="long?" @bind-Value="_new.StateOrProvinceId" Label="State ID" Style="max-width:120px" />
+        <MudNumericField T="long?" @bind-Value="_new.DistrictId" Label="District ID" Style="max-width:120px" />
+        <MudTextField @bind-Value="_new.ZipCode" Label="ZIP" Style="max-width:120px" />
+        <MudNumericField @bind-Value="_new.MinOrderSubtotal" Label="Min subtotal" Format="F2" Style="max-width:140px" Min="0m" />
+        <MudNumericField @bind-Value="_new.ShippingPrice" Label="Shipping price" Format="F2" Style="max-width:140px" Min="0m" />
+        <MudTextField @bind-Value="_new.Note" Label="Note" />
+        <MudButton OnClick="Create" Variant="Variant.Filled" Color="Color.Primary">Add</MudButton>
+    </MudStack>
+
+    @if (_rates is null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (_rates.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">No table rates yet.</MudAlert>
+    }
+    else
+    {
+        <MudTable T="AdminTableRateItem" Items="_rates" Dense="true" Hover="true">
+            <HeaderContent>
+                <MudTh>ID</MudTh><MudTh>Country</MudTh><MudTh>State</MudTh><MudTh>District</MudTh>
+                <MudTh>ZIP</MudTh><MudTh>Min subtotal</MudTh><MudTh>Price</MudTh><MudTh>Note</MudTh><MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Id</MudTd>
+                <MudTd>@context.CountryId</MudTd>
+                <MudTd>@context.StateOrProvinceId</MudTd>
+                <MudTd>@context.DistrictId</MudTd>
+                <MudTd>@context.ZipCode</MudTd>
+                <MudTd>@context.MinOrderSubtotal.ToString("F2")</MudTd>
+                <MudTd>@context.ShippingPrice.ToString("F2")</MudTd>
+                <MudTd>@context.Note</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                   OnClick="@(() => Delete(context.Id))" aria-label="Delete" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private IReadOnlyList<AdminTableRateItem>? _rates;
+    private NewRow _new = new();
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload() { _rates = await Shipping.ListTableRatesAsync(); StateHasChanged(); }
+
+    private async Task Create()
+    {
+        if (string.IsNullOrWhiteSpace(_new.CountryId)) { Snack.Add("Country ID is required.", Severity.Warning); return; }
+        using var resp = await Shipping.CreateTableRateAsync(new AdminTableRateInput(
+            _new.CountryId, _new.StateOrProvinceId, _new.DistrictId, _new.ZipCode, _new.Note,
+            _new.MinOrderSubtotal, _new.ShippingPrice));
+        if (resp.IsSuccessStatusCode)
+        {
+            _new = new NewRow { CountryId = _new.CountryId };
+            await Reload();
+            Snack.Add("Rate added.", Severity.Success);
+        }
+        else { Snack.Add($"Add failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    private async Task Delete(long id)
+    {
+        using var resp = await Shipping.DeleteTableRateAsync(id);
+        if (resp.IsSuccessStatusCode) { await Reload(); }
+        else { Snack.Add($"Delete failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    private class NewRow
+    {
+        public string CountryId { get; set; } = string.Empty;
+        public long? StateOrProvinceId { get; set; }
+        public long? DistrictId { get; set; }
+        public string? ZipCode { get; set; }
+        public string? Note { get; set; }
+        public decimal MinOrderSubtotal { get; set; }
+        public decimal ShippingPrice { get; set; }
+    }
+}

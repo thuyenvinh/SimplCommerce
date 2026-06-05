@@ -79,6 +79,19 @@ public record AdminTaxRateInput(long TaxClassId, string CountryId, long? StateOr
 
 // --- Shipping admin ---
 public record AdminShippingProviderItem(string Id, string Name, bool IsEnabled);
+public record AdminShippingProviderDetail(string Id, string Name, bool IsEnabled,
+    bool ToAllShippingEnabledCountries, string? OnlyCountryIdsString,
+    bool ToAllShippingEnabledStatesOrProvinces, string? OnlyStateOrProvinceIdsString,
+    string? AdditionalSettings);
+public record AdminShippingProviderInput(bool IsEnabled,
+    bool ToAllShippingEnabledCountries, string? OnlyCountryIdsString,
+    bool ToAllShippingEnabledStatesOrProvinces, string? OnlyStateOrProvinceIdsString,
+    string? AdditionalSettings);
+
+public record AdminTableRateItem(long Id, string CountryId, long? StateOrProvinceId, long? DistrictId,
+    string? ZipCode, string? Note, decimal MinOrderSubtotal, decimal ShippingPrice);
+public record AdminTableRateInput(string CountryId, long? StateOrProvinceId, long? DistrictId,
+    string? ZipCode, string? Note, decimal MinOrderSubtotal, decimal ShippingPrice);
 
 // --- Payments admin ---
 public record AdminPaymentProviderItem(string Id, string Name, bool IsEnabled);

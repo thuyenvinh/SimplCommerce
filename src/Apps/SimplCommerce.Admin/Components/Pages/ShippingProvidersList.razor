@@ -1,6 +1,7 @@
 @page "/shipping-providers"
 @rendermode RenderMode.InteractiveServer
 @inject IAdminShippingApi Shipping
+@inject NavigationManager Nav
 
 <PageTitle>Shipping providers — Admin</PageTitle>
 <MudText Typo="Typo.h4" Class="mb-4">Shipping providers</MudText>
@@ -10,14 +11,27 @@
     {
         <MudProgressCircular Indeterminate="true" />
     }
+    else if (_providers.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">No shipping providers installed.</MudAlert>
+    }
     else
     {
-        <MudTable T="AdminShippingProviderItem" Items="_providers" Hover="true">
-            <HeaderContent><MudTh>ID</MudTh><MudTh>Name</MudTh><MudTh>Enabled</MudTh></HeaderContent>
+        <MudTable T="AdminShippingProviderItem" Items="_providers" Hover="true"
+                  OnRowClick="@((TableRowClickEventArgs<AdminShippingProviderItem> e) => Nav.NavigateTo($"/shipping-providers/{e.Item!.Id}"))">
+            <HeaderContent><MudTh>ID</MudTh><MudTh>Name</MudTh><MudTh>Enabled</MudTh><MudTh>Actions</MudTh></HeaderContent>
             <RowTemplate>
                 <MudTd>@context.Id</MudTd>
                 <MudTd>@context.Name</MudTd>
-                <MudTd>@(context.IsEnabled ? "✓" : "—")</MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="@(context.IsEnabled ? Color.Success : Color.Default)">
+                        @(context.IsEnabled ? "Enabled" : "Disabled")
+                    </MudChip>
+                </MudTd>
+                <MudTd @onclick:stopPropagation="true">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                   OnClick="@(() => Nav.NavigateTo($"/shipping-providers/{context.Id}"))" aria-label="Configure" />
+                </MudTd>
             </RowTemplate>
         </MudTable>
     }

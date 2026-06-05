@@ -428,8 +428,8 @@ Storefront endpoint groups đã tạo (9 groups):
 - [x] P5-44 + P5-45 + P5-46 | `/pricing` — tabbed view (cart rules / catalog rules / coupons). **Cart-rule CRUD live** (`/pricing/cart-rules/create` + `/edit/{id}` with discount type, window, usage caps). **Coupon create + delete inline** on the Coupons tab. Catalog rules still list-only (form pending — needs richer condition editor)
 
 **5.4.9 Shipping & Tax**
-- [x] P5-47 | `/shipping-providers` — list providers (GET); config form is follow-up
-- [ ] P5-48..P5-49 | Zones + rates — deferred (need endpoint surface first)
+- [x] P5-47 | `/shipping-providers` — list + per-provider configure (`/shipping-providers/{id}`). Backend gained `GET /providers/{id}` (returns IsEnabled, country/state restriction flags, AdditionalSettings JSON) + `PUT /{id}`. UI: enable toggle + "all countries" / "only these comma-separated IDs" controls + raw JSON config editor
+- [x] P5-48..P5-49 | **Zones + rates** (`PriceAndDestination`) CRUD live at `/shipping/table-rates`. New `ShippingTableRateAdminEndpoints` covers GET/POST/PUT/DELETE on `/api/admin/shipping/table-rates`. UI: inline add row (country/state/district/ZIP/min subtotal/price/note) + per-row delete
 - [x] P5-50 | `/tax-classes` — list + inline create
 - [x] P5-51 | **Tax classes + rates CRUD** live at `/tax-classes` (tabbed: Classes + Rates). Backend gained `PUT/DELETE /api/admin/tax/classes/{id}` and `PUT/DELETE /rates/{id}`. UI: per-row inline rename for classes, inline create form for rates with tax-class picker + per-row delete
 
