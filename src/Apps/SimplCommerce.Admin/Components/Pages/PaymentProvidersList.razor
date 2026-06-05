@@ -1,6 +1,8 @@
 @page "/payment-providers"
 @rendermode RenderMode.InteractiveServer
 @inject IAdminPaymentsApi Payments
+@inject NavigationManager Nav
+@inject ISnackbar Snack
 
 <PageTitle>Payment providers — Admin</PageTitle>
 <MudText Typo="Typo.h4" Class="mb-4">Payment providers</MudText>
@@ -10,14 +12,27 @@
     {
         <MudProgressCircular Indeterminate="true" />
     }
+    else if (_providers.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">No payment providers installed.</MudAlert>
+    }
     else
     {
-        <MudTable T="AdminPaymentProviderItem" Items="_providers" Hover="true">
-            <HeaderContent><MudTh>ID</MudTh><MudTh>Name</MudTh><MudTh>Enabled</MudTh></HeaderContent>
+        <MudTable T="AdminPaymentProviderItem" Items="_providers" Hover="true"
+                  OnRowClick="@((TableRowClickEventArgs<AdminPaymentProviderItem> e) => Nav.NavigateTo($"/payment-providers/{e.Item!.Id}"))">
+            <HeaderContent><MudTh>ID</MudTh><MudTh>Name</MudTh><MudTh>Enabled</MudTh><MudTh>Actions</MudTh></HeaderContent>
             <RowTemplate>
                 <MudTd>@context.Id</MudTd>
                 <MudTd>@context.Name</MudTd>
-                <MudTd>@(context.IsEnabled ? "✓" : "—")</MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="@(context.IsEnabled ? Color.Success : Color.Default)">
+                        @(context.IsEnabled ? "Enabled" : "Disabled")
+                    </MudChip>
+                </MudTd>
+                <MudTd @onclick:stopPropagation="true">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                   OnClick="@(() => Nav.NavigateTo($"/payment-providers/{context.Id}"))" aria-label="Configure" />
+                </MudTd>
             </RowTemplate>
         </MudTable>
     }

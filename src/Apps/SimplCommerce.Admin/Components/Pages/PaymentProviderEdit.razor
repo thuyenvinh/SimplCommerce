@@ -1,0 +1,84 @@
+@page "/payment-providers/{Id}"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminPaymentsApi Payments
+@inject NavigationManager Nav
+@inject ISnackbar Snack
+
+<PageTitle>Configure @Id — Payments</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Nav.NavigateTo("/payment-providers"))" aria-label="Back" />
+    <MudText Typo="Typo.h4">Configure @(_detail?.Name ?? Id)</MudText>
+</MudStack>
+
+@if (_detail is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudPaper Class="pa-4 mb-3">
+        <MudSwitch @bind-Value="_form.IsEnabled" Label="Enabled" Color="Color.Primary" />
+    </MudPaper>
+    <MudPaper Class="pa-4 mb-3">
+        <MudText Typo="Typo.h6" Class="mb-2">Provider config (JSON)</MudText>
+        <MudText Typo="Typo.body2" Class="mb-2" Color="Color.Secondary">
+            Each provider expects a specific JSON shape — Stripe wants <code>PublicKey</code>/<code>PrivateKey</code>,
+            VNPAY wants <code>TmnCode</code>/<code>HashSecret</code>/<code>PayUrl</code>, MoMo wants
+            <code>PartnerCode</code>/<code>AccessKey</code>/<code>SecretKey</code>, etc.
+        </MudText>
+        <MudTextField @bind-Value="_form.AdditionalSettings" Label="AdditionalSettings (raw JSON)" Lines="14" Variant="Variant.Outlined" />
+    </MudPaper>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="_saving">@(_saving ? "Saving…" : "Save")</MudButton>
+    <MudButton OnClick="@(() => Nav.NavigateTo("/payment-providers"))" Class="ml-2">Cancel</MudButton>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = string.Empty;
+
+    private AdminPaymentProviderDetail? _detail;
+    private FormModel _form = new();
+    private bool _saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _detail = await Payments.GetProviderAsync(Id);
+        if (_detail is null)
+        {
+            Snack.Add("Provider not found.", Severity.Error);
+            Nav.NavigateTo("/payment-providers");
+            return;
+        }
+        _form = new FormModel
+        {
+            IsEnabled = _detail.IsEnabled,
+            AdditionalSettings = _detail.AdditionalSettings ?? string.Empty,
+        };
+    }
+
+    private async Task Save()
+    {
+        _saving = true;
+        try
+        {
+            using var resp = await Payments.UpdateProviderAsync(Id, new AdminPaymentProviderInput(_form.IsEnabled, _form.AdditionalSettings));
+            if (!resp.IsSuccessStatusCode)
+            {
+                Snack.Add($"Save failed (HTTP {(int)resp.StatusCode}).", Severity.Error);
+                return;
+            }
+            Snack.Add("Provider saved.", Severity.Success);
+            Nav.NavigateTo("/payment-providers");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private class FormModel
+    {
+        public bool IsEnabled { get; set; }
+        public string AdditionalSettings { get; set; } = string.Empty;
+    }
+}

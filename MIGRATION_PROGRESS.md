@@ -395,7 +395,7 @@ Storefront endpoint groups đã tạo (9 groups):
 **5.4.2 Catalog**
 - [x] P5-18 | `/products` list (DataGrid: id, name, sku, price, stock, published, delete action) + search + paging
 - [x] P5-19 | `/products/create` + `/products/edit/{id}` live with backend `POST/PUT /api/admin/catalog/products` + `GET /api/admin/catalog/products/{id}` projected to `ProductEditDto`. Form covers general + pricing + inventory + status switches + brand select. Media/attributes/variants tabs are follow-up sub-PRs — endpoints/UI for those are deliberately separate (attribute editor + media picker are big components on their own)
-- [x] P5-20 | `/categories` list + add (flat form; tree view + drag-drop is follow-up)
+- [x] P5-20 | `/categories` list + add + **inline edit + delete + parent select** live. Backend Catalog admin already had PUT/DELETE; client gained `UpdateCategoryAsync`/`DeleteCategoryAsync`. Tree view + drag-drop is still follow-up
 - [x] P5-21 | `/brands` list + add + delete
 - [ ] P5-22..P5-24 | options / attributes / product-templates — **deferred**; endpoints exist for some, UI is sub-PR
 
@@ -431,10 +431,10 @@ Storefront endpoint groups đã tạo (9 groups):
 - [x] P5-47 | `/shipping-providers` — list providers (GET); config form is follow-up
 - [ ] P5-48..P5-49 | Zones + rates — deferred (need endpoint surface first)
 - [x] P5-50 | `/tax-classes` — list + inline create
-- [~] P5-51 | Tax rates — list endpoint + table (pending full CRUD UI sub-PR)
+- [x] P5-51 | **Tax classes + rates CRUD** live at `/tax-classes` (tabbed: Classes + Rates). Backend gained `PUT/DELETE /api/admin/tax/classes/{id}` and `PUT/DELETE /rates/{id}`. UI: per-row inline rename for classes, inline create form for rates with tax-class picker + per-row delete
 
 **5.4.10 Payments**
-- [x] P5-52 | `/payment-providers` — list + enabled flag. Per-provider config form (Stripe/Braintree etc.) is per-provider follow-up
+- [x] P5-52 | `/payment-providers` — list + per-provider configure page (`/payment-providers/{id}`). Backend `GET /providers/{id}` returns full `PaymentProviderDetail` (incl. `AdditionalSettings` JSON) + `PUT /{id}` upserts enabled flag + JSON config. UI: enabled toggle + raw JSON config editor with per-provider shape hints. Replaces 7 different MVC admin areas with one unified form
 
 **5.4.11 Vendors**
 - [x] P5-53 | `/vendors` — list + inline create

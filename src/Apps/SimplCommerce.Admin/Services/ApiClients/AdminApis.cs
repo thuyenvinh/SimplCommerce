@@ -22,6 +22,8 @@ public interface IAdminCatalogApi
 
     Task<IReadOnlyList<CategoryItem>?> ListCategoriesAsync(CancellationToken ct = default);
     Task<HttpResponseMessage> CreateCategoryAsync(CategoryInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> UpdateCategoryAsync(long id, CategoryInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> DeleteCategoryAsync(long id, CancellationToken ct = default);
 
     Task<ProductsPage?> ListProductsAsync(int page = 1, int pageSize = 20, string? search = null, CancellationToken ct = default);
     Task<ProductEditDto?> GetProductAsync(long id, CancellationToken ct = default);
@@ -49,6 +51,12 @@ public sealed class AdminCatalogApi(HttpClient http) : IAdminCatalogApi
 
     public Task<HttpResponseMessage> CreateCategoryAsync(CategoryInput input, CancellationToken ct) =>
         http.PostAsJsonAsync("/api/admin/catalog/categories", input, ct);
+
+    public Task<HttpResponseMessage> UpdateCategoryAsync(long id, CategoryInput input, CancellationToken ct) =>
+        http.PutAsJsonAsync($"/api/admin/catalog/categories/{id}", input, ct);
+
+    public Task<HttpResponseMessage> DeleteCategoryAsync(long id, CancellationToken ct) =>
+        http.DeleteAsync($"/api/admin/catalog/categories/{id}", ct);
 
     public Task<ProductsPage?> ListProductsAsync(int page, int pageSize, string? search, CancellationToken ct)
     {
@@ -277,8 +285,12 @@ public interface IAdminTaxApi
 {
     Task<IReadOnlyList<AdminTaxClassItem>?> ListClassesAsync(CancellationToken ct = default);
     Task<HttpResponseMessage> CreateClassAsync(AdminTaxClassInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> UpdateClassAsync(long id, AdminTaxClassInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> DeleteClassAsync(long id, CancellationToken ct = default);
     Task<IReadOnlyList<AdminTaxRateItem>?> ListRatesAsync(CancellationToken ct = default);
     Task<HttpResponseMessage> CreateRateAsync(AdminTaxRateInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> UpdateRateAsync(long id, AdminTaxRateInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> DeleteRateAsync(long id, CancellationToken ct = default);
 }
 
 public sealed class AdminTaxApi(HttpClient http) : IAdminTaxApi
@@ -289,11 +301,23 @@ public sealed class AdminTaxApi(HttpClient http) : IAdminTaxApi
     public Task<HttpResponseMessage> CreateClassAsync(AdminTaxClassInput input, CancellationToken ct) =>
         http.PostAsJsonAsync("/api/admin/tax/classes", input, ct);
 
+    public Task<HttpResponseMessage> UpdateClassAsync(long id, AdminTaxClassInput input, CancellationToken ct) =>
+        http.PutAsJsonAsync($"/api/admin/tax/classes/{id}", input, ct);
+
+    public Task<HttpResponseMessage> DeleteClassAsync(long id, CancellationToken ct) =>
+        http.DeleteAsync($"/api/admin/tax/classes/{id}", ct);
+
     public async Task<IReadOnlyList<AdminTaxRateItem>?> ListRatesAsync(CancellationToken ct) =>
         await http.GetFromJsonAsync<List<AdminTaxRateItem>>("/api/admin/tax/rates", ct);
 
     public Task<HttpResponseMessage> CreateRateAsync(AdminTaxRateInput input, CancellationToken ct) =>
         http.PostAsJsonAsync("/api/admin/tax/rates", input, ct);
+
+    public Task<HttpResponseMessage> UpdateRateAsync(long id, AdminTaxRateInput input, CancellationToken ct) =>
+        http.PutAsJsonAsync($"/api/admin/tax/rates/{id}", input, ct);
+
+    public Task<HttpResponseMessage> DeleteRateAsync(long id, CancellationToken ct) =>
+        http.DeleteAsync($"/api/admin/tax/rates/{id}", ct);
 }
 
 public interface IAdminShippingApi
@@ -310,6 +334,8 @@ public sealed class AdminShippingApi(HttpClient http) : IAdminShippingApi
 public interface IAdminPaymentsApi
 {
     Task<IReadOnlyList<AdminPaymentProviderItem>?> ListProvidersAsync(CancellationToken ct = default);
+    Task<AdminPaymentProviderDetail?> GetProviderAsync(string id, CancellationToken ct = default);
+    Task<HttpResponseMessage> UpdateProviderAsync(string id, AdminPaymentProviderInput input, CancellationToken ct = default);
     Task<AdminPaymentsPage?> ListPaymentsAsync(int page = 1, int pageSize = 20, CancellationToken ct = default);
 }
 
@@ -317,6 +343,12 @@ public sealed class AdminPaymentsApi(HttpClient http) : IAdminPaymentsApi
 {
     public async Task<IReadOnlyList<AdminPaymentProviderItem>?> ListProvidersAsync(CancellationToken ct) =>
         await http.GetFromJsonAsync<List<AdminPaymentProviderItem>>("/api/admin/payments/providers", ct);
+
+    public Task<AdminPaymentProviderDetail?> GetProviderAsync(string id, CancellationToken ct) =>
+        http.GetFromJsonAsync<AdminPaymentProviderDetail>($"/api/admin/payments/providers/{Uri.EscapeDataString(id)}", ct);
+
+    public Task<HttpResponseMessage> UpdateProviderAsync(string id, AdminPaymentProviderInput input, CancellationToken ct) =>
+        http.PutAsJsonAsync($"/api/admin/payments/providers/{Uri.EscapeDataString(id)}", input, ct);
 
     public Task<AdminPaymentsPage?> ListPaymentsAsync(int page, int pageSize, CancellationToken ct) =>
         http.GetFromJsonAsync<AdminPaymentsPage>($"/api/admin/payments/?page={page}&pageSize={pageSize}", ct);

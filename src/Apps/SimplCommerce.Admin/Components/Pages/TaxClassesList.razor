@@ -3,51 +3,141 @@
 @inject IAdminTaxApi Tax
 @inject ISnackbar Snack
 
-<PageTitle>Tax classes — Admin</PageTitle>
-<MudText Typo="Typo.h4" Class="mb-4">Tax classes</MudText>
+<PageTitle>Tax classes & rates — Admin</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Tax classes & rates</MudText>
 
-<MudPaper Class="pa-4">
-    <EditForm Model="_input" OnValidSubmit="Create" FormName="newTaxClass">
-        <DataAnnotationsValidator />
-        <MudStack Row="true" AlignItems="AlignItems.End">
-            <MudTextField @bind-Value="_input.Name" Label="Name" Required="true" />
-            <MudButton ButtonType="ButtonType.Submit" Color="Color.Primary" Variant="Variant.Filled">Add</MudButton>
+<MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+    <MudTabPanel Text="Classes">
+        <MudStack Row="true" AlignItems="AlignItems.End" Class="mb-3">
+            <MudTextField @bind-Value="_newClassName" Label="New tax class" />
+            <MudButton OnClick="CreateClass" Variant="Variant.Filled" Color="Color.Primary">Add</MudButton>
         </MudStack>
-    </EditForm>
-    <MudDivider Class="my-3" />
-
-    @if (_list is null)
-    {
-        <MudProgressCircular Indeterminate="true" />
-    }
-    else
-    {
-        <MudTable T="AdminTaxClassItem" Items="_list" Hover="true" Dense="true">
-            <HeaderContent><MudTh>ID</MudTh><MudTh>Name</MudTh></HeaderContent>
-            <RowTemplate>
-                <MudTd>@context.Id</MudTd>
-                <MudTd>@context.Name</MudTd>
-            </RowTemplate>
-        </MudTable>
-    }
-</MudPaper>
+        @if (_classes is null) { <MudProgressCircular Indeterminate="true" /> }
+        else
+        {
+            <MudTable T="ClassRow" Items="_classRows" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>ID</MudTh><MudTh>Name</MudTh><MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Id</MudTd>
+                    <MudTd><MudTextField @bind-Value="context.Name" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudTd>
+                    <MudTd>
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => SaveClass(context))">Save</MudButton>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                       OnClick="@(() => DeleteClass(context.Id))" aria-label="Delete" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudTabPanel>
+    <MudTabPanel Text="Rates">
+        <MudStack Row="true" AlignItems="AlignItems.End" Class="mb-3" Spacing="2">
+            <MudSelect T="long" @bind-Value="_newRate.TaxClassId" Label="Tax class" Style="min-width:160px">
+                @if (_classes is not null)
+                {
+                    @foreach (var c in _classes) { <MudSelectItem T="long" Value="@c.Id">@c.Name</MudSelectItem> }
+                }
+            </MudSelect>
+            <MudTextField @bind-Value="_newRate.CountryId" Label="Country" Style="max-width:120px" />
+            <MudNumericField @bind-Value="_newRate.StateOrProvinceId" Label="State ID" Style="max-width:120px" Min="0L" />
+            <MudTextField @bind-Value="_newRate.ZipCode" Label="ZIP" Style="max-width:120px" />
+            <MudNumericField @bind-Value="_newRate.Rate" Label="Rate %" Format="F2" Style="max-width:120px" />
+            <MudButton OnClick="CreateRate" Variant="Variant.Filled" Color="Color.Primary">Add</MudButton>
+        </MudStack>
+        @if (_rates is null) { <MudProgressCircular Indeterminate="true" /> }
+        else
+        {
+            <MudTable T="AdminTaxRateItem" Items="_rates" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>ID</MudTh><MudTh>Class</MudTh><MudTh>Country</MudTh><MudTh>State</MudTh><MudTh>ZIP</MudTh><MudTh>Rate %</MudTh><MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Id</MudTd>
+                    <MudTd>@ClassName(context.TaxClassId)</MudTd>
+                    <MudTd>@context.CountryId</MudTd>
+                    <MudTd>@context.StateOrProvinceId</MudTd>
+                    <MudTd>@context.ZipCode</MudTd>
+                    <MudTd>@context.Rate</MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                       OnClick="@(() => DeleteRate(context.Id))" aria-label="Delete" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudTabPanel>
+</MudTabs>
 
 @code {
-    private IReadOnlyList<AdminTaxClassItem>? _list;
-    private NewInput _input = new();
+    private IReadOnlyList<AdminTaxClassItem>? _classes;
+    private List<ClassRow> _classRows = new();
+    private IReadOnlyList<AdminTaxRateItem>? _rates;
+    private string _newClassName = string.Empty;
+    private NewRateForm _newRate = new();
 
-    protected override async Task OnInitializedAsync() => await Reload();
-    private async Task Reload() { _list = await Tax.ListClassesAsync(); StateHasChanged(); }
+    protected override async Task OnInitializedAsync() => await ReloadAll();
 
-    private async Task Create()
+    private async Task ReloadAll()
     {
-        var resp = await Tax.CreateClassAsync(new AdminTaxClassInput(_input.Name));
-        if (resp.IsSuccessStatusCode) { Snack.Add("Added.", Severity.Success); _input = new(); await Reload(); }
-        else { Snack.Add("Create failed.", Severity.Error); }
+        _classes = await Tax.ListClassesAsync();
+        _classRows = _classes?.Select(c => new ClassRow { Id = c.Id, Name = c.Name }).ToList() ?? new();
+        _rates = await Tax.ListRatesAsync();
+        StateHasChanged();
     }
 
-    public sealed class NewInput
+    private string ClassName(long id) => _classes?.FirstOrDefault(c => c.Id == id)?.Name ?? id.ToString();
+
+    private async Task CreateClass()
     {
-        [System.ComponentModel.DataAnnotations.Required] public string Name { get; set; } = string.Empty;
+        if (string.IsNullOrWhiteSpace(_newClassName)) return;
+        using var resp = await Tax.CreateClassAsync(new AdminTaxClassInput(_newClassName));
+        if (resp.IsSuccessStatusCode) { _newClassName = ""; await ReloadAll(); }
+        else { Snack.Add($"Add failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    private async Task SaveClass(ClassRow row)
+    {
+        using var resp = await Tax.UpdateClassAsync(row.Id, new AdminTaxClassInput(row.Name));
+        if (resp.IsSuccessStatusCode) { Snack.Add("Saved.", Severity.Success); }
+        else { Snack.Add($"Save failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    private async Task DeleteClass(long id)
+    {
+        using var resp = await Tax.DeleteClassAsync(id);
+        if (resp.IsSuccessStatusCode) { await ReloadAll(); }
+        else { Snack.Add($"Delete failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    private async Task CreateRate()
+    {
+        using var resp = await Tax.CreateRateAsync(new AdminTaxRateInput(
+            _newRate.TaxClassId, _newRate.CountryId,
+            _newRate.StateOrProvinceId == 0 ? null : _newRate.StateOrProvinceId,
+            _newRate.ZipCode, _newRate.Rate));
+        if (resp.IsSuccessStatusCode)
+        {
+            _newRate = new NewRateForm { TaxClassId = _newRate.TaxClassId };
+            await ReloadAll();
+        }
+        else { Snack.Add($"Add failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    private async Task DeleteRate(long id)
+    {
+        using var resp = await Tax.DeleteRateAsync(id);
+        if (resp.IsSuccessStatusCode) { await ReloadAll(); }
+        else { Snack.Add($"Delete failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    private class ClassRow { public long Id { get; set; } public string Name { get; set; } = string.Empty; }
+    private class NewRateForm
+    {
+        public long TaxClassId { get; set; }
+        public string CountryId { get; set; } = string.Empty;
+        public long StateOrProvinceId { get; set; }
+        public string? ZipCode { get; set; }
+        public decimal Rate { get; set; }
     }
 }

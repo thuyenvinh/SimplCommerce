@@ -82,6 +82,8 @@ public record AdminShippingProviderItem(string Id, string Name, bool IsEnabled);
 
 // --- Payments admin ---
 public record AdminPaymentProviderItem(string Id, string Name, bool IsEnabled);
+public record AdminPaymentProviderDetail(string Id, string Name, bool IsEnabled, string? AdditionalSettings);
+public record AdminPaymentProviderInput(bool IsEnabled, string? AdditionalSettings);
 public record AdminPaymentItem(long Id, long OrderId, string? PaymentMethod, decimal PaymentFee, decimal Amount, int Status, DateTimeOffset CreatedOn);
 public record AdminPaymentsPage(int Total, int Page, int PageSize, IReadOnlyList<AdminPaymentItem> Items);
 
