@@ -396,7 +396,7 @@ Storefront endpoint groups đã tạo (9 groups):
 - [x] P5-18 | `/products` list (DataGrid: id, name, sku, price, stock, published, delete action) + search + paging
 - [x] P5-19 | `/products/create` + `/products/edit/{id}` live with backend `POST/PUT /api/admin/catalog/products` + `GET /api/admin/catalog/products/{id}` projected to `ProductEditDto`. Form covers general + pricing + inventory + status switches + brand select. Media/attributes/variants tabs are follow-up sub-PRs — endpoints/UI for those are deliberately separate (attribute editor + media picker are big components on their own)
 - [x] P5-20 | `/categories` list + add + **inline edit + delete + parent select** live. Backend Catalog admin already had PUT/DELETE; client gained `UpdateCategoryAsync`/`DeleteCategoryAsync`. Tree view + drag-drop is still follow-up
-- [x] P5-21 | `/brands` list + add + delete
+- [x] P5-21 | `/brands` list + add + **inline edit (name/slug/published) + delete**. UpdateBrandAsync was already on the client; UI rewrote rows as editable cells with per-row Save
 - [ ] P5-22..P5-24 | options / attributes / product-templates — **deferred**; endpoints exist for some, UI is sub-PR
 
 **5.4.3 Orders**
@@ -441,7 +441,7 @@ Storefront endpoint groups đã tạo (9 groups):
 - [x] P5-54 | **Vendors detail/edit/delete live** (`/vendors`, `/vendors/create`, `/vendors/edit/{id}`). Backend GET /{id} + PUT + DELETE added with `VendorDetail/VendorInput` records, fields: Name/Slug/Email/Description/IsActive. Vendor-specific product list endpoint still follow-up
 
 **5.4.12 Localization**
-- [ ] P5-55..P5-56 | Languages + translations — deferred (translation editor UI is complex sub-PR)
+- [x] P5-55..P5-56 | **Languages + translation editor** live at `/translations`. Backend `LocalizationAdminEndpoints` exposes culture CRUD (`/api/admin/localization/cultures`) and resource CRUD with paging + key/value search (`/resources`). UI is split: cultures pane (count badge per language + add/delete) + resources pane (search + inline upsert + per-row save/delete). Wires straight into `EFStringLocalizer` so changes show up at runtime without a process restart
 
 **5.4.13 Settings**
 - [~] P5-57..P5-60 | **App settings panel** live at `/settings`: GET `/api/admin/core/app-settings` (optional `?module=` filter) + PUT `/{id}` upsert. Inline edit per row + add-new row. Per-concern settings forms (general / email SMTP / payment-provider config / SEO etc.) are sub-PRs on top of this generic store

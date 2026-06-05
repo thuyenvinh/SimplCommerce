@@ -1,0 +1,185 @@
+@page "/translations"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminLocalizationApi Loc
+@inject ISnackbar Snack
+
+<PageTitle>Translations — Admin</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Translations</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="4">
+        <MudPaper Class="pa-4 mb-3">
+            <MudText Typo="Typo.h6" Class="mb-2">Languages</MudText>
+            @if (_cultures is null)
+            {
+                <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+            }
+            else
+            {
+                <MudList T="AdminCultureItem" Dense="true">
+                    @foreach (var c in _cultures)
+                    {
+                        <MudListItem T="AdminCultureItem" Value="@c" OnClick="@(() => SelectCulture(c.Id))">
+                            <div style="display:flex; align-items:center; gap:.5rem;">
+                                <MudIcon Icon="@(c.Id == _selectedCulture ? Icons.Material.Filled.Check : Icons.Material.Filled.Translate)"
+                                         Size="Size.Small" Color="@(c.Id == _selectedCulture ? Color.Primary : Color.Default)" />
+                                <strong>@c.Id</strong>
+                                <span>@c.Name</span>
+                                <MudSpacer />
+                                <MudText Typo="Typo.caption">@c.ResourceCount keys</MudText>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                               OnClick="@(() => DeleteCulture(c.Id))" aria-label="Delete" />
+                            </div>
+                        </MudListItem>
+                    }
+                </MudList>
+            }
+            <MudDivider Class="my-3" />
+            <MudStack Row="true">
+                <MudTextField @bind-Value="_newCultureId" Label="Culture ID" Placeholder="vi-VN" />
+                <MudTextField @bind-Value="_newCultureName" Label="Name" Placeholder="Tiếng Việt" />
+            </MudStack>
+            <MudButton OnClick="CreateCulture" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">Add language</MudButton>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="8">
+        <MudPaper Class="pa-4">
+            <MudStack Row="true" AlignItems="AlignItems.End" Class="mb-3" Spacing="2">
+                <MudText Typo="Typo.h6">Resources for @(_selectedCulture ?? "(pick a language)")</MudText>
+                <MudSpacer />
+                <MudTextField @bind-Value="_search" Label="Search key or value" DebounceInterval="350" OnDebounceIntervalElapsed="ReloadResources" Style="max-width:280px" />
+            </MudStack>
+
+            @if (_selectedCulture is null)
+            {
+                <MudAlert Severity="Severity.Info">Pick a language on the left to edit its translation keys.</MudAlert>
+            }
+            else
+            {
+                <MudStack Row="true" Class="mb-3" Spacing="2">
+                    <MudTextField @bind-Value="_newKey" Label="Key" Placeholder="account.welcome" />
+                    <MudTextField @bind-Value="_newValue" Label="Value" />
+                    <MudButton OnClick="UpsertNew" Color="Color.Primary" Variant="Variant.Filled">Add / update</MudButton>
+                </MudStack>
+
+                @if (_resources is null)
+                {
+                    <MudProgressCircular Indeterminate="true" />
+                }
+                else if (_resources.Items.Count == 0)
+                {
+                    <MudAlert Severity="Severity.Info">No keys for this language yet.</MudAlert>
+                }
+                else
+                {
+                    <MudTable T="EditRow" Items="_editRows" Dense="true" Hover="true">
+                        <HeaderContent>
+                            <MudTh>Key</MudTh><MudTh>Value</MudTh><MudTh>Actions</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd Style="max-width:280px;">@context.Key</MudTd>
+                            <MudTd>
+                                <MudTextField @bind-Value="context.Value" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                            </MudTd>
+                            <MudTd>
+                                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary"
+                                           OnClick="@(() => SaveResource(context))">Save</MudButton>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                               OnClick="@(() => DeleteResource(context.Id))" aria-label="Delete" />
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private IReadOnlyList<AdminCultureItem>? _cultures;
+    private string? _selectedCulture;
+    private string _newCultureId = string.Empty;
+    private string _newCultureName = string.Empty;
+
+    private AdminResourcesPage? _resources;
+    private List<EditRow> _editRows = new();
+    private string _search = string.Empty;
+    private string _newKey = string.Empty;
+    private string _newValue = string.Empty;
+
+    protected override async Task OnInitializedAsync() => await ReloadCultures();
+
+    private async Task ReloadCultures()
+    {
+        _cultures = await Loc.ListCulturesAsync();
+        if (_selectedCulture is null && _cultures is { Count: > 0 })
+        {
+            _selectedCulture = _cultures[0].Id;
+            await ReloadResources();
+        }
+        StateHasChanged();
+    }
+
+    private async Task SelectCulture(string id)
+    {
+        _selectedCulture = id;
+        await ReloadResources();
+    }
+
+    private async Task ReloadResources()
+    {
+        if (_selectedCulture is null) { _resources = null; return; }
+        _resources = await Loc.ListResourcesAsync(_selectedCulture, _search, page: 1, pageSize: 200);
+        _editRows = _resources?.Items.Select(r => new EditRow { Id = r.Id, Key = r.Key, Value = r.Value ?? string.Empty }).ToList() ?? new();
+        StateHasChanged();
+    }
+
+    private async Task CreateCulture()
+    {
+        if (string.IsNullOrWhiteSpace(_newCultureId)) return;
+        using var resp = await Loc.CreateCultureAsync(new AdminCultureInput(_newCultureId, _newCultureName));
+        if (resp.IsSuccessStatusCode) { _newCultureId = ""; _newCultureName = ""; await ReloadCultures(); }
+        else { Snack.Add($"Create failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    private async Task DeleteCulture(string id)
+    {
+        using var resp = await Loc.DeleteCultureAsync(id);
+        if (resp.IsSuccessStatusCode)
+        {
+            if (_selectedCulture == id) _selectedCulture = null;
+            await ReloadCultures();
+        }
+        else { Snack.Add($"Delete failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    private async Task UpsertNew()
+    {
+        if (_selectedCulture is null || string.IsNullOrWhiteSpace(_newKey)) return;
+        using var resp = await Loc.UpsertResourceAsync(new AdminResourceInput(_selectedCulture, _newKey, _newValue));
+        if (resp.IsSuccessStatusCode) { _newKey = ""; _newValue = ""; await ReloadResources(); await ReloadCultures(); }
+        else { Snack.Add($"Save failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    private async Task SaveResource(EditRow row)
+    {
+        if (_selectedCulture is null) return;
+        using var resp = await Loc.UpdateResourceAsync(row.Id, new AdminResourceInput(_selectedCulture, row.Key, row.Value));
+        if (resp.IsSuccessStatusCode) { Snack.Add("Saved.", Severity.Success); }
+        else { Snack.Add($"Save failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    private async Task DeleteResource(long id)
+    {
+        using var resp = await Loc.DeleteResourceAsync(id);
+        if (resp.IsSuccessStatusCode) { await ReloadResources(); await ReloadCultures(); }
+        else { Snack.Add($"Delete failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    private class EditRow
+    {
+        public long Id { get; set; }
+        public string Key { get; set; } = string.Empty;
+        public string Value { get; set; } = string.Empty;
+    }
+}

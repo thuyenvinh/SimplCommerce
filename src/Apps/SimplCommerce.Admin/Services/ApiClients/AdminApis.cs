@@ -496,3 +496,43 @@ public sealed class AdminContactsApi(HttpClient http) : IAdminContactsApi
     public Task<HttpResponseMessage> SetStatusAsync(long id, AdminContactStatusInput input, CancellationToken ct) =>
         http.PatchAsJsonAsync($"/api/admin/contacts/{id}/status", input, ct);
 }
+
+public interface IAdminLocalizationApi
+{
+    Task<IReadOnlyList<AdminCultureItem>?> ListCulturesAsync(CancellationToken ct = default);
+    Task<HttpResponseMessage> CreateCultureAsync(AdminCultureInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> DeleteCultureAsync(string id, CancellationToken ct = default);
+    Task<AdminResourcesPage?> ListResourcesAsync(string? cultureId = null, string? search = null, int page = 1, int pageSize = 100, CancellationToken ct = default);
+    Task<HttpResponseMessage> UpsertResourceAsync(AdminResourceInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> UpdateResourceAsync(long id, AdminResourceInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> DeleteResourceAsync(long id, CancellationToken ct = default);
+}
+
+public sealed class AdminLocalizationApi(HttpClient http) : IAdminLocalizationApi
+{
+    public async Task<IReadOnlyList<AdminCultureItem>?> ListCulturesAsync(CancellationToken ct) =>
+        await http.GetFromJsonAsync<List<AdminCultureItem>>("/api/admin/localization/cultures", ct);
+
+    public Task<HttpResponseMessage> CreateCultureAsync(AdminCultureInput input, CancellationToken ct) =>
+        http.PostAsJsonAsync("/api/admin/localization/cultures", input, ct);
+
+    public Task<HttpResponseMessage> DeleteCultureAsync(string id, CancellationToken ct) =>
+        http.DeleteAsync($"/api/admin/localization/cultures/{Uri.EscapeDataString(id)}", ct);
+
+    public Task<AdminResourcesPage?> ListResourcesAsync(string? cultureId, string? search, int page, int pageSize, CancellationToken ct)
+    {
+        var url = $"/api/admin/localization/resources?page={page}&pageSize={pageSize}";
+        if (!string.IsNullOrWhiteSpace(cultureId)) url += $"&cultureId={Uri.EscapeDataString(cultureId)}";
+        if (!string.IsNullOrWhiteSpace(search)) url += $"&search={Uri.EscapeDataString(search)}";
+        return http.GetFromJsonAsync<AdminResourcesPage>(url, ct);
+    }
+
+    public Task<HttpResponseMessage> UpsertResourceAsync(AdminResourceInput input, CancellationToken ct) =>
+        http.PostAsJsonAsync("/api/admin/localization/resources", input, ct);
+
+    public Task<HttpResponseMessage> UpdateResourceAsync(long id, AdminResourceInput input, CancellationToken ct) =>
+        http.PutAsJsonAsync($"/api/admin/localization/resources/{id}", input, ct);
+
+    public Task<HttpResponseMessage> DeleteResourceAsync(long id, CancellationToken ct) =>
+        http.DeleteAsync($"/api/admin/localization/resources/{id}", ct);
+}

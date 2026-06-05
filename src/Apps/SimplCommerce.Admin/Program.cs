@@ -90,6 +90,8 @@ builder.Services.AddHttpClient<IAdminContactsApi, AdminContactsApi>(c => c.BaseA
     .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
 builder.Services.AddHttpClient<IAdminNewsApi, AdminNewsApi>(c => c.BaseAddress = new Uri(apiBase))
     .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
+builder.Services.AddHttpClient<IAdminLocalizationApi, AdminLocalizationApi>(c => c.BaseAddress = new Uri(apiBase))
+    .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
 
 builder.Services.AddScoped<CookieAuthStateService>();
 builder.Services.AddResponseCompression(o => o.EnableForHttps = true);

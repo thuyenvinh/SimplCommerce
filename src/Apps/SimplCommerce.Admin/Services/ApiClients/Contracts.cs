@@ -114,6 +114,13 @@ public record AdminAppSettingInput(string Value);
 public record AdminCustomerGroupItem(long Id, string Name);
 public record AdminCustomerGroupInput(string Name);
 
+// --- Localization admin ---
+public record AdminCultureItem(string Id, string Name, int ResourceCount);
+public record AdminCultureInput(string Id, string Name);
+public record AdminResourceItem(long Id, string CultureId, string Key, string? Value);
+public record AdminResourcesPage(int Total, int Page, int PageSize, IReadOnlyList<AdminResourceItem> Items);
+public record AdminResourceInput(string CultureId, string Key, string? Value);
+
 // --- Cms admin ---
 public record AdminCmsPageListItem(long Id, string Name, string Slug, bool IsPublished, DateTimeOffset CreatedOn);
 public record AdminCmsPageDetail(long Id, string Name, string Slug, string? Body, bool IsPublished, DateTimeOffset CreatedOn);

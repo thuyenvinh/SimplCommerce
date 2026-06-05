@@ -22,20 +22,25 @@
     {
         <MudProgressCircular Indeterminate="true" />
     }
+    else if (_brands.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">No brands yet.</MudAlert>
+    }
     else
     {
-        <MudTable T="BrandItem" Items="_brands" Hover="true" Dense="true">
+        <MudTable T="EditRow" Items="_editRows" Hover="true" Dense="true">
             <HeaderContent>
                 <MudTh>ID</MudTh><MudTh>Name</MudTh><MudTh>Slug</MudTh><MudTh>Published</MudTh><MudTh>Actions</MudTh>
             </HeaderContent>
             <RowTemplate>
                 <MudTd>@context.Id</MudTd>
-                <MudTd>@context.Name</MudTd>
-                <MudTd>@context.Slug</MudTd>
-                <MudTd>@(context.IsPublished ? "✓" : "—")</MudTd>
+                <MudTd><MudTextField @bind-Value="context.Name" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudTd>
+                <MudTd><MudTextField @bind-Value="context.Slug" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudTd>
+                <MudTd><MudSwitch T="bool" @bind-Value="context.IsPublished" Color="Color.Primary" /></MudTd>
                 <MudTd>
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => Save(context))">Save</MudButton>
                     <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
-                                   OnClick="@(() => Delete(context.Id))" />
+                                   OnClick="@(() => Delete(context.Id))" aria-label="Delete" />
                 </MudTd>
             </RowTemplate>
         </MudTable>
@@ -44,29 +49,42 @@
 
 @code {
     private IReadOnlyList<BrandItem>? _brands;
+    private List<EditRow> _editRows = new();
     private NewBrandInput _input = new();
 
     protected override async Task OnInitializedAsync() => await Reload();
 
-    private async Task Reload() { _brands = await Catalog.ListBrandsAsync(); StateHasChanged(); }
+    private async Task Reload()
+    {
+        _brands = await Catalog.ListBrandsAsync();
+        _editRows = _brands?.Select(b => new EditRow { Id = b.Id, Name = b.Name, Slug = b.Slug, IsPublished = b.IsPublished }).ToList() ?? new();
+        StateHasChanged();
+    }
 
     private async Task Create()
     {
-        var resp = await Catalog.CreateBrandAsync(new BrandInput(_input.Name, _input.Slug, _input.IsPublished));
+        using var resp = await Catalog.CreateBrandAsync(new BrandInput(_input.Name, _input.Slug, _input.IsPublished));
         if (resp.IsSuccessStatusCode)
         {
             Snack.Add("Brand added.", Severity.Success);
             _input = new();
             await Reload();
         }
-        else { Snack.Add("Create failed — HTTP " + (int)resp.StatusCode, Severity.Error); }
+        else { Snack.Add($"Create failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    private async Task Save(EditRow row)
+    {
+        using var resp = await Catalog.UpdateBrandAsync(row.Id, new BrandInput(row.Name, row.Slug, row.IsPublished));
+        if (resp.IsSuccessStatusCode) { Snack.Add("Saved.", Severity.Success); }
+        else { Snack.Add($"Save failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
     }
 
     private async Task Delete(long id)
     {
-        var resp = await Catalog.DeleteBrandAsync(id);
+        using var resp = await Catalog.DeleteBrandAsync(id);
         if (resp.IsSuccessStatusCode) { Snack.Add("Brand deleted.", Severity.Success); await Reload(); }
-        else { Snack.Add("Delete failed.", Severity.Error); }
+        else { Snack.Add($"Delete failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
     }
 
     public sealed class NewBrandInput
@@ -74,5 +92,13 @@
         [System.ComponentModel.DataAnnotations.Required] public string Name { get; set; } = string.Empty;
         [System.ComponentModel.DataAnnotations.Required] public string Slug { get; set; } = string.Empty;
         public bool IsPublished { get; set; } = true;
+    }
+
+    private class EditRow
+    {
+        public long Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Slug { get; set; } = string.Empty;
+        public bool IsPublished { get; set; }
     }
 }
