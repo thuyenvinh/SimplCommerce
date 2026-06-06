@@ -58,7 +58,10 @@ public class SimplApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseEnvironment("Testing");
+        // Use Development so ServiceDefaults.MapDefaultEndpoints exposes /health +
+        // /alive (they're intentionally dev-only — in prod they're scraped via the
+        // Aspire dashboard, so we don't loosen that posture just for tests).
+        builder.UseEnvironment("Development");
 
         // SimplDbContext.OnModelCreating walks GlobalConfiguration.Modules for entity
         // discovery; seed the manifest (idempotent — Program.cs also calls it).
