@@ -58,10 +58,13 @@ public class SimplApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        // Use Development so ServiceDefaults.MapDefaultEndpoints exposes /health +
-        // /alive (they're intentionally dev-only — in prod they're scraped via the
-        // Aspire dashboard, so we don't loosen that posture just for tests).
-        builder.UseEnvironment("Development");
+        // Keep a production-like environment. NOT Development: that flips on the DI
+        // container's ValidateOnBuild, which eagerly validates every registration in
+        // this large modular app (many conditional/IEnumerable handler registrations
+        // aren't resolvable as roots) — stricter than production and out of scope to
+        // satisfy here. Health endpoints are dev-only by design, so the smoke test
+        // hits an always-mapped anonymous endpoint instead.
+        builder.UseEnvironment("Testing");
 
         // SimplDbContext.OnModelCreating walks GlobalConfiguration.Modules for entity
         // discovery; seed the manifest (idempotent — Program.cs also calls it).
