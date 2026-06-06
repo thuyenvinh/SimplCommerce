@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SimplCommerce.Infrastructure;
 using SimplCommerce.Infrastructure.Data;
+using SimplCommerce.Module.Catalog.Models;
 using SimplCommerce.Module.ShoppingCart.Models;
 using SimplCommerce.Module.Core.Services;
 using SimplCommerce.Module.Pricing.Services;
@@ -16,6 +17,7 @@ namespace SimplCommerce.Module.ShoppingCart.Services
     public class CartService : ICartService
     {
         private readonly IRepository<CartItem> _cartItemRepository;
+        private readonly IRepository<Product> _productRepository;
         private readonly IMediaService _mediaService;
         private readonly ICouponService _couponService;
         private readonly bool _isProductPriceIncludeTax;
@@ -24,7 +26,7 @@ namespace SimplCommerce.Module.ShoppingCart.Services
         private readonly IProductPricingService _productPricingService;
 
         public CartService(IRepository<CartItem> cartItemRepository, ICouponService couponService,
-            IMediaService mediaService, IConfiguration config, ICurrencyService currencyService, IStringLocalizerFactory stringLocalizerFactory, IProductPricingService productPricingService)
+            IMediaService mediaService, IConfiguration config, ICurrencyService currencyService, IStringLocalizerFactory stringLocalizerFactory, IProductPricingService productPricingService, IRepository<Product> productRepository)
         {
             _cartItemRepository = cartItemRepository;
             _couponService = couponService;
@@ -33,6 +35,7 @@ namespace SimplCommerce.Module.ShoppingCart.Services
             _isProductPriceIncludeTax = config.GetValue<bool>("Catalog.IsProductPriceIncludeTax");
             _localizer = stringLocalizerFactory.Create(null);
             _productPricingService = productPricingService;
+            _productRepository = productRepository;
         }
 
         public async Task<AddToCartResult> AddToCart(long customerId, long productId, int quantity)
@@ -50,8 +53,38 @@ namespace SimplCommerce.Module.ShoppingCart.Services
             {
                 return CreateQuantityOverflowError();
             }
-            
+
+            // W3-G16: validate the product is sellable BEFORE writing a CartItem so the
+            // storefront fails fast with a meaningful error instead of erroring out at
+            // checkout. Three guards:
+            //   • product exists + not soft-deleted + published + IsAllowToOrder
+            //   • when StockTrackingIsEnabled, requested qty (including what's already
+            //     in the cart) must not exceed on-hand StockQuantity
+            //   • call-for-pricing products are *displayable* but not *orderable*; they
+            //     must not enter the cart at all.
+            var product = await _productRepository.Query()
+                .Where(p => p.Id == productId)
+                .Select(p => new { p.Id, p.IsDeleted, p.IsPublished, p.IsAllowToOrder, p.IsCallForPricing, p.StockTrackingIsEnabled, p.StockQuantity })
+                .FirstOrDefaultAsync();
+            if (product is null || product.IsDeleted || !product.IsPublished || !product.IsAllowToOrder || product.IsCallForPricing)
+            {
+                addToCartResult.ErrorMessage = _localizer["This product is not available to order"].Value;
+                addToCartResult.ErrorCode = "product-not-orderable";
+                return addToCartResult;
+            }
+
             var cartItem = await _cartItemRepository.Query().FirstOrDefaultAsync(x => x.ProductId == productId && x.CustomerId == customerId);
+
+            if (product.StockTrackingIsEnabled)
+            {
+                var desiredTotal = (cartItem?.Quantity ?? 0) + quantity;
+                if (desiredTotal > product.StockQuantity)
+                {
+                    addToCartResult.ErrorMessage = _localizer["Not enough stock available"].Value;
+                    addToCartResult.ErrorCode = "out-of-stock";
+                    return addToCartResult;
+                }
+            }
 
             if (cartItem == null)
             {
@@ -79,7 +112,7 @@ namespace SimplCommerce.Module.ShoppingCart.Services
             await _cartItemRepository.SaveChangesAsync();
 
             addToCartResult.Success = true;
-            
+
             return addToCartResult;
 
             AddToCartResult CreateQuantityOverflowError()

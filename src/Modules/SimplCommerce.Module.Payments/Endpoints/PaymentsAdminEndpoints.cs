@@ -118,17 +118,21 @@ public static class PaymentsAdminEndpoints
             }
             await payments.SaveChangesAsync();
 
-            if (isFullRefund)
+            // W3-G13: publish for partial refunds too. The Order status only flips on
+            // a full refund, but OrderHistory / customer-email handlers still need to
+            // know that a refund occurred (with the amount in the note) — otherwise the
+            // customer gets money back with no audit trail or notification.
+            var note = string.IsNullOrWhiteSpace(req.Reason)
+                ? $"refund {req.Amount:0.##}"
+                : $"refund {req.Amount:0.##}: {req.Reason}";
+            await mediator.Publish(new OrderChanged
             {
-                await mediator.Publish(new OrderChanged
-                {
-                    OrderId = order.Id,
-                    Order = order,
-                    OldStatus = oldStatus,
-                    NewStatus = OrderStatus.Refunded,
-                    Note = string.IsNullOrWhiteSpace(req.Reason) ? "refund" : $"refund: {req.Reason}",
-                });
-            }
+                OrderId = order.Id,
+                Order = order,
+                OldStatus = oldStatus,
+                NewStatus = order.OrderStatus,
+                Note = note,
+            });
             return Results.Ok(new
             {
                 paymentId = payment.Id,

@@ -45,6 +45,12 @@ namespace SimplCommerce.Module.Inventory.Services
 
         public async Task UpdateStock(StockUpdateRequest stockUpdateRequest)
         {
+            // W3-G11: serialize the read-modify-write across (Product, Stock, StockHistory).
+            // Without the transaction two concurrent orders can both read the same stock
+            // quantity, both subtract from it, and both commit — pushing stock negative
+            // even though each check passed individually. Serializable isolation makes
+            // the SELECTs take key-range locks so the second transaction waits.
+            using var transaction = _stockRepository.BeginTransaction();
             var product = await _productRepository.Query().FirstOrDefaultAsync(x => x.Id == stockUpdateRequest.ProductId);
             var stock = await _stockRepository.Query().FirstOrDefaultAsync(x => x.ProductId == stockUpdateRequest.ProductId && x.WarehouseId == stockUpdateRequest.WarehouseId);
 
@@ -69,6 +75,7 @@ namespace SimplCommerce.Module.Inventory.Services
 
             _stockHistoryRepository.Add(stockHistory);
             await _stockHistoryRepository.SaveChangesAsync();
+            transaction.Commit();
 
             if (prevStockQuantity <= 0 && product.StockQuantity > 0)
             {
