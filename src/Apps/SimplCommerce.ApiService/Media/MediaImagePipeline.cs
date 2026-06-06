@@ -24,7 +24,7 @@ public static class MediaImagePipeline
 {
     private const string MediaRoot = "user-content";
 
-    public static IServiceCollection AddMediaImagePipeline(this IServiceCollection services)
+    public static IServiceCollection AddMediaImagePipeline(this IServiceCollection services, string webRootPath)
     {
         services.AddImageSharp(options =>
         {
@@ -38,7 +38,10 @@ public static class MediaImagePipeline
         })
         .Configure<PhysicalFileSystemProviderOptions>(options =>
         {
-            options.ProviderRootPath = null;
+            // Resolve served + cached files relative to this explicit root rather than
+            // defaulting to IWebHostEnvironment.WebRootPath, which can be null on a
+            // minimal-API host with no wwwroot (would throw at host start).
+            options.ProviderRootPath = webRootPath;
         })
         .SetRequestParser<QueryCollectionRequestParser>()
         .Configure<PhysicalFileSystemCacheOptions>(options =>

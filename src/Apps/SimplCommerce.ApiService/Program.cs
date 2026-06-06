@@ -96,7 +96,15 @@ builder.AddSqlServerDbContext<SimplDbContext>("SimplCommerce", configureDbContex
 builder.AddRedisDistributedCache("redis");
 builder.AddAzureBlobServiceClient("blobs");
 
-GlobalConfiguration.WebRootPath = builder.Environment.WebRootPath;
+// The ApiService is a minimal-API host with no static-web-asset wwwroot, so
+// builder.Environment.WebRootPath can be null. StorageLocal + ImageSharp.Web both
+// need a concrete web root, so materialize one under the content root.
+var resolvedWebRoot = builder.Environment.WebRootPath
+    ?? Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
+Directory.CreateDirectory(resolvedWebRoot);
+builder.Environment.WebRootPath = resolvedWebRoot;
+
+GlobalConfiguration.WebRootPath = resolvedWebRoot;
 GlobalConfiguration.ContentRootPath = builder.Environment.ContentRootPath;
 
 // ---- Identity (JWT-ready; no cookie middleware here — that's the Storefront/Admin BFF job) ----
@@ -137,7 +145,7 @@ builder.Services
 builder.Services.AddScoped<JwtTokenService>();
 
 builder.Services.AddWebhookVerifiers(builder.Configuration);
-builder.Services.AddMediaImagePipeline();
+builder.Services.AddMediaImagePipeline(resolvedWebRoot);
 
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy("AdminOnly", p => p.RequireRole("admin"))

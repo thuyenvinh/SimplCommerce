@@ -10,6 +10,7 @@ WORKDIR /src
 
 COPY global.json ./
 COPY src/ServiceDefaults/ src/ServiceDefaults/
+COPY src/SimplCommerce.RealTime/ src/SimplCommerce.RealTime/
 COPY src/Apps/SimplCommerce.Admin/ src/Apps/SimplCommerce.Admin/
 
 RUN dotnet restore src/Apps/SimplCommerce.Admin/SimplCommerce.Admin.csproj
