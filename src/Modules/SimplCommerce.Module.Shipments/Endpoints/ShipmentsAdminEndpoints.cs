@@ -26,12 +26,17 @@ public static class ShipmentsAdminEndpoints
         System.Collections.Generic.IReadOnlyList<ShipmentItemInput> Items);
 
     public record AdminShipmentItem(long Id, long OrderId, string? TrackingNumber,
-        long WarehouseId, System.DateTimeOffset CreatedOn, int ItemCount);
+        long WarehouseId, ShipmentStatus Status, System.DateTimeOffset CreatedOn, int ItemCount);
 
     public record AdminShipmentDetail(long Id, long OrderId, string? TrackingNumber,
-        long WarehouseId, System.DateTimeOffset CreatedOn,
+        long WarehouseId, ShipmentStatus Status, System.DateTimeOffset CreatedOn,
         System.Collections.Generic.IReadOnlyList<AdminShipmentLine> Items);
     public record AdminShipmentLine(long Id, long OrderItemId, long ProductId, string ProductName, int Quantity);
+
+    // G01: shipment status transitions. Pending → Shipped → Delivered is the happy
+    // path; Returned/Cancelled are terminal off-ramps. Rejected transitions return
+    // 400 so admins can't accidentally regress a delivered parcel back to Pending.
+    public record UpdateShipmentStatusRequest(ShipmentStatus NewStatus);
 
     public static IEndpointRouteBuilder MapShipmentsAdminEndpoints(this IEndpointRouteBuilder app)
     {
@@ -45,7 +50,7 @@ public static class ShipmentsAdminEndpoints
             if (orderId.HasValue) query = query.Where(s => s.OrderId == orderId);
             var list = await query.OrderByDescending(s => s.CreatedOn)
                 .Select(s => new AdminShipmentItem(s.Id, s.OrderId, s.TrackingNumber,
-                    s.WarehouseId, s.CreatedOn, s.Items.Count))
+                    s.WarehouseId, s.Status, s.CreatedOn, s.Items.Count))
                 .ToListAsync();
             return Results.Ok(list);
         });
@@ -57,9 +62,23 @@ public static class ShipmentsAdminEndpoints
                 .FirstOrDefaultAsync(x => x.Id == id);
             if (s is null) return Results.NotFound();
             return Results.Ok(new AdminShipmentDetail(s.Id, s.OrderId, s.TrackingNumber,
-                s.WarehouseId, s.CreatedOn,
+                s.WarehouseId, s.Status, s.CreatedOn,
                 s.Items.Select(i => new AdminShipmentLine(i.Id, i.OrderItemId, i.ProductId,
                     i.Product?.Name ?? string.Empty, i.Quantity)).ToList()));
+        });
+
+        group.MapPatch("/{id:long}/status", async (long id, UpdateShipmentStatusRequest req, IRepository<Shipment> repo) =>
+        {
+            var s = await repo.Query().FirstOrDefaultAsync(x => x.Id == id);
+            if (s is null) return Results.NotFound();
+            if (!IsValidTransition(s.Status, req.NewStatus))
+            {
+                return Results.BadRequest(new { error = $"Invalid transition {s.Status} → {req.NewStatus}." });
+            }
+            s.Status = req.NewStatus;
+            s.LatestUpdatedOn = System.DateTimeOffset.UtcNow;
+            await repo.SaveChangesAsync();
+            return Results.NoContent();
         });
 
         group.MapPost("/", async (
@@ -111,5 +130,18 @@ public static class ShipmentsAdminEndpoints
         });
 
         return app;
+    }
+
+    private static bool IsValidTransition(ShipmentStatus from, ShipmentStatus to)
+    {
+        if (from == to) return true;
+        return from switch
+        {
+            ShipmentStatus.Pending => to is ShipmentStatus.Shipped or ShipmentStatus.Cancelled,
+            ShipmentStatus.Shipped => to is ShipmentStatus.Delivered or ShipmentStatus.Returned,
+            ShipmentStatus.Delivered => to is ShipmentStatus.Returned,
+            // Returned + Cancelled are terminal.
+            _ => false,
+        };
     }
 }

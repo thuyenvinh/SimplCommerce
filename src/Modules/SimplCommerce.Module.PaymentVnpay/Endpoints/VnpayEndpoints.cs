@@ -101,7 +101,8 @@ public static class VnpayEndpoints
         HttpContext ctx,
         IOrderService orderService,
         IRepositoryWithTypedId<Checkout, Guid> checkouts,
-        IRepositoryWithTypedId<PaymentProvider, string> providers)
+        IRepositoryWithTypedId<PaymentProvider, string> providers,
+        IRepository<Payment> payments)
     {
         var (params_, checkoutId) = ParseParams(ctx);
         var cfg = LoadConfig(providers);
@@ -119,6 +120,7 @@ public static class VnpayEndpoints
                 var result = await orderService.CreateOrder(id, VnpayProvider.Id, cfg.PaymentFee, OrderStatus.PaymentReceived);
                 if (result.Success)
                 {
+                    await RecordPaymentAsync(payments, result.Value, params_, cfg);
                     return Results.Redirect($"/checkout/{result.Value.Id}/success");
                 }
             }
@@ -131,7 +133,8 @@ public static class VnpayEndpoints
         HttpContext ctx,
         IOrderService orderService,
         IRepositoryWithTypedId<Checkout, Guid> checkouts,
-        IRepositoryWithTypedId<PaymentProvider, string> providers)
+        IRepositoryWithTypedId<PaymentProvider, string> providers,
+        IRepository<Payment> payments)
     {
         var (params_, checkoutId) = ParseParams(ctx);
         var cfg = LoadConfig(providers);
@@ -148,11 +151,51 @@ public static class VnpayEndpoints
             {
                 return Results.Json(new { RspCode = "01", Message = "Order not found" });
             }
-            await orderService.CreateOrder(id, VnpayProvider.Id, cfg.PaymentFee, OrderStatus.PaymentReceived);
+            var result = await orderService.CreateOrder(id, VnpayProvider.Id, cfg.PaymentFee, OrderStatus.PaymentReceived);
+            if (result.Success)
+            {
+                await RecordPaymentAsync(payments, result.Value, params_, cfg);
+            }
             return Results.Json(new { RspCode = "00", Message = "Confirm Success" });
         }
 
         return Results.Json(new { RspCode = "02", Message = "Order already confirmed or failed" });
+    }
+
+    // G06: persist a Payment row for every successful VNPAY capture so the
+    // Payments admin table has an audit trail. Idempotent — checks for an
+    // existing Payment+GatewayTransactionId before inserting because the same
+    // checkout fires both the browser-return AND the server-to-server IPN.
+    private static async Task RecordPaymentAsync(
+        IRepository<Payment> payments,
+        Order order,
+        Dictionary<string, string> vnpParams,
+        VnpayConfig cfg)
+    {
+        var txnId = vnpParams.TryGetValue("vnp_TransactionNo", out var t) ? t : string.Empty;
+        var already = await payments.Query()
+            .AnyAsync(p => p.OrderId == order.Id && p.PaymentMethod == VnpayProvider.Id);
+        if (already) return;
+
+        // vnp_Amount is in VND minor units (×100). Fall back to OrderTotal if the
+        // param is missing/unparseable — never trust gateway input blindly.
+        decimal capturedAmount = order.OrderTotal;
+        if (vnpParams.TryGetValue("vnp_Amount", out var amtRaw)
+            && long.TryParse(amtRaw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var minor))
+        {
+            capturedAmount = minor / 100m;
+        }
+
+        payments.Add(new Payment
+        {
+            OrderId = order.Id,
+            PaymentMethod = VnpayProvider.Id,
+            Amount = capturedAmount,
+            PaymentFee = cfg.PaymentFee,
+            GatewayTransactionId = txnId,
+            Status = PaymentStatus.Succeeded,
+        });
+        await payments.SaveChangesAsync();
     }
 
     private static (Dictionary<string, string> Params, Guid? CheckoutId) ParseParams(HttpContext ctx)

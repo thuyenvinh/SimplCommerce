@@ -41,6 +41,18 @@ public static class CatalogAdminEndpoints
         bool StockTrackingIsEnabled, int StockQuantity,
         long? BrandId, System.Collections.Generic.IReadOnlyList<long> CategoryIds);
 
+    // G07: variant CRUD. Variants are sibling Product rows with IsVisibleIndividually=false,
+    // joined back to the parent through ProductLink(LinkType=Super). Only fields that
+    // legitimately vary per-SKU are surfaced — name/sku/price/stock/published — so the
+    // parent's marketing copy (description, brand, categories) stays the single source.
+    public record ProductVariantInput(
+        string Name, string? Sku, decimal Price, decimal? OldPrice,
+        int StockQuantity, bool IsPublished);
+
+    public record ProductVariantDto(
+        long Id, string Name, string Slug, string? Sku,
+        decimal Price, decimal? OldPrice, int StockQuantity, bool IsPublished);
+
     public static IEndpointRouteBuilder MapCatalogAdminEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/admin/catalog")
@@ -255,6 +267,106 @@ public static class CatalogAdminEndpoints
             if (product is null) return Results.NotFound();
             product.IsDeleted = true;
             repo.SaveChanges();
+            return Results.NoContent();
+        });
+
+        // ---- Product variants (G07) ----
+        // Variants live as child Product rows linked back to the parent via
+        // ProductLink(LinkType=Super). HasOptions stays a manual admin field —
+        // it's display-layer (the parent gets a swatch picker on the storefront)
+        // and we don't want to flip it implicitly on the first variant insert.
+        group.MapGet("/products/{parentId:long}/variants", async (long parentId, IRepository<Product> products) =>
+        {
+            var parent = await products.Query().FirstOrDefaultAsync(p => p.Id == parentId && !p.IsDeleted);
+            if (parent is null) return Results.NotFound();
+            var rows = await products.Query()
+                .Where(v => !v.IsDeleted)
+                .Join(products.Query()
+                        .Where(p => p.Id == parentId)
+                        .SelectMany(p => p.ProductLinks.Where(l => l.LinkType == ProductLinkType.Super)),
+                    v => v.Id, l => l.LinkedProductId, (v, _) => v)
+                .Select(v => new ProductVariantDto(v.Id, v.Name, v.Slug, v.Sku,
+                    v.Price, v.OldPrice, v.StockQuantity, v.IsPublished))
+                .ToListAsync();
+            return Results.Ok(rows);
+        });
+
+        group.MapPost("/products/{parentId:long}/variants", async (long parentId, ProductVariantInput input, IRepository<Product> products) =>
+        {
+            if (string.IsNullOrWhiteSpace(input.Name))
+            {
+                return Results.BadRequest(new { error = "Name is required." });
+            }
+            var parent = await products.Query().FirstOrDefaultAsync(p => p.Id == parentId && !p.IsDeleted);
+            if (parent is null) return Results.NotFound();
+
+            var variant = new Product
+            {
+                Name = input.Name,
+                // Slug must be globally unique on Product; derive from parent + name
+                // so admins don't collide manually when adding "Red / Large" twice.
+                Slug = $"{parent.Slug}-{System.Guid.NewGuid():N}".Substring(0, System.Math.Min(parent.Slug.Length + 9, 200)),
+                Sku = input.Sku,
+                Price = input.Price,
+                OldPrice = input.OldPrice,
+                StockQuantity = input.StockQuantity,
+                IsPublished = input.IsPublished,
+                IsVisibleIndividually = false,
+                IsAllowToOrder = parent.IsAllowToOrder,
+                IsCallForPricing = parent.IsCallForPricing,
+                BrandId = parent.BrandId,
+                TaxClassId = parent.TaxClassId,
+                StockTrackingIsEnabled = parent.StockTrackingIsEnabled,
+            };
+            parent.AddProductLinks(new ProductLink { LinkedProduct = variant, LinkType = ProductLinkType.Super });
+            products.Add(variant);
+            await products.SaveChangesAsync();
+            return Results.Created($"/api/admin/catalog/products/{parentId}/variants/{variant.Id}", new { variant.Id });
+        });
+
+        group.MapPut("/products/{parentId:long}/variants/{variantId:long}", async (long parentId, long variantId, ProductVariantInput input, IRepository<Product> products) =>
+        {
+            var variant = await products.Query()
+                .Where(v => v.Id == variantId && !v.IsDeleted && !v.IsVisibleIndividually)
+                .FirstOrDefaultAsync();
+            if (variant is null) return Results.NotFound();
+            // Guard against cross-parent edits: only update if a Super link from
+            // parentId actually points at this variant.
+            var linked = await products.Query()
+                .Where(p => p.Id == parentId)
+                .SelectMany(p => p.ProductLinks)
+                .AnyAsync(l => l.LinkedProductId == variantId && l.LinkType == ProductLinkType.Super);
+            if (!linked) return Results.NotFound();
+
+            variant.Name = input.Name;
+            variant.Sku = input.Sku;
+            variant.Price = input.Price;
+            variant.OldPrice = input.OldPrice;
+            variant.StockQuantity = input.StockQuantity;
+            variant.IsPublished = input.IsPublished;
+            variant.LatestUpdatedOn = System.DateTimeOffset.UtcNow;
+            await products.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
+        group.MapDelete("/products/{parentId:long}/variants/{variantId:long}", async (long parentId, long variantId, IRepository<Product> products) =>
+        {
+            var variant = await products.Query()
+                .Where(v => v.Id == variantId && !v.IsVisibleIndividually)
+                .FirstOrDefaultAsync();
+            if (variant is null) return Results.NotFound();
+            var linked = await products.Query()
+                .Where(p => p.Id == parentId)
+                .SelectMany(p => p.ProductLinks)
+                .AnyAsync(l => l.LinkedProductId == variantId && l.LinkType == ProductLinkType.Super);
+            if (!linked) return Results.NotFound();
+
+            // Soft-delete only — the historic order_item rows still reference this
+            // product. Removing the ProductLink row would force a separate cascade
+            // strategy; leave it intact and let the soft-delete filter hide the
+            // variant everywhere it matters.
+            variant.IsDeleted = true;
+            await products.SaveChangesAsync();
             return Results.NoContent();
         });
 

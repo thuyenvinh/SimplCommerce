@@ -14,7 +14,12 @@ namespace SimplCommerce.Module.Shipments.Models
         {
             CreatedOn = DateTimeOffset.Now;
             LatestUpdatedOn = DateTimeOffset.Now;
+            // G01: every new shipment starts as Pending. Admin moves it forward
+            // via PATCH /api/admin/shipments/{id}/status as the parcel progresses.
+            Status = ShipmentStatus.Pending;
         }
+
+        public ShipmentStatus Status { get; set; }
 
         public long OrderId { get; set; }
 

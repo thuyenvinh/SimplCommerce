@@ -54,5 +54,9 @@ namespace SimplCommerce.Module.Checkouts.Models
         [StringLength(1000)]
         public string OrderNote { get; set; }
 
+        // G04: idempotency cookie. CreateOrder stamps the resulting Order.Id back
+        // here so retry callers (e.g. VNPay return + IPN both fire on a single
+        // checkout) get the same order instead of a duplicate row.
+        public long? OrderCreatedId { get; set; }
     }
 }

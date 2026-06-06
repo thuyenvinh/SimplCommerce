@@ -72,6 +72,21 @@ namespace SimplCommerce.Module.Orders.Services
                 return Result.Fail<Order>($"Checkout id {checkoutId} cannot be found");
             }
 
+            // G04: idempotency guard. VNPay (and any future redirect-then-callback
+            // provider) fires both the browser-return and the server-to-server IPN
+            // on the same checkout. Without this, each call creates a fresh Order
+            // row. We stamp Checkout.OrderCreatedId after the first successful
+            // creation and replay it on subsequent calls.
+            if (checkout.OrderCreatedId is { } existingOrderId)
+            {
+                var existing = await _orderRepository.Query()
+                    .FirstOrDefaultAsync(o => o.Id == existingOrderId);
+                if (existing is not null)
+                {
+                    return Result.Ok(existing);
+                }
+            }
+
             var shippingData = JsonConvert.DeserializeObject<DeliveryInformationVm>(checkout.ShippingData ?? string.Empty);
             if (shippingData == null)
             {
@@ -355,6 +370,10 @@ namespace SimplCommerce.Module.Orders.Services
                 }
 
                 _couponService.AddCouponUsage(checkout.CustomerId, order.Id, checkingDiscountResult);
+                // G04: persist the checkout→order link inside the same transaction
+                // so a crash between SaveChanges and Commit doesn't leave a created
+                // order with no idempotency stamp.
+                checkout.OrderCreatedId = order.Id;
                 _orderRepository.SaveChanges();
                 transaction.Commit();
             }
