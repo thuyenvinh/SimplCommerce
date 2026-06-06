@@ -1,4 +1,3 @@
-using System.Data.Common;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -58,27 +57,13 @@ public class SimplApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             });
         });
 
-        builder.ConfigureServices(services =>
-        {
-            ModuleManifestLoader.LoadAllBundled();
-
-            var dbDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<SimplDbContext>));
-            if (dbDescriptor is not null)
-            {
-                services.Remove(dbDescriptor);
-            }
-            var connectionDescriptors = services
-                .Where(d => d.ServiceType == typeof(DbConnection))
-                .ToList();
-            foreach (var cd in connectionDescriptors)
-            {
-                services.Remove(cd);
-            }
-
-            services.AddDbContext<SimplDbContext>(options =>
-                options.UseSqlServer(_sql.GetConnectionString(),
-                    sql => sql.MigrationsAssembly("SimplCommerce.Migrations")));
-        });
+        // The ApiService registers SimplDbContext through Aspire's pooled
+        // AddSqlServerDbContext("SimplCommerce"), which reads
+        // ConnectionStrings:SimplCommerce — already pointed at the Testcontainer
+        // above. Re-registering the DbContext here would collide with the pool, so
+        // we only seed the module manifest (needed by SimplDbContext.OnModelCreating
+        // for entity discovery; idempotent — Program.cs also calls it).
+        builder.ConfigureServices(_ => ModuleManifestLoader.LoadAllBundled());
     }
 }
 

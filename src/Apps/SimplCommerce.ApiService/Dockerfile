@@ -14,6 +14,7 @@ COPY global.json ./
 COPY SimplCommerce.sln ./
 COPY src/ServiceDefaults/ src/ServiceDefaults/
 COPY src/SimplCommerce.Infrastructure/ src/SimplCommerce.Infrastructure/
+COPY src/SimplCommerce.RealTime/ src/SimplCommerce.RealTime/
 COPY src/Migrations/ src/Migrations/
 COPY src/Modules/ src/Modules/
 COPY src/Apps/SimplCommerce.ApiService/ src/Apps/SimplCommerce.ApiService/

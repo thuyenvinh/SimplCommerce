@@ -66,6 +66,10 @@ builder.Services.AddHttpClient<IAdminOrdersApi, AdminOrdersApi>(c => c.BaseAddre
     .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
 builder.Services.AddHttpClient<IAdminShipmentsApi, AdminShipmentsApi>(c => c.BaseAddress = new Uri(apiBase))
     .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
+// Named client for the <MediaPicker> shared component's multipart upload — carries
+// the same bearer-forwarding handler so /api/media/upload's AdminOrVendor auth passes.
+builder.Services.AddHttpClient("MediaApi", c => c.BaseAddress = new Uri(apiBase))
+    .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
 builder.Services.AddHttpClient<IAdminCoreApi, AdminCoreApi>(c => c.BaseAddress = new Uri(apiBase))
     .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
 builder.Services.AddHttpClient<IAdminReviewsApi, AdminReviewsApi>(c => c.BaseAddress = new Uri(apiBase))

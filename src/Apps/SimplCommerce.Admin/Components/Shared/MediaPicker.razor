@@ -1,0 +1,120 @@
+@*
+    MediaPicker
+    -----------
+    Upload-and-pick control. A MudFileUpload<IBrowserFile> sends the selected file as
+    multipart/form-data to POST /api/media/upload (see ApiService MediaUploadEndpoints),
+    reads the returned { url, fileName } JSON and raises ValueChanged with the url.
+    A small image preview is shown when Value is set.
+
+    Two-way binding follows the @bind-Value + ValueChanged idiom from SlugInput.razor.
+
+    The API client is created from IHttpClientFactory using the same base-address fallback
+    expression Admin/Program.cs uses to build its typed clients:
+        services:api:https:0 -> services:api:http:0 -> "https+http://api".
+    (Note: the upload endpoint requires auth; in an authenticated session the platform's
+    auth-forwarding handler on the typed clients is what carries credentials. This control
+    creates a plain client per the task spec.)
+
+    Usage:
+      <MediaPicker @bind-Value="_form.ThumbnailUrl" Label="Thumbnail" />
+*@
+
+@inject IHttpClientFactory HttpClientFactory
+
+<div class="d-flex flex-column" style="gap:8px">
+    @if (!string.IsNullOrWhiteSpace(Value))
+    {
+        <MudImage Src="@Value" Alt="@Label" Width="160" Height="160"
+                  ObjectFit="ObjectFit.Cover" Class="rounded mud-elevation-1" />
+    }
+
+    <MudFileUpload T="IBrowserFile" FilesChanged="UploadAsync" Accept="image/*" Disabled="@_busy">
+        <ActivatorContent>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.CloudUpload" Disabled="@_busy">
+                @(_busy ? "Uploading…" : (string.IsNullOrWhiteSpace(Value) ? $"Upload {Label}" : $"Replace {Label}"))
+            </MudButton>
+        </ActivatorContent>
+    </MudFileUpload>
+
+    @if (_busy)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <MudAlert Severity="Severity.Error" Dense="true" ShowCloseIcon="true"
+                  CloseIconClicked="@(() => _error = null)">@_error</MudAlert>
+    }
+</div>
+
+@code {
+    private const long MaxFileSize = 10 * 1024 * 1024; // 10 MB, matches the server cap.
+
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public string Label { get; set; } = "Image";
+
+    private bool _busy;
+    private string? _error;
+
+    private record UploadResponse(string? Url, string? FileName);
+
+    private async Task UploadAsync(IBrowserFile? file)
+    {
+        if (file is null) return;
+
+        _error = null;
+
+        if (file.Size > MaxFileSize)
+        {
+            _error = "File exceeds the 10 MB size limit.";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            // "MediaApi" is registered in Program.cs with the base address +
+            // ApiAuthDelegatingHandler so the upload is authenticated.
+            var client = HttpClientFactory.CreateClient("MediaApi");
+
+            using var content = new MultipartFormDataContent();
+            await using var stream = file.OpenReadStream(MaxFileSize);
+            var fileContent = new StreamContent(stream);
+            if (!string.IsNullOrWhiteSpace(file.ContentType))
+            {
+                fileContent.Headers.ContentType =
+                    new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
+            }
+            // The server endpoint binds a parameter named "file".
+            content.Add(fileContent, "file", file.Name);
+
+            using var response = await client.PostAsync("/api/media/upload", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = $"Upload failed ({(int)response.StatusCode}).";
+                return;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<UploadResponse>();
+            if (result is null || string.IsNullOrWhiteSpace(result.Url))
+            {
+                _error = "Upload succeeded but no URL was returned.";
+                return;
+            }
+
+            Value = result.Url;
+            await ValueChanged.InvokeAsync(result.Url);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Upload failed: {ex.Message}";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
