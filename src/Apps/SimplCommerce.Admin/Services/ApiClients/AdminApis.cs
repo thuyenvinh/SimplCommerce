@@ -30,6 +30,12 @@ public interface IAdminCatalogApi
     Task<HttpResponseMessage> CreateProductAsync(ProductInput input, CancellationToken ct = default);
     Task<HttpResponseMessage> UpdateProductAsync(long id, ProductInput input, CancellationToken ct = default);
     Task<HttpResponseMessage> DeleteProductAsync(long id, CancellationToken ct = default);
+
+    // G07: variant CRUD
+    Task<IReadOnlyList<ProductVariantDto>?> ListVariantsAsync(long parentId, CancellationToken ct = default);
+    Task<HttpResponseMessage> CreateVariantAsync(long parentId, ProductVariantInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> UpdateVariantAsync(long parentId, long variantId, ProductVariantInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> DeleteVariantAsync(long parentId, long variantId, CancellationToken ct = default);
 }
 
 public sealed class AdminCatalogApi(HttpClient http) : IAdminCatalogApi
@@ -76,6 +82,18 @@ public sealed class AdminCatalogApi(HttpClient http) : IAdminCatalogApi
 
     public Task<HttpResponseMessage> DeleteProductAsync(long id, CancellationToken ct) =>
         http.DeleteAsync($"/api/admin/catalog/products/{id}", ct);
+
+    public async Task<IReadOnlyList<ProductVariantDto>?> ListVariantsAsync(long parentId, CancellationToken ct) =>
+        await http.GetFromJsonAsync<List<ProductVariantDto>>($"/api/admin/catalog/products/{parentId}/variants", ct);
+
+    public Task<HttpResponseMessage> CreateVariantAsync(long parentId, ProductVariantInput input, CancellationToken ct) =>
+        http.PostAsJsonAsync($"/api/admin/catalog/products/{parentId}/variants", input, ct);
+
+    public Task<HttpResponseMessage> UpdateVariantAsync(long parentId, long variantId, ProductVariantInput input, CancellationToken ct) =>
+        http.PutAsJsonAsync($"/api/admin/catalog/products/{parentId}/variants/{variantId}", input, ct);
+
+    public Task<HttpResponseMessage> DeleteVariantAsync(long parentId, long variantId, CancellationToken ct) =>
+        http.DeleteAsync($"/api/admin/catalog/products/{parentId}/variants/{variantId}", ct);
 }
 
 public interface IAdminOrdersApi
@@ -119,6 +137,8 @@ public interface IAdminShipmentsApi
     Task<AdminShipmentDetail?> GetAsync(long id, CancellationToken ct = default);
     Task<HttpResponseMessage> CreateAsync(AdminShipmentInput input, CancellationToken ct = default);
     Task<HttpResponseMessage> DeleteAsync(long id, CancellationToken ct = default);
+    // G01: ShipmentStatus lifecycle transitions
+    Task<HttpResponseMessage> UpdateStatusAsync(long id, AdminUpdateShipmentStatusRequest req, CancellationToken ct = default);
 }
 
 public sealed class AdminShipmentsApi(HttpClient http) : IAdminShipmentsApi
@@ -138,6 +158,9 @@ public sealed class AdminShipmentsApi(HttpClient http) : IAdminShipmentsApi
 
     public Task<HttpResponseMessage> DeleteAsync(long id, CancellationToken ct) =>
         http.DeleteAsync($"/api/admin/shipments/{id}", ct);
+
+    public Task<HttpResponseMessage> UpdateStatusAsync(long id, AdminUpdateShipmentStatusRequest req, CancellationToken ct) =>
+        http.PatchAsJsonAsync($"/api/admin/shipments/{id}/status", req, ct);
 }
 
 public interface IAdminCoreApi
@@ -400,6 +423,8 @@ public interface IAdminPaymentsApi
     Task<AdminPaymentProviderDetail?> GetProviderAsync(string id, CancellationToken ct = default);
     Task<HttpResponseMessage> UpdateProviderAsync(string id, AdminPaymentProviderInput input, CancellationToken ct = default);
     Task<AdminPaymentsPage?> ListPaymentsAsync(int page = 1, int pageSize = 20, CancellationToken ct = default);
+    // G03: full or partial refund against an order's captured Payment.
+    Task<HttpResponseMessage> CreateRefundAsync(AdminRefundRequest req, CancellationToken ct = default);
 }
 
 public sealed class AdminPaymentsApi(HttpClient http) : IAdminPaymentsApi
@@ -415,6 +440,9 @@ public sealed class AdminPaymentsApi(HttpClient http) : IAdminPaymentsApi
 
     public Task<AdminPaymentsPage?> ListPaymentsAsync(int page, int pageSize, CancellationToken ct) =>
         http.GetFromJsonAsync<AdminPaymentsPage>($"/api/admin/payments/?page={page}&pageSize={pageSize}", ct);
+
+    public Task<HttpResponseMessage> CreateRefundAsync(AdminRefundRequest req, CancellationToken ct) =>
+        http.PostAsJsonAsync("/api/admin/payments/refunds", req, ct);
 }
 
 public interface IAdminPricingApi

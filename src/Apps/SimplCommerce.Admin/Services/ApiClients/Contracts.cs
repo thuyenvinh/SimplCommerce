@@ -31,6 +31,10 @@ public record ProductEditDto(
     bool StockTrackingIsEnabled, int StockQuantity,
     long? BrandId, IReadOnlyList<long> CategoryIds);
 
+// --- Product variants (G07) ---
+public record ProductVariantInput(string Name, string? Sku, decimal Price, decimal? OldPrice, int StockQuantity, bool IsPublished);
+public record ProductVariantDto(long Id, string Name, string Slug, string? Sku, decimal Price, decimal? OldPrice, int StockQuantity, bool IsPublished);
+
 // --- Orders admin ---
 public record AdminCustomerSummary(long Id, string? FullName, string? Email);
 public record AdminOrderListItem(long Id, DateTimeOffset CreatedOn, decimal OrderTotal, int OrderStatus, AdminCustomerSummary Customer);
@@ -41,11 +45,12 @@ public record AdminOrderItemDto(long ProductId, string ProductName, int Quantity
 public record AdminOrderItemLite(long Id, long ProductId, string ProductName, int Quantity);
 
 // --- Shipments admin ---
-public record AdminShipmentListItem(long Id, long OrderId, string? TrackingNumber, long WarehouseId, DateTimeOffset CreatedOn, int ItemCount);
+public record AdminShipmentListItem(long Id, long OrderId, string? TrackingNumber, long WarehouseId, int Status, DateTimeOffset CreatedOn, int ItemCount);
 public record AdminShipmentLine(long Id, long OrderItemId, long ProductId, string ProductName, int Quantity);
-public record AdminShipmentDetail(long Id, long OrderId, string? TrackingNumber, long WarehouseId, DateTimeOffset CreatedOn, IReadOnlyList<AdminShipmentLine> Items);
+public record AdminShipmentDetail(long Id, long OrderId, string? TrackingNumber, long WarehouseId, int Status, DateTimeOffset CreatedOn, IReadOnlyList<AdminShipmentLine> Items);
 public record AdminShipmentItemInput(long OrderItemId, long ProductId, int Quantity);
 public record AdminShipmentInput(long OrderId, long WarehouseId, string? TrackingNumber, IReadOnlyList<AdminShipmentItemInput> Items);
+public record AdminUpdateShipmentStatusRequest(int NewStatus);
 
 // --- Sales report ---
 public record AdminSalesReportRow(DateTime Day, int OrderCount, decimal Revenue);
@@ -110,8 +115,10 @@ public record AdminTableRateInput(string CountryId, long? StateOrProvinceId, lon
 public record AdminPaymentProviderItem(string Id, string Name, bool IsEnabled);
 public record AdminPaymentProviderDetail(string Id, string Name, bool IsEnabled, string? AdditionalSettings);
 public record AdminPaymentProviderInput(bool IsEnabled, string? AdditionalSettings);
-public record AdminPaymentItem(long Id, long OrderId, string? PaymentMethod, decimal PaymentFee, decimal Amount, int Status, DateTimeOffset CreatedOn);
+public record AdminPaymentItem(long Id, long OrderId, string? PaymentMethod, decimal PaymentFee, decimal Amount, decimal? RefundedAmount, int Status, DateTimeOffset CreatedOn);
 public record AdminPaymentsPage(int Total, int Page, int PageSize, IReadOnlyList<AdminPaymentItem> Items);
+public record AdminRefundRequest(long OrderId, decimal Amount, string? Reason);
+public record AdminRefundResponse(long PaymentId, decimal? RefundedAmount, decimal Remaining, int PaymentStatus, int OrderStatus);
 
 // --- News admin ---
 public record AdminNewsItemListItem(long Id, string Name, string Slug, bool IsPublished, DateTimeOffset CreatedOn);

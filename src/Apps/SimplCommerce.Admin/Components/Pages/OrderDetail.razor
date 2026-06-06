@@ -3,6 +3,7 @@
 @inject IAdminOrdersApi Orders
 @inject IAdminShipmentsApi Shipments
 @inject IAdminInventoryApi Inventory
+@inject IAdminPaymentsApi Payments
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
 
@@ -26,7 +27,7 @@ else
             }
         </MudSelect>
         <MudButton Color="Color.Error" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Undo"
-                   Disabled="@(_order.OrderStatus == 90)" OnClick="MarkRefunded">Refund</MudButton>
+                   Disabled="@(_order.OrderStatus == 90)" OnClick="@OpenRefundDialog">Refund</MudButton>
     </MudStack>
 
     <MudGrid>
@@ -114,13 +115,23 @@ else
                     <MudTable T="AdminShipmentListItem" Items="_shipments" Dense="true" Hover="true">
                         <HeaderContent>
                             <MudTh>ID</MudTh><MudTh>Tracking #</MudTh><MudTh>Warehouse</MudTh>
-                            <MudTh>Lines</MudTh><MudTh>Created</MudTh><MudTh>Actions</MudTh>
+                            <MudTh>Lines</MudTh><MudTh>Status</MudTh><MudTh>Created</MudTh><MudTh>Actions</MudTh>
                         </HeaderContent>
                         <RowTemplate>
                             <MudTd>@context.Id</MudTd>
                             <MudTd>@context.TrackingNumber</MudTd>
                             <MudTd>@WarehouseName(context.WarehouseId)</MudTd>
                             <MudTd>@context.ItemCount</MudTd>
+                            <MudTd>
+                                <MudSelect T="int" Value="context.Status" Dense="true" Variant="Variant.Text" Margin="Margin.None"
+                                           ValueChanged="@(v => OnShipmentStatusChanged(context.Id, v))"
+                                           Style="min-width:140px;">
+                                    @foreach (var s in ShipmentStatusOptions)
+                                    {
+                                        <MudSelectItem T="int" Value="@s.Value">@s.Label</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </MudTd>
                             <MudTd>@context.CreatedOn.LocalDateTime.ToString("g")</MudTd>
                             <MudTd>
                                 <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
@@ -157,6 +168,31 @@ else
             <MudButton OnClick="@(() => _shipDialog = false)">Cancel</MudButton>
             <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="CreateShipment" Disabled="_creatingShip">
                 @(_creatingShip ? "Saving…" : "Create shipment")
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
+
+    <MudDialog @bind-Visible="_refundDialog" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+        <TitleContent>Refund order #@_order.Id</TitleContent>
+        <DialogContent>
+            <MudText Typo="Typo.body2" Class="mb-2">
+                Order total: <strong>@_order.OrderTotal.ToString("C")</strong>.
+                A full refund flips the order to <em>Refunded</em>; a partial
+                refund leaves the order open and is recorded against the linked Payment.
+            </MudText>
+            <MudNumericField T="decimal" @bind-Value="_refundAmount" Label="Refund amount"
+                             Min="0" Max="@_order.OrderTotal" Required="true" />
+            <MudTextField @bind-Value="_refundReason" Label="Reason (optional)"
+                          Class="mt-3" Lines="2" />
+            @if (!string.IsNullOrEmpty(_refundError))
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-3">@_refundError</MudAlert>
+            }
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="@(() => _refundDialog = false)">Cancel</MudButton>
+            <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="SubmitRefund" Disabled="_refunding">
+                @(_refunding ? "Submitting…" : "Issue refund")
             </MudButton>
         </DialogActions>
     </MudDialog>
@@ -271,9 +307,78 @@ else
         else { Snackbar.Add($"Delete failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
     }
 
-    private async Task MarkRefunded()
+    private bool _refundDialog;
+    private bool _refunding;
+    private decimal _refundAmount;
+    private string? _refundReason;
+    private string? _refundError;
+
+    // ShipmentStatus enum mirror (G01): keep aligned with
+    // SimplCommerce.Module.Shipments.Models.ShipmentStatus. Gap values left
+    // intentionally so future Picking/AtCarrier states slot in.
+    private static readonly (int Value, string Label)[] ShipmentStatusOptions =
     {
-        await OnStatusChanged(90);
+        (1,  "Pending"),
+        (20, "Shipped"),
+        (40, "Delivered"),
+        (60, "Returned"),
+        (80, "Cancelled"),
+    };
+
+    private void OpenRefundDialog()
+    {
+        if (_order is null) return;
+        _refundAmount = _order.OrderTotal;
+        _refundReason = null;
+        _refundError = null;
+        _refundDialog = true;
+    }
+
+    private async Task SubmitRefund()
+    {
+        if (_order is null) return;
+        if (_refundAmount <= 0)
+        {
+            _refundError = "Refund amount must be positive.";
+            return;
+        }
+        _refunding = true;
+        _refundError = null;
+        try
+        {
+            using var resp = await Payments.CreateRefundAsync(new AdminRefundRequest(Id, _refundAmount, _refundReason));
+            if (!resp.IsSuccessStatusCode)
+            {
+                // Surface the server's structured error (captured / remaining / error)
+                // verbatim. The endpoint returns a JSON body that's specific enough
+                // for admins to diagnose without opening a separate tab.
+                _refundError = $"Refund failed (HTTP {(int)resp.StatusCode}): {await resp.Content.ReadAsStringAsync()}";
+                return;
+            }
+            Snackbar.Add($"Refunded {_refundAmount:C}.", Severity.Success);
+            _refundDialog = false;
+            _order = await Orders.GetAsync(Id);
+        }
+        finally
+        {
+            _refunding = false;
+        }
+    }
+
+    private async Task OnShipmentStatusChanged(long shipmentId, int next)
+    {
+        using var resp = await Shipments.UpdateStatusAsync(shipmentId, new AdminUpdateShipmentStatusRequest(next));
+        if (!resp.IsSuccessStatusCode)
+        {
+            // 400 from server = invalid transition (e.g. Delivered → Pending).
+            // Reload so the dropdown snaps back to the persisted value.
+            Snackbar.Add($"Shipment status change rejected (HTTP {(int)resp.StatusCode}).", Severity.Warning);
+        }
+        else
+        {
+            Snackbar.Add("Shipment status updated.", Severity.Success);
+        }
+        await ReloadShipments();
     }
 
     private class NewShipForm
