@@ -14,10 +14,11 @@ namespace SimplCommerce.ApiService.Webhooks;
 /// 3. Endpoints are idempotent — providers retry freely.
 /// 4. No auth middleware — the signature IS the authentication.
 ///
-/// Domain side-effects (marking payments Captured / Refunded, firing OrderPaid) are
-/// intentionally still stubs; they'll be wired per-provider once the Payments module
-/// exposes the right command handlers. That follow-up is strictly additive — once
-/// verification fails, no domain change happens, so it's safe to ship the gate alone.
+/// G02: Stripe verified events are now dispatched into IPaymentWebhookHandler which
+/// updates Payment.Status, advances the linked Order, and publishes OrderChanged.
+/// PayPal + Momo side-effect dispatch are deliberately still gate-only until those
+/// providers persist a GatewayTransactionId during checkout — without that link a
+/// webhook event has nothing to correlate to.
 /// </summary>
 public static class PaymentWebhookEndpoints
 {
@@ -38,11 +39,31 @@ public static class PaymentWebhookEndpoints
     private static async Task<IResult> StripeWebhook(
         HttpContext ctx,
         IWebhookSignatureVerifier verifier,
-        TimeProvider time)
+        IPaymentWebhookHandler handler,
+        TimeProvider time,
+        CancellationToken ct)
     {
         var payload = await ReadBodyAsync(ctx);
         var signature = ctx.Request.Headers["Stripe-Signature"].ToString();
         var result = verifier.VerifyStripe(payload, signature, time.GetUtcNow());
+        if (result == WebhookVerifyResult.Verified)
+        {
+            // G02: dispatch domain side-effects. Failures inside the handler should
+            // NOT bubble back to Stripe — that would trigger automatic retries and
+            // potentially double-apply the side effect on an already-mutated order.
+            // The handler logs + swallows; we always return 202 after a verified event.
+            try
+            {
+                await handler.HandleStripeAsync(payload, ct);
+            }
+            catch (Exception ex)
+            {
+                ctx.RequestServices
+                    .GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("StripeWebhook")
+                    .LogError(ex, "Stripe webhook side-effects failed after signature verified.");
+            }
+        }
         return Respond(result, "stripe");
     }
 
@@ -101,6 +122,8 @@ public static class WebhookServiceCollectionExtensions
         services.AddSingleton(momo);
         services.AddSingleton<IWebhookSignatureVerifier>(_ => new WebhookSignatureVerifier(stripe, momo));
         services.AddHttpClient<IPayPalWebhookVerifier, PayPalWebhookVerifier>();
+        // G02: per-request handler because it touches DbContext-bound repositories.
+        services.AddScoped<IPaymentWebhookHandler, PaymentWebhookHandler>();
         return services;
     }
 }

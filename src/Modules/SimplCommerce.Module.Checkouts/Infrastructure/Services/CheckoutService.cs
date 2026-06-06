@@ -62,15 +62,22 @@ namespace SimplCommerce.Module.Checkouts.Services
                 IsProductPriceIncludeTax = _isProductPriceIncludeTax,
                 CouponCode = couponCode
             };
-            
-            foreach(var cartItem in cartItems)
+
+            // G14: snapshot the calculated product price on each CheckoutItem so
+            // OrderService.CreateOrder can detect drift between "what the buyer saw"
+            // and "what we'd charge today". The actual price write happens after
+            // SaveChanges below — at this point we just stamp the timestamp.
+            var pricedAt = DateTimeOffset.UtcNow;
+
+            foreach (var cartItem in cartItems)
             {
                 var checkOutItem = new CheckoutItem
                 {
                     Checkout = checkout,
                     ProductId = cartItem.ProductId,
                     Quantity = cartItem.Quantity,
-                    CreatedOn = DateTimeOffset.Now
+                    CreatedOn = DateTimeOffset.Now,
+                    LockedPriceOn = pricedAt,
                 };
 
                 checkout.CheckoutItems.Add(checkOutItem);
@@ -78,7 +85,38 @@ namespace SimplCommerce.Module.Checkouts.Services
 
             _checkoutRepository.Add(checkout);
             await _checkoutRepository.SaveChangesAsync();
+
+            // G14: now that the checkout is persisted, fetch the live calculated
+            // prices and write them back. Done after SaveChanges so we don't tangle
+            // the snapshot with the create transaction — even if the price write
+            // fails, the order can still proceed (LockedPrice null = skip drift check).
+            try
+            {
+                await SnapshotPricesAsync(checkout, pricedAt);
+            }
+            catch
+            {
+                // Snapshot is best-effort. A null LockedPrice degrades to "no drift
+                // check" rather than blocking checkout — the cart guard already
+                // caught the most important availability issues.
+            }
             return checkout;
+        }
+
+        private async Task SnapshotPricesAsync(Checkout checkout, DateTimeOffset pricedAt)
+        {
+            var items = await _checkoutItemRepository.Query()
+                .Include(i => i.Product)
+                .Where(i => i.CheckoutId == checkout.Id)
+                .ToListAsync();
+            foreach (var item in items)
+            {
+                if (item.Product is null) continue;
+                var calc = _productPriceService.CalculateProductPrice(item.Product);
+                item.LockedPrice = calc.Price;
+                item.LockedPriceOn = pricedAt;
+            }
+            await _checkoutItemRepository.SaveChangesAsync();
         }
 
         public async Task<CheckoutTaxAndShippingPriceVm> UpdateTaxAndShippingPrices(Guid checkoutId, TaxAndShippingPriceRequestVm model)

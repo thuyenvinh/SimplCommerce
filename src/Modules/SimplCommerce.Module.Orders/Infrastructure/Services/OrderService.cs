@@ -246,6 +246,22 @@ namespace SimplCommerce.Module.Orders.Services
                     return Result.Fail<Order>($"The product {checkoutItem.Product.Name} is not available any more");
                 }
 
+                // G14: reject the order if the live price has drifted >5% from the
+                // price the buyer saw at checkout. Without this an admin price update
+                // (or a flash-sale ending mid-checkout) silently overcharges or
+                // undercharges. Null LockedPrice (legacy rows or snapshot failed)
+                // skips the check — we never block on missing data, only on conflict.
+                if (checkoutItem.LockedPrice is { } locked && locked > 0m)
+                {
+                    var current = _productPricingService.CalculateProductPrice(checkoutItem.Product).Price;
+                    var drift = System.Math.Abs(current - locked) / locked;
+                    if (drift > 0.05m)
+                    {
+                        return Result.Fail<Order>(
+                            $"The price of {checkoutItem.Product.Name} changed (was {locked:0.##}, now {current:0.##}). Please review your cart.");
+                    }
+                }
+
                 if (checkoutItem.Product.StockTrackingIsEnabled && checkoutItem.Product.StockQuantity < checkoutItem.Quantity)
                 {
                     return Result.Fail<Order>($"There are only {checkoutItem.Product.StockQuantity} items available for {checkoutItem.Product.Name}");

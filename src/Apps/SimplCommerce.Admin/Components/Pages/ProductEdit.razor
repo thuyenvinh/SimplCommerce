@@ -107,19 +107,40 @@ else
                         <MudTh>Price</MudTh><MudTh>Stock</MudTh><MudTh>Published</MudTh><MudTh>Actions</MudTh>
                     </HeaderContent>
                     <RowTemplate>
-                        <MudTd>@context.Id</MudTd>
-                        <MudTd>@context.Name</MudTd>
-                        <MudTd>@context.Sku</MudTd>
-                        <MudTd>@context.Price.ToString("C")</MudTd>
-                        <MudTd>@context.StockQuantity</MudTd>
-                        <MudTd>
-                            <MudIcon Icon="@(context.IsPublished ? Icons.Material.Filled.Check : Icons.Material.Filled.Close)"
-                                     Color="@(context.IsPublished ? Color.Success : Color.Default)" Size="Size.Small" />
-                        </MudTd>
-                        <MudTd>
-                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
-                                           OnClick="@(() => DeleteVariant(parentId, context.Id))" aria-label="Delete variant" />
-                        </MudTd>
+                        @if (_editingVariantId == context.Id && _editForm is not null)
+                        {
+                            <MudTd>@context.Id</MudTd>
+                            <MudTd><MudTextField @bind-Value="_editForm.Name" Required="true" Margin="Margin.Dense" /></MudTd>
+                            <MudTd><MudTextField @bind-Value="_editForm.Sku" Margin="Margin.Dense" /></MudTd>
+                            <MudTd><MudNumericField @bind-Value="_editForm.Price" Format="F2" Min="0m" Margin="Margin.Dense" /></MudTd>
+                            <MudTd><MudNumericField @bind-Value="_editForm.StockQuantity" Min="0" Margin="Margin.Dense" /></MudTd>
+                            <MudTd><MudSwitch @bind-Value="_editForm.IsPublished" Color="Color.Primary" /></MudTd>
+                            <MudTd>
+                                <MudIconButton Icon="@Icons.Material.Filled.Save" Color="Color.Primary" Size="Size.Small"
+                                               OnClick="@(() => SaveEditedVariant(parentId, context.Id))"
+                                               Disabled="_savingVariant" aria-label="Save" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                                               OnClick="@CancelEdit" aria-label="Cancel" />
+                            </MudTd>
+                        }
+                        else
+                        {
+                            <MudTd>@context.Id</MudTd>
+                            <MudTd>@context.Name</MudTd>
+                            <MudTd>@context.Sku</MudTd>
+                            <MudTd>@context.Price.ToString("C")</MudTd>
+                            <MudTd>@context.StockQuantity</MudTd>
+                            <MudTd>
+                                <MudIcon Icon="@(context.IsPublished ? Icons.Material.Filled.Check : Icons.Material.Filled.Close)"
+                                         Color="@(context.IsPublished ? Color.Success : Color.Default)" Size="Size.Small" />
+                            </MudTd>
+                            <MudTd>
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                               OnClick="@(() => StartEditVariant(context))" aria-label="Edit variant" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                               OnClick="@(() => DeleteVariant(parentId, context.Id))" aria-label="Delete variant" />
+                            </MudTd>
+                        }
                     </RowTemplate>
                 </MudTable>
             }
@@ -160,6 +181,8 @@ else
 
     private IReadOnlyList<ProductVariantDto>? _variants;
     private VariantFormModel? _newVariant;
+    private long? _editingVariantId;
+    private VariantFormModel? _editForm;
     private bool _savingVariant;
 
     protected override async Task OnInitializedAsync()
@@ -234,6 +257,54 @@ else
         }
         Snackbar.Add("Variant deleted.", Severity.Success);
         await ReloadVariants(parentId);
+    }
+
+    private void StartEditVariant(ProductVariantDto v)
+    {
+        // Materialize a fresh form from the row so cancelling reverts cleanly. The
+        // dto is immutable (record) so we don't need to clone defensively.
+        _editingVariantId = v.Id;
+        _editForm = new VariantFormModel
+        {
+            Name = v.Name,
+            Sku = v.Sku,
+            Price = v.Price,
+            StockQuantity = v.StockQuantity,
+            IsPublished = v.IsPublished,
+        };
+    }
+
+    private void CancelEdit()
+    {
+        _editingVariantId = null;
+        _editForm = null;
+    }
+
+    private async Task SaveEditedVariant(long parentId, long variantId)
+    {
+        if (_editForm is null) return;
+        if (string.IsNullOrWhiteSpace(_editForm.Name))
+        {
+            Snackbar.Add("Variant name is required.", Severity.Warning);
+            return;
+        }
+        _savingVariant = true;
+        try
+        {
+            using var resp = await Catalog.UpdateVariantAsync(parentId, variantId, _editForm.ToInput());
+            if (!resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add($"Save failed (HTTP {(int)resp.StatusCode}).", Severity.Error);
+                return;
+            }
+            Snackbar.Add("Variant updated.", Severity.Success);
+            CancelEdit();
+            await ReloadVariants(parentId);
+        }
+        finally
+        {
+            _savingVariant = false;
+        }
     }
 
     private class VariantFormModel
