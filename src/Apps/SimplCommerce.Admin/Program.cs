@@ -64,6 +64,8 @@ builder.Services.AddHttpClient<IAdminCatalogApi, AdminCatalogApi>(c => c.BaseAdd
     .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
 builder.Services.AddHttpClient<IAdminOrdersApi, AdminOrdersApi>(c => c.BaseAddress = new Uri(apiBase))
     .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
+builder.Services.AddHttpClient<IAdminShipmentsApi, AdminShipmentsApi>(c => c.BaseAddress = new Uri(apiBase))
+    .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
 builder.Services.AddHttpClient<IAdminCoreApi, AdminCoreApi>(c => c.BaseAddress = new Uri(apiBase))
     .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
 builder.Services.AddHttpClient<IAdminReviewsApi, AdminReviewsApi>(c => c.BaseAddress = new Uri(apiBase))

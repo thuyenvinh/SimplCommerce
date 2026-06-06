@@ -38,6 +38,19 @@ public record AdminOrdersPage(int Total, int Page, int PageSize, IReadOnlyList<A
 public record UpdateOrderStatusRequest(int NewStatus);
 
 public record AdminOrderItemDto(long ProductId, string ProductName, int Quantity, decimal ProductPrice, decimal DiscountAmount);
+public record AdminOrderItemLite(long Id, long ProductId, string ProductName, int Quantity);
+
+// --- Shipments admin ---
+public record AdminShipmentListItem(long Id, long OrderId, string? TrackingNumber, long WarehouseId, DateTimeOffset CreatedOn, int ItemCount);
+public record AdminShipmentLine(long Id, long OrderItemId, long ProductId, string ProductName, int Quantity);
+public record AdminShipmentDetail(long Id, long OrderId, string? TrackingNumber, long WarehouseId, DateTimeOffset CreatedOn, IReadOnlyList<AdminShipmentLine> Items);
+public record AdminShipmentItemInput(long OrderItemId, long ProductId, int Quantity);
+public record AdminShipmentInput(long OrderId, long WarehouseId, string? TrackingNumber, IReadOnlyList<AdminShipmentItemInput> Items);
+
+// --- Sales report ---
+public record AdminSalesReportRow(DateTime Day, int OrderCount, decimal Revenue);
+public record AdminSalesReportTotals(int OrderCount, decimal Revenue, DateTimeOffset From, DateTimeOffset To);
+public record AdminSalesReport(AdminSalesReportTotals Totals, IReadOnlyList<AdminSalesReportRow> Rows);
 public record AdminOrderAddressDto(string ContactName, string Phone, string AddressLine1, string? AddressLine2, string? City, string? ZipCode);
 public record AdminOrderDetail(
     long Id, DateTimeOffset CreatedOn, DateTimeOffset LatestUpdatedOn,

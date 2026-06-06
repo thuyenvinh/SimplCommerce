@@ -15,6 +15,9 @@ public static class OrdersAdminEndpoints
 {
     public record UpdateStatusRequest(OrderStatus NewStatus);
 
+    public record SalesReportRow(System.DateTime Day, int OrderCount, decimal Revenue);
+    public record SalesReportTotals(int OrderCount, decimal Revenue, System.DateTimeOffset From, System.DateTimeOffset To);
+
     public record AdminOrderItem(long ProductId, string ProductName, int Quantity, decimal ProductPrice, decimal DiscountAmount);
     public record AdminOrderAddress(string ContactName, string Phone, string AddressLine1, string? AddressLine2, string? City, string? ZipCode);
     public record AdminOrderDetail(
@@ -96,6 +99,33 @@ public static class OrdersAdminEndpoints
             repo.SaveChanges();
             return Results.NoContent();
         }).RequireAuthorization("AdminOnly");
+
+        // Sales report: daily aggregates between [from, to). Both dates default to
+        // last 30 days. Returns one row per yyyy-MM-dd with order count + gross revenue.
+        // Counts orders in PaymentReceived / Invoiced / Shipping / Shipped / Complete —
+        // i.e. anything past the "pending" line — to avoid pollution from abandoned carts.
+        group.MapGet("/sales-report", async (IRepository<Order> repo, System.DateTimeOffset? from = null, System.DateTimeOffset? to = null) =>
+        {
+            var until = to ?? DateTimeOffset.UtcNow;
+            var since = from ?? until.AddDays(-30);
+            var rows = await repo.Query()
+                .Where(o => o.CreatedOn >= since && o.CreatedOn < until)
+                .Where(o => o.OrderStatus == OrderStatus.PaymentReceived
+                    || o.OrderStatus == OrderStatus.Invoiced
+                    || o.OrderStatus == OrderStatus.Shipping
+                    || o.OrderStatus == OrderStatus.Shipped
+                    || o.OrderStatus == OrderStatus.Complete)
+                .GroupBy(o => o.CreatedOn.Date)
+                .Select(g => new SalesReportRow(
+                    g.Key, g.Count(), g.Sum(o => o.OrderTotal)))
+                .OrderBy(r => r.Day)
+                .ToListAsync();
+            var totals = new SalesReportTotals(
+                rows.Sum(r => r.OrderCount),
+                rows.Sum(r => r.Revenue),
+                since, until);
+            return Results.Ok(new { totals, rows });
+        });
 
         return app;
     }

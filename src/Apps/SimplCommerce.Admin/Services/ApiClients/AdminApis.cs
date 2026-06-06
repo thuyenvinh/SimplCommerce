@@ -83,6 +83,7 @@ public interface IAdminOrdersApi
     Task<AdminOrdersPage?> ListAsync(int? status = null, string? customerSearch = null, int page = 1, int pageSize = 20, CancellationToken ct = default);
     Task<AdminOrderDetail?> GetAsync(long id, CancellationToken ct = default);
     Task<HttpResponseMessage> UpdateStatusAsync(long id, UpdateOrderStatusRequest req, CancellationToken ct = default);
+    Task<AdminSalesReport?> GetSalesReportAsync(DateTimeOffset? from = null, DateTimeOffset? to = null, CancellationToken ct = default);
 }
 
 public sealed class AdminOrdersApi(HttpClient http) : IAdminOrdersApi
@@ -100,6 +101,43 @@ public sealed class AdminOrdersApi(HttpClient http) : IAdminOrdersApi
 
     public Task<HttpResponseMessage> UpdateStatusAsync(long id, UpdateOrderStatusRequest req, CancellationToken ct) =>
         http.PatchAsJsonAsync($"/api/admin/orders/{id}/status", req, ct);
+
+    public Task<AdminSalesReport?> GetSalesReportAsync(DateTimeOffset? from, DateTimeOffset? to, CancellationToken ct)
+    {
+        var url = "/api/admin/orders/sales-report";
+        var qs = new List<string>();
+        if (from.HasValue) qs.Add($"from={Uri.EscapeDataString(from.Value.ToString("o"))}");
+        if (to.HasValue) qs.Add($"to={Uri.EscapeDataString(to.Value.ToString("o"))}");
+        if (qs.Count > 0) url += "?" + string.Join("&", qs);
+        return http.GetFromJsonAsync<AdminSalesReport>(url, ct);
+    }
+}
+
+public interface IAdminShipmentsApi
+{
+    Task<IReadOnlyList<AdminShipmentListItem>?> ListAsync(long? orderId = null, CancellationToken ct = default);
+    Task<AdminShipmentDetail?> GetAsync(long id, CancellationToken ct = default);
+    Task<HttpResponseMessage> CreateAsync(AdminShipmentInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> DeleteAsync(long id, CancellationToken ct = default);
+}
+
+public sealed class AdminShipmentsApi(HttpClient http) : IAdminShipmentsApi
+{
+    public async Task<IReadOnlyList<AdminShipmentListItem>?> ListAsync(long? orderId, CancellationToken ct)
+    {
+        var url = "/api/admin/shipments/";
+        if (orderId.HasValue) url += $"?orderId={orderId}";
+        return await http.GetFromJsonAsync<List<AdminShipmentListItem>>(url, ct);
+    }
+
+    public Task<AdminShipmentDetail?> GetAsync(long id, CancellationToken ct) =>
+        http.GetFromJsonAsync<AdminShipmentDetail>($"/api/admin/shipments/{id}", ct);
+
+    public Task<HttpResponseMessage> CreateAsync(AdminShipmentInput input, CancellationToken ct) =>
+        http.PostAsJsonAsync("/api/admin/shipments/", input, ct);
+
+    public Task<HttpResponseMessage> DeleteAsync(long id, CancellationToken ct) =>
+        http.DeleteAsync($"/api/admin/shipments/{id}", ct);
 }
 
 public interface IAdminCoreApi

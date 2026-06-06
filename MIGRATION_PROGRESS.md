@@ -379,11 +379,11 @@ Storefront endpoint groups đã tạo (9 groups):
 ### 5.3 Shared components
 - [ ] P5-09 | `<EntityDataGrid<T>>` wrapper MudDataGrid với server-side pagination/sort/filter chuẩn
 - [ ] P5-10 | `<MediaPicker>` upload + chọn từ thư viện
-- [ ] P5-11 | `<SlugInput>` auto-generate from name
+- [x] P5-11 | `<SlugInput>` live in `Components/Shared/`. Auto-slugifies from a Source param until the user types manually; uses MudTextField + ValueChanged
 - [ ] P5-12 | `<RichTextEditor>` (TinyMCE Blazor wrapper hoặc QuillJS interop)
 - [ ] P5-13 | `<EntityPicker<T>>` autocomplete chọn entity (dùng cho FK)
-- [ ] P5-14 | `<ConfirmDialog>` xác nhận xoá
-- [ ] P5-15 | `<FormCard>` chuẩn validation + save/cancel buttons
+- [x] P5-14 | `<ConfirmDialog>` live in `Components/Shared/`. Used via `IDialogService.ShowAsync<ConfirmDialog>(...)` with DialogParameters for Message/ConfirmText/ConfirmColor; returns `DialogResult.Ok(true)` on confirm
+- [x] P5-15 | `<FormCard>` live in `Components/Shared/`. MudPaper wrapper with optional Title + Save/Cancel button row + Saving spinner toggle
 - [ ] P5-16 | Toast wrapper qua MudSnackbar
 
 ### 5.4 Pages
@@ -402,7 +402,9 @@ Storefront endpoint groups đã tạo (9 groups):
 **5.4.3 Orders**
 - [x] P5-25 | `/orders` list with status + customer-search filter + paging
 - [x] P5-26 | `/orders/{id}` admin detail page live. Backend `GET /api/admin/orders/{id}` now projects to `AdminOrderDetail` DTO (items + shipping address + billing address + customer + totals). UI has clickable list rows, MudTable line items, inline status dropdown that PATCHes via `IAdminOrdersApi.UpdateStatusAsync`, MudSnackbar on success/failure. Timeline (audit-log per order) is still a follow-up
-- [ ] P5-27..P5-29 | shipments / refunds / sales-report — deferred (endpoint scaffold needed first)
+- [x] P5-27 | **Shipments admin** live. New `ShipmentsAdminEndpoints` (GET / + GET/{id} + POST + DELETE) on `/api/admin/shipments`. Order detail page (`/orders/{id}`) gets a "Shipments" panel + "New shipment" dialog (warehouse picker + tracking number + per-item include checkbox with qty caps from the order). Per-row delete on existing shipments
+- [x] P5-28 | **Refunds** = state transition Refunded (status=90) on the order. Order detail page gains a red "Refund" button that PATCHes `/orders/{id}/status` to 90 (disabled when already refunded). Domain doesn't have a separate Refund entity — keeping the simple status flow is matched to the legacy behavior
+- [x] P5-29 | **Sales report** live at `/sales-report`. Backend `GET /api/admin/orders/sales-report?from=&to=` groups orders by day, filters to paid+ states (PaymentReceived..Complete), returns daily counts + revenue + totals. UI: date pickers + MudChart line graph + tabular breakdown
 
 **5.4.4 Customers**
 - [~] P5-30..P5-31 | `/customers/*` — the list IS surfaced as `/users` (Core admin endpoint returns Identity users). Customer/vendor role split + detail page deferred
@@ -516,7 +518,7 @@ Storefront endpoint groups đã tạo (9 groups):
 - [~] P7-20 | Aspire dashboard trace verify — BLOCKED-Docker (traces generated, chỉ cần runtime pour verify)
 
 ### 7.5 Documentation
-- [~] P7-21 | README root — cần cập nhật chọn lọc (file hiện tại còn instruction .NET 8 + AngularJS); không touch trong commit này để giảm scope, làm riêng follow-up
+- [x] P7-21 | README root rewritten — bỏ legacy WebHost references, intro nói rõ Phase 8 đã xóa AngularJS + MVC, repo layout cập nhật cho post-cutover structure (4 host + 41 module), thêm test commands cho 2 suite
 - [x] P7-22 | `docs/architecture.md` — topology diagram + projects table + hardening table + trace-path example
 - [x] P7-23 | `docs/deployment.md` — Aspire local, Azure Container Apps via `aspire publish`, k8s, Docker Compose reference, secrets list, observability + scaling knobs
 - [x] P7-24 | `docs/development.md` — clone/build/run, adding new module (7-step), endpoint convention, Blazor page convention, migration tooling shortcuts
