@@ -1,6 +1,5 @@
 using FluentAssertions;
 using Moq;
-using SimplCommerce.Infrastructure.Web;
 using SimplCommerce.Module.Core.Models;
 using SimplCommerce.Module.Core.Services;
 using SimplCommerce.Module.Orders.Models;
@@ -12,14 +11,8 @@ namespace SimplCommerce.Module.Orders.Tests.Services;
 public class OrderEmailServiceTests
 {
     [Fact]
-    public async Task Renders_template_with_order_and_sends_html_email()
+    public async Task Sends_html_email_with_order_number_in_subject()
     {
-        var renderer = new Mock<IRazorViewRenderer>();
-        renderer.Setup(x => x.RenderViewToStringAsync(
-                "/Areas/Orders/Views/EmailTemplates/OrderEmailToCustomer.cshtml",
-                It.IsAny<Order>()))
-            .ReturnsAsync("<html>hi</html>");
-
         string? toCapture = null;
         string? subjectCapture = null;
         string? bodyCapture = null;
@@ -32,36 +25,43 @@ public class OrderEmailServiceTests
               })
               .Returns(Task.CompletedTask);
 
-        var sut = new OrderEmailService(sender.Object, renderer.Object);
-        var user = new User { Email = "alice@example.com" };
-        var order = new Order();
+        var sut = new OrderEmailService(sender.Object);
+        var user = new User { Email = "alice@example.com", FullName = "Alice" };
+        var order = new Order { OrderTotal = 123.45m };
         typeof(SimplCommerce.Infrastructure.Models.EntityBaseWithTypedId<long>)
             .GetProperty(nameof(Order.Id))!.SetValue(order, 321L);
 
         await sut.SendEmailToUser(user, order);
 
         toCapture.Should().Be("alice@example.com");
-        subjectCapture.Should().Be("Order information #321");
-        bodyCapture.Should().Be("<html>hi</html>");
+        subjectCapture.Should().Be("Order confirmation #321");
         htmlCapture.Should().BeTrue();
-        renderer.VerifyAll();
+        bodyCapture.Should().Contain("#321");
+        bodyCapture.Should().Contain("123.45");
+        bodyCapture.Should().Contain("Alice");
     }
 
     [Fact]
-    public async Task Passes_order_as_model_to_renderer()
+    public async Task Skips_send_when_user_has_no_email()
     {
-        Order? seen = null;
-        var renderer = new Mock<IRazorViewRenderer>();
-        renderer.Setup(x => x.RenderViewToStringAsync(It.IsAny<string>(), It.IsAny<Order>()))
-                .Callback<string, Order>((_, o) => seen = o)
-                .ReturnsAsync(string.Empty);
         var sender = new Mock<IEmailSender>();
-        sender.Setup(s => s.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()))
-              .Returns(Task.CompletedTask);
+        var sut = new OrderEmailService(sender.Object);
 
+        await sut.SendEmailToUser(new User { Email = null }, new Order());
+
+        sender.Verify(s => s.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public void Body_html_encodes_customer_name_to_prevent_xss()
+    {
         var order = new Order();
-        await new OrderEmailService(sender.Object, renderer.Object).SendEmailToUser(new User { Email = "x@y.z" }, order);
+        var user = new User { Email = "x@y.z", FullName = "<script>alert(1)</script>" };
 
-        seen.Should().BeSameAs(order);
+        var body = OrderEmailService.BuildOrderConfirmationHtml(order, user);
+
+        body.Should().NotContain("<script>alert(1)</script>");
+        body.Should().Contain("&lt;script&gt;");
     }
 }
