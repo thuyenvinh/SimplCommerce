@@ -28,7 +28,10 @@ public static class CatalogAdminEndpoints
         string? ShortDescription, string? Description, string? Specification,
         bool IsPublished, bool IsAllowToOrder, bool IsCallForPricing, bool IsFeatured,
         bool StockTrackingIsEnabled, int StockQuantity,
-        long? BrandId);
+        long? BrandId,
+        // G08: round-trip CategoryIds so PUT can move a product between categories
+        // (read by ProductEditDto on GET). Null = don't touch; empty list = clear.
+        System.Collections.Generic.IReadOnlyList<long>? CategoryIds = null);
 
     public record ProductEditDto(
         long Id, string Name, string Slug, string? Sku,
@@ -189,6 +192,13 @@ public static class CatalogAdminEndpoints
                 BrandId = input.BrandId,
                 IsVisibleIndividually = true,
             };
+            if (input.CategoryIds is { Count: > 0 })
+            {
+                foreach (var cid in input.CategoryIds)
+                {
+                    product.AddCategory(new ProductCategory { CategoryId = cid });
+                }
+            }
             repo.Add(product);
             await repo.SaveChangesAsync();
             return Results.Created($"/api/admin/catalog/products/{product.Id}", new { product.Id });
@@ -196,7 +206,9 @@ public static class CatalogAdminEndpoints
 
         group.MapPut("/products/{id:long}", async (long id, ProductInput input, IRepository<Product> repo) =>
         {
-            var product = await repo.Query().FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
+            var product = await repo.Query()
+                .Include(p => p.Categories)
+                .FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
             if (product is null) return Results.NotFound();
 
             product.Name = input.Name;
@@ -215,6 +227,23 @@ public static class CatalogAdminEndpoints
             product.StockQuantity = input.StockQuantity;
             product.BrandId = input.BrandId;
             product.LatestUpdatedOn = System.DateTimeOffset.UtcNow;
+
+            // G08: sync ProductCategory rows when the client sends an explicit list.
+            // Null = leave categories untouched (backwards-compatible); empty = clear all.
+            if (input.CategoryIds is not null)
+            {
+                var desired = input.CategoryIds.Distinct().ToHashSet();
+                var existing = product.Categories.ToList();
+                foreach (var stale in existing.Where(c => !desired.Contains(c.CategoryId)))
+                {
+                    product.Categories.Remove(stale);
+                }
+                var existingIds = existing.Select(c => c.CategoryId).ToHashSet();
+                foreach (var add in desired.Where(id => !existingIds.Contains(id)))
+                {
+                    product.AddCategory(new ProductCategory { CategoryId = add });
+                }
+            }
 
             await repo.SaveChangesAsync();
             return Results.NoContent();

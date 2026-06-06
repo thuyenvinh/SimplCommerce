@@ -90,13 +90,43 @@ public static class OrdersAdminEndpoints
             return Results.Ok(dto);
         });
 
-        group.MapPatch("/{id:long}/status", async (long id, UpdateStatusRequest req, IRepository<Order> repo) =>
+        group.MapPatch("/{id:long}/status", async (long id, UpdateStatusRequest req,
+            IRepository<Order> repo,
+            MediatR.IMediator mediator,
+            System.Security.Claims.ClaimsPrincipal principal) =>
         {
             var order = await repo.Query().FirstOrDefaultAsync(o => o.Id == id);
             if (order is null) return Results.NotFound();
+
+            var oldStatus = order.OrderStatus;
+            if (oldStatus == req.NewStatus)
+            {
+                return Results.NoContent();
+            }
+
             order.OrderStatus = req.NewStatus;
             order.LatestUpdatedOn = DateTimeOffset.UtcNow;
-            repo.SaveChanges();
+            await repo.SaveChangesAsync();
+
+            // G05: publish OrderChanged so downstream handlers (OrderHistory writer,
+            // email, SignalR) fire just like the cancel-by-background-service path —
+            // not silent like the legacy admin patch.
+            // FindFirstValue lives in the AspNetCore framework reference, which this
+            // module deliberately doesn't pull. ClaimsPrincipal.FindFirst from corelib
+            // is enough here.
+            var rawUserId = principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? principal.FindFirst("sub")?.Value;
+            long.TryParse(rawUserId, out var userId);
+            await mediator.Publish(new Events.OrderChanged
+            {
+                OrderId = order.Id,
+                Order = order,
+                OldStatus = oldStatus,
+                NewStatus = req.NewStatus,
+                UserId = userId,
+                Note = "admin status change",
+            });
+
             return Results.NoContent();
         }).RequireAuthorization("AdminOnly");
 

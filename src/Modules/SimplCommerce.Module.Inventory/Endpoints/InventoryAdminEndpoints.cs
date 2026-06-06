@@ -81,7 +81,15 @@ public static class InventoryAdminEndpoints
                 };
                 stocks.Add(stock);
             }
-            stock.Quantity += (int)input.AdjustedQuantity;
+            // G13: stock-on-hand must never go negative. Reject the adjustment so
+            // the caller can correct it rather than silently writing -X into Stock
+            // (which then breaks reorder reports + cart availability checks).
+            var newQty = stock.Quantity + (int)input.AdjustedQuantity;
+            if (newQty < 0)
+            {
+                return Results.BadRequest(new { error = "Adjustment would drive stock negative.", currentQuantity = stock.Quantity });
+            }
+            stock.Quantity = newQty;
 
             var userIdRaw = principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? principal.FindFirstValue("sub");
             long.TryParse(userIdRaw, out var userId);
