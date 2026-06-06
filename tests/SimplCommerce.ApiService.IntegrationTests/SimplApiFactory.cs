@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SimplCommerce.Infrastructure.Modules;
 using SimplCommerce.Module.Core.Data;
@@ -32,6 +31,17 @@ public class SimplApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     {
         await _sql.StartAsync();
 
+        // Aspire's AddSqlServerDbContext("SimplCommerce") reads the connection string
+        // at registration time inside Program.cs — BEFORE WebApplicationFactory's
+        // ConfigureAppConfiguration callbacks run — so an in-memory config source is
+        // applied too late and Aspire captures a null connection string. Environment
+        // variables ARE read by WebApplication.CreateBuilder immediately, so set them
+        // before the host is built (first .Services access below). Empty redis/blobs
+        // tell Aspire to disable those components.
+        Environment.SetEnvironmentVariable("ConnectionStrings__SimplCommerce", _sql.GetConnectionString());
+        Environment.SetEnvironmentVariable("ConnectionStrings__redis", string.Empty);
+        Environment.SetEnvironmentVariable("ConnectionStrings__blobs", string.Empty);
+
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SimplDbContext>();
         await db.Database.MigrateAsync();
@@ -39,6 +49,9 @@ public class SimplApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public new async Task DisposeAsync()
     {
+        Environment.SetEnvironmentVariable("ConnectionStrings__SimplCommerce", null);
+        Environment.SetEnvironmentVariable("ConnectionStrings__redis", null);
+        Environment.SetEnvironmentVariable("ConnectionStrings__blobs", null);
         await _sql.DisposeAsync();
         await base.DisposeAsync();
     }
@@ -47,22 +60,8 @@ public class SimplApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     {
         builder.UseEnvironment("Testing");
 
-        builder.ConfigureAppConfiguration((_, config) =>
-        {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:SimplCommerce"] = _sql.GetConnectionString(),
-                ["ConnectionStrings:redis"] = string.Empty,
-                ["ConnectionStrings:blobs"] = string.Empty,
-            });
-        });
-
-        // The ApiService registers SimplDbContext through Aspire's pooled
-        // AddSqlServerDbContext("SimplCommerce"), which reads
-        // ConnectionStrings:SimplCommerce — already pointed at the Testcontainer
-        // above. Re-registering the DbContext here would collide with the pool, so
-        // we only seed the module manifest (needed by SimplDbContext.OnModelCreating
-        // for entity discovery; idempotent — Program.cs also calls it).
+        // SimplDbContext.OnModelCreating walks GlobalConfiguration.Modules for entity
+        // discovery; seed the manifest (idempotent — Program.cs also calls it).
         builder.ConfigureServices(_ => ModuleManifestLoader.LoadAllBundled());
     }
 }
