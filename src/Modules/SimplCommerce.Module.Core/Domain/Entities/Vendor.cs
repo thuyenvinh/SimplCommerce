@@ -32,6 +32,12 @@ namespace SimplCommerce.Module.Core.Models
 
         public bool IsDeleted { get; set; }
 
+        // Wave 8: platform commission taken from every sub-order routed to this
+        // vendor. Stored as a percent (0-100). Defaults to 0 — a freshly created
+        // vendor keeps 100% until admin sets a rate. Per-category overrides are a
+        // follow-up; this single rate covers the marketplace MVP.
+        public decimal CommissionPercent { get; set; }
+
         public IList<User> Users { get; set; } = new List<User>();
     }
 }

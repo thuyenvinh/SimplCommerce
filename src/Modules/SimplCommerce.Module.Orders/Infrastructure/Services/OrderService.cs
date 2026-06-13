@@ -25,6 +25,7 @@ namespace SimplCommerce.Module.Orders.Services
     public class OrderService : IOrderService
     {
         private readonly IRepository<Order> _orderRepository;
+        private readonly IRepository<Vendor> _vendorRepository;
         private readonly ICouponService _couponService;
         private readonly IRepository<CheckoutItem> _checkoutItemRepository;
         private readonly IRepository<OrderItem> _orderItemRepository;
@@ -46,7 +47,8 @@ namespace SimplCommerce.Module.Orders.Services
             IShippingPriceService shippingPriceService,
             IRepository<UserAddress> userAddressRepository,
             IMediator mediator,
-            IProductPricingService productPricingService)
+            IProductPricingService productPricingService,
+            IRepository<Vendor> vendorRepository)
         {
             _orderRepository = orderRepository;
             _couponService = couponService;
@@ -59,6 +61,7 @@ namespace SimplCommerce.Module.Orders.Services
             _userAddressRepository = userAddressRepository;
             _mediator = mediator;
             _productPricingService = productPricingService;
+            _vendorRepository = vendorRepository;
         }
 
         public async Task<Result<Order>> CreateOrder(Guid checkoutId, string paymentMethod, decimal paymentFeeAmount, OrderStatus orderStatus = OrderStatus.New)
@@ -321,11 +324,21 @@ namespace SimplCommerce.Module.Orders.Services
             order.OrderTotal = order.SubTotal + order.TaxAmount + order.ShippingFeeAmount + order.PaymentFeeAmount - order.DiscountAmount;
             _orderRepository.Add(order);
 
-            var vendorIds = checkout.CheckoutItems.Where(x => x.Product.VendorId.HasValue).Select(x => x.Product.VendorId.Value).Distinct();
+            var vendorIds = checkout.CheckoutItems.Where(x => x.Product.VendorId.HasValue).Select(x => x.Product.VendorId.Value).Distinct().ToList();
             if (vendorIds.Any())
             {
                 order.IsMasterOrder = true;
             }
+
+            // Wave 8: pull commission rates for every vendor involved in one shot
+            // so each sub-order doesn't issue its own SELECT. Missing vendor row
+            // (deleted between cart-add and checkout) → 0% commission (vendor
+            // keeps everything; admin will catch the orphan in payouts UI).
+            var vendorCommissions = vendorIds.Count == 0
+                ? new Dictionary<long, decimal>()
+                : await _vendorRepository.Query()
+                    .Where(v => vendorIds.Contains(v.Id))
+                    .ToDictionaryAsync(v => v.Id, v => v.CommissionPercent);
 
             IList<Order> subOrders = new List<Order>();
             foreach (var vendorId in vendorIds)
@@ -372,6 +385,11 @@ namespace SimplCommerce.Module.Orders.Services
                 subOrder.SubTotal = subOrder.OrderItems.Sum(x => x.ProductPrice * x.Quantity);
                 subOrder.TaxAmount = subOrder.OrderItems.Sum(x => x.TaxAmount);
                 subOrder.OrderTotal = subOrder.SubTotal + subOrder.TaxAmount + subOrder.ShippingFeeAmount - subOrder.DiscountAmount;
+                // Wave 8: commission on the goods subtotal (not on tax/shipping —
+                // platform doesn't claim a cut on the tax it remits or the carrier
+                // fee it forwards). Truncated to 2 decimals to match the column.
+                var rate = vendorCommissions.TryGetValue(vendorId, out var r) ? r : 0m;
+                subOrder.CommissionAmount = System.Math.Round(subOrder.SubTotal * rate / 100m, 2);
                 _orderRepository.Add(subOrder);
                 subOrders.Add(subOrder);
             }
