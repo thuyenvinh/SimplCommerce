@@ -283,7 +283,7 @@ builder.Services
     .AddPaymentMomoModule()
     .AddPaymentNganLuongModule()
     .AddPaymentPaypalExpressModule()
-    .AddPaymentStripeModule()
+    .AddPaymentStripeModule(builder.Configuration)
     .AddPaymentVnpayModule()
     .AddCommentsModule()
     .AddSampleDataModule()

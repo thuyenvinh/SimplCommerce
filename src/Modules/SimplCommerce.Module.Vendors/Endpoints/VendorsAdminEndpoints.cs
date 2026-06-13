@@ -2,15 +2,18 @@
 using System;
 using System.Linq;
 using System.Security.Claims;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
 using SimplCommerce.Infrastructure.Data;
 using SimplCommerce.Infrastructure.Web;
 using SimplCommerce.Module.Core.Models;
 using SimplCommerce.Module.Orders.Models;
+using SimplCommerce.Module.Payments.Services;
 using SimplCommerce.Module.Vendors.Models;
 
 namespace SimplCommerce.Module.Vendors.Endpoints;
@@ -175,6 +178,7 @@ public static class VendorsAdminEndpoints
             IRepository<Vendor> vendors,
             IRepository<Order> orders,
             IRepository<VendorPayout> payouts,
+            IEnumerable<IPayoutGateway> gateways,
             ClaimsPrincipal principal) =>
         {
             var vendor = await vendors.Query().FirstOrDefaultAsync(v => v.Id == id && !v.IsDeleted);
@@ -234,6 +238,55 @@ public static class VendorsAdminEndpoints
                 o.VendorPayoutId = payout.Id;
             }
             await orders.SaveChangesAsync();
+
+            // Wave 12: if the method is provider-backed, dispatch the actual
+            // transfer immediately. Success → status flips to Sent + SentOn
+            // stamped + provider reference captured. Failure parks at Failed
+            // with the gateway's error code in the response blob so admin can
+            // diagnose and retry via PATCH /payouts/{id}/status.
+            // Manual payouts skip dispatch entirely (admin does the bank transfer
+            // out-of-band and PATCHes status when done).
+            if (method != PayoutMethod.Manual)
+            {
+                var gateway = gateways.FirstOrDefault(g => g.MethodId == (int)method);
+                if (gateway is not null)
+                {
+                    var destination = method switch
+                    {
+                        PayoutMethod.StripeConnect => vendor.StripeAccountId,
+                        PayoutMethod.VnpayVendor => vendor.VnpayMerchantId,
+                        PayoutMethod.MomoVendor => vendor.MomoPartnerCode,
+                        _ => string.Empty,
+                    };
+                    var dispatchResult = await gateway.DispatchAsync(new PayoutDispatchRequest(
+                        payout.Id,
+                        destination ?? string.Empty,
+                        payout.NetAmount,
+                        Currency: "usd",
+                        Description: $"SimplCommerce payout #{payout.Id} to {vendor.Name}"),
+                        CancellationToken.None);
+                    if (dispatchResult.Success)
+                    {
+                        payout.Status = PayoutStatus.Sent;
+                        payout.SentOn = DateTimeOffset.UtcNow;
+                        if (!string.IsNullOrWhiteSpace(dispatchResult.ProviderReference))
+                        {
+                            payout.ExternalTransferReference = dispatchResult.ProviderReference;
+                        }
+                    }
+                    else
+                    {
+                        payout.Status = PayoutStatus.Failed;
+                    }
+                    if (!string.IsNullOrWhiteSpace(dispatchResult.RawResponse))
+                    {
+                        payout.ProviderResponse = dispatchResult.RawResponse.Length > 4000
+                            ? dispatchResult.RawResponse[..4000]
+                            : dispatchResult.RawResponse;
+                    }
+                    await payouts.SaveChangesAsync();
+                }
+            }
 
             return Results.Created($"/api/admin/vendors/{id}/payouts/{payout.Id}",
                 new PayoutItem(payout.Id, payout.VendorId, payout.CreatedOn, payout.GrossAmount,
