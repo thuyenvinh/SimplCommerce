@@ -375,6 +375,9 @@ app.MapVendorApplicationStorefrontEndpoints();
 app.MapVendorsStorefrontEndpoints();
 // Wave 14: KYC document upload + verification workflow.
 app.MapVendorDocumentEndpoints();
+// Wave 15: buyer ↔ vendor messaging.
+app.MapVendorMessageStorefrontEndpoints();
+app.MapVendorMessageAdminEndpoints();
 app.MapLocalizationAdminEndpoints();
 app.MapActivityLogAdminEndpoints();
 
