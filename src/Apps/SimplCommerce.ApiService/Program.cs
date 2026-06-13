@@ -371,6 +371,8 @@ app.MapVendorsAdminEndpoints();
 // Wave 7: marketplace onboarding queue (admin) + self-apply form (storefront).
 app.MapVendorApplicationAdminEndpoints();
 app.MapVendorApplicationStorefrontEndpoints();
+// Wave 10: public vendor pages on the storefront.
+app.MapVendorsStorefrontEndpoints();
 app.MapLocalizationAdminEndpoints();
 app.MapActivityLogAdminEndpoints();
 
