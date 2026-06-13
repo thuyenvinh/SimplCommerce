@@ -12,8 +12,9 @@ public sealed class ProductsListPage
     public ProductsListPage(IPage page) => _page = page;
 
     public ILocator Heading => _page.GetByRole(AriaRole.Heading, new() { Name = "Products" });
-    public ILocator SearchField => _page.GetByLabel("Search", new() { Exact = false });
-    public ILocator NewProductButton => _page.GetByRole(AriaRole.Button, new() { Name = "New product" });
+    public ILocator SearchField => _page.GetByLabel("Search by name / SKU");
+    // MudButton with Href renders as <a> not <button> → AriaRole.Link, not Button.
+    public ILocator NewProductButton => _page.GetByRole(AriaRole.Link, new() { Name = "New product" });
     public ILocator Table => _page.Locator("table.mud-table-root");
 
     public ILocator RowByName(string name) => _page.GetByRole(AriaRole.Row, new() { Name = name });

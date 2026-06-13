@@ -39,8 +39,9 @@ public class AuthTests : PlaywrightFixture
         await login.GoToAsync();
         await login.LoginAsync(Config.AdminEmail, Config.AdminPassword);
         await Page.WaitForURLAsync(u => !u.Contains("/login"), new() { Timeout = Config.NavigationTimeoutMs });
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         var dashboard = new DashboardPage(Page);
-        await Assertions.Expect(dashboard.Heading.Or(Page.GetByText("Dashboard"))).ToBeVisibleAsync();
+        await Assertions.Expect(dashboard.Heading).ToBeVisibleAsync(new() { Timeout = Config.NavigationTimeoutMs });
         await Artifacts.CaptureStepAsync(Page, "dashboard-after-login");
     }
 

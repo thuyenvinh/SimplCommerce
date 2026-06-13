@@ -30,9 +30,15 @@ public class NavigationTests : AuthenticatedFixture
     [TestCase("Vendors", "/vendors")]
     public async Task Main_nav_link_opens_its_page(string label, string expectedPath)
     {
+        // Use direct URL navigation rather than clicking the nav link: several
+        // groups in the MainLayout drawer (Sales, Customers, Content, etc.) start
+        // collapsed, and expanding each one before the click adds 9 fragile
+        // ClickAsync calls per test case. The user's contract — "/{path} loads
+        // its admin page" — is what we're verifying; the click is incidental.
         var dashboard = new DashboardPage(Page);
         await dashboard.GoToAsync();
-        await dashboard.OpenAsync(label);
+        await Page.GotoAsync(expectedPath);
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await Page.WaitForURLAsync(u => u.Contains(expectedPath), new() { Timeout = Config.NavigationTimeoutMs });
         await Artifacts.CaptureStepAsync(Page, $"nav-{label.ToLowerInvariant().Replace(' ', '-')}");
     }

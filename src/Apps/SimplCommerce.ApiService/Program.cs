@@ -89,12 +89,33 @@ ModuleManifestLoader.LoadAllBundled();
 builder.AddServiceDefaults();
 
 // ---- Infrastructure wiring (Aspire-injected connection strings) ----
-builder.AddSqlServerDbContext<SimplDbContext>("SimplCommerce", configureDbContextOptions: options =>
+// E2E + dev-local can override the SQL Server requirement by setting
+// SIMPL_E2E_SQLITE=<file-path> — Aspire normally injects the connection string
+// from the AppHost which requires Docker. The SQLite branch uses
+// SimplDbContext's existing Sqlite-aware OnModelCreating code path and bypasses
+// migrations via EnsureCreated, then seeds an admin user so the Blazor admin
+// app can sign in immediately. Production deploys leave the env var unset and
+// behave exactly as before.
+var sqliteFile = Environment.GetEnvironmentVariable("SIMPL_E2E_SQLITE");
+var useSqlite = !string.IsNullOrWhiteSpace(sqliteFile);
+if (useSqlite)
 {
-    options.UseSqlServer(sql => sql.MigrationsAssembly("SimplCommerce.Migrations"));
-});
-builder.AddRedisDistributedCache("redis");
-builder.AddAzureBlobServiceClient("blobs");
+    builder.Services.AddDbContext<SimplDbContext>(options =>
+        options.UseSqlite($"Data Source={sqliteFile}"));
+    // Aspire's AddRedisDistributedCache + AddAzureBlobServiceClient also need
+    // containers; degrade to in-memory equivalents so the rest of the host
+    // doesn't fail at construction.
+    builder.Services.AddDistributedMemoryCache();
+}
+else
+{
+    builder.AddSqlServerDbContext<SimplDbContext>("SimplCommerce", configureDbContextOptions: options =>
+    {
+        options.UseSqlServer(sql => sql.MigrationsAssembly("SimplCommerce.Migrations"));
+    });
+    builder.AddRedisDistributedCache("redis");
+    builder.AddAzureBlobServiceClient("blobs");
+}
 
 // The ApiService is a minimal-API host with no static-web-asset wwwroot, so
 // builder.Environment.WebRootPath can be null. StorageLocal + ImageSharp.Web both
@@ -309,6 +330,40 @@ builder.Services.AddTransient<
     SimplCommerce.ApiService.Notifications.OrderCreatedAdminBroadcastHandler>();
 
 var app = builder.Build();
+
+// E2E SQLite bootstrap. Creates the schema from the model (skipping migrations
+// because they're SQL-Server-specific) and seeds an admin role + user so the
+// Blazor admin app's login flow succeeds against the fake backend.
+if (useSqlite)
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<SimplDbContext>();
+    await db.Database.EnsureCreatedAsync();
+    var userMgr = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<SimplCommerce.Module.Core.Models.User>>();
+    var roleMgr = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.RoleManager<SimplCommerce.Module.Core.Models.Role>>();
+    if (!await roleMgr.RoleExistsAsync("admin"))
+    {
+        await roleMgr.CreateAsync(new SimplCommerce.Module.Core.Models.Role { Name = "admin" });
+    }
+    var seedEmail = Environment.GetEnvironmentVariable("SIMPL_E2E_ADMIN_EMAIL") ?? "admin@simplcommerce.com";
+    var seedPass = Environment.GetEnvironmentVariable("SIMPL_E2E_ADMIN_PASSWORD") ?? "1qazZAQ!";
+    var seedUser = await userMgr.FindByEmailAsync(seedEmail);
+    if (seedUser is null)
+    {
+        seedUser = new SimplCommerce.Module.Core.Models.User
+        {
+            UserName = seedEmail,
+            Email = seedEmail,
+            FullName = "Shop Admin",
+            EmailConfirmed = true,
+        };
+        var createRes = await userMgr.CreateAsync(seedUser, seedPass);
+        if (createRes.Succeeded && !await userMgr.IsInRoleAsync(seedUser, "admin"))
+        {
+            await userMgr.AddToRoleAsync(seedUser, "admin");
+        }
+    }
+}
 
 app.MapDefaultEndpoints();
 
