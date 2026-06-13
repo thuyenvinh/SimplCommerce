@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <!--
+    NUnit parallel + Playwright share a browser per test class via fixture, so
+    crank workers up to 4 for the catalog/orders/vendors flows that don't share
+    state. Auth tests run serially because they share the admin seed account.
+  -->
+  <NUnit>
+    <NumberOfTestWorkers>4</NumberOfTestWorkers>
+  </NUnit>
+  <RunConfiguration>
+    <EnvironmentVariables>
+      <!-- Force CI mode so Playwright skips its first-run telemetry prompt -->
+      <CI>true</CI>
+    </EnvironmentVariables>
+  </RunConfiguration>
+</RunSettings>
