@@ -1,8 +1,10 @@
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using SimplCommerce.Module.Cms.Services;
 using SimplCommerce.Module.Core.Models;
 using SimplCommerce.Module.Core.Services;
 using SimplCommerce.Module.Orders.Models;
@@ -19,10 +21,12 @@ namespace SimplCommerce.Module.Orders.Services
     public class OrderEmailService : IOrderEmailService
     {
         private readonly IEmailSender _emailSender;
+        private readonly IEmailTemplateService _templates;
 
-        public OrderEmailService(IEmailSender emailSender)
+        public OrderEmailService(IEmailSender emailSender, IEmailTemplateService templates)
         {
             _emailSender = emailSender;
+            _templates = templates;
         }
 
         public async Task SendEmailToUser(User user, Order order)
@@ -32,9 +36,39 @@ namespace SimplCommerce.Module.Orders.Services
                 return;
             }
 
-            var subject = $"Order confirmation #{order.Id}";
-            var body = BuildOrderConfirmationHtml(order, user);
+            // Wave 17: prefer the admin-editable CMS template. When no row is
+            // active (cold start, admin deleted it, key not seeded yet) we fall
+            // back to the inline default so email delivery never stops.
+            var rendered = await _templates.RenderAsync("order-confirmation",
+                BuildPlaceholders(order, user));
+            string subject;
+            string body;
+            if (rendered is not null)
+            {
+                subject = rendered.Subject;
+                body = rendered.BodyHtml;
+            }
+            else
+            {
+                subject = $"Order confirmation #{order.Id}";
+                body = BuildOrderConfirmationHtml(order, user);
+            }
             await _emailSender.SendEmailAsync(user.Email, subject, body, isHtml: true);
+        }
+
+        private static IReadOnlyDictionary<string, string> BuildPlaceholders(Order order, User user)
+        {
+            var ci = CultureInfo.InvariantCulture;
+            return new Dictionary<string, string>
+            {
+                ["OrderId"] = order.Id.ToString(ci),
+                ["CustomerName"] = WebUtility.HtmlEncode(user.FullName ?? user.Email ?? string.Empty),
+                ["OrderTotal"] = order.OrderTotal.ToString("0.00", ci),
+                ["SubTotal"] = order.SubTotal.ToString("0.00", ci),
+                ["TaxAmount"] = order.TaxAmount.ToString("0.00", ci),
+                ["ShippingAmount"] = order.ShippingFeeAmount.ToString("0.00", ci),
+                ["DiscountAmount"] = order.DiscountAmount.ToString("0.00", ci),
+            };
         }
 
         // Public so tests can pin invariants (HTML encoding of customer name etc.)

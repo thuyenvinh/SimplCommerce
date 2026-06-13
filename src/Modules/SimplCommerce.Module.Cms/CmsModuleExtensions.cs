@@ -13,6 +13,8 @@ namespace SimplCommerce.Module.Cms
         {
             services.AddTransient<INotificationHandler<EntityDeleting>, EntityDeletingHandler>();
             services.AddTransient<IPageService, PageService>();
+            // Wave 17: admin-editable email template service.
+            services.AddTransient<IEmailTemplateService, EmailTemplateService>();
             return services;
         }
     }

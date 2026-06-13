@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Moq;
+using SimplCommerce.Module.Cms.Services;
 using SimplCommerce.Module.Core.Models;
 using SimplCommerce.Module.Core.Services;
 using SimplCommerce.Module.Orders.Models;
@@ -10,8 +11,16 @@ namespace SimplCommerce.Module.Orders.Tests.Services;
 
 public class OrderEmailServiceTests
 {
+    private static Mock<IEmailTemplateService> StubTemplates(EmailRenderResult? result = null)
+    {
+        var mock = new Mock<IEmailTemplateService>();
+        mock.Setup(t => t.RenderAsync(It.IsAny<string>(), It.IsAny<IReadOnlyDictionary<string, string>>()))
+            .ReturnsAsync(result);
+        return mock;
+    }
+
     [Fact]
-    public async Task Sends_html_email_with_order_number_in_subject()
+    public async Task Falls_back_to_inline_html_when_cms_template_missing()
     {
         string? toCapture = null;
         string? subjectCapture = null;
@@ -25,7 +34,7 @@ public class OrderEmailServiceTests
               })
               .Returns(Task.CompletedTask);
 
-        var sut = new OrderEmailService(sender.Object);
+        var sut = new OrderEmailService(sender.Object, StubTemplates(null).Object);
         var user = new User { Email = "alice@example.com", FullName = "Alice" };
         var order = new Order { OrderTotal = 123.45m };
         typeof(SimplCommerce.Infrastructure.Models.EntityBaseWithTypedId<long>)
@@ -42,10 +51,29 @@ public class OrderEmailServiceTests
     }
 
     [Fact]
+    public async Task Uses_cms_template_when_available()
+    {
+        string? subjectCapture = null;
+        string? bodyCapture = null;
+        var sender = new Mock<IEmailSender>();
+        sender.Setup(s => s.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()))
+              .Callback<string, string, string, bool>((_, s, b, _) => { subjectCapture = s; bodyCapture = b; })
+              .Returns(Task.CompletedTask);
+
+        var sut = new OrderEmailService(sender.Object,
+            StubTemplates(new EmailRenderResult("CMS subject", "<p>CMS body</p>")).Object);
+
+        await sut.SendEmailToUser(new User { Email = "x@y.z" }, new Order());
+
+        subjectCapture.Should().Be("CMS subject");
+        bodyCapture.Should().Be("<p>CMS body</p>");
+    }
+
+    [Fact]
     public async Task Skips_send_when_user_has_no_email()
     {
         var sender = new Mock<IEmailSender>();
-        var sut = new OrderEmailService(sender.Object);
+        var sut = new OrderEmailService(sender.Object, StubTemplates().Object);
 
         await sut.SendEmailToUser(new User { Email = null }, new Order());
 
