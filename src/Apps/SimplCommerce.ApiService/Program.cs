@@ -368,6 +368,9 @@ app.MapShippingTableRateAdminEndpoints();
 app.MapTaxAdminEndpoints();
 app.MapPaymentsAdminEndpoints();
 app.MapVendorsAdminEndpoints();
+// Wave 7: marketplace onboarding queue (admin) + self-apply form (storefront).
+app.MapVendorApplicationAdminEndpoints();
+app.MapVendorApplicationStorefrontEndpoints();
 app.MapLocalizationAdminEndpoints();
 app.MapActivityLogAdminEndpoints();
 

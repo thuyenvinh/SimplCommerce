@@ -322,6 +322,11 @@ public interface IAdminVendorsApi
     Task<HttpResponseMessage> CreateAsync(AdminVendorInput input, CancellationToken ct = default);
     Task<HttpResponseMessage> UpdateAsync(long id, AdminVendorInput input, CancellationToken ct = default);
     Task<HttpResponseMessage> DeleteAsync(long id, CancellationToken ct = default);
+
+    // Wave 7: onboarding queue
+    Task<AdminVendorApplicationsPage?> ListApplicationsAsync(int? status = null, int page = 1, int pageSize = 20, CancellationToken ct = default);
+    Task<HttpResponseMessage> ApproveApplicationAsync(long id, AdminVendorApplicationDecision req, CancellationToken ct = default);
+    Task<HttpResponseMessage> RejectApplicationAsync(long id, AdminVendorApplicationDecision req, CancellationToken ct = default);
 }
 
 public sealed class AdminVendorsApi(HttpClient http) : IAdminVendorsApi
@@ -340,6 +345,19 @@ public sealed class AdminVendorsApi(HttpClient http) : IAdminVendorsApi
 
     public Task<HttpResponseMessage> DeleteAsync(long id, CancellationToken ct) =>
         http.DeleteAsync($"/api/admin/vendors/{id}", ct);
+
+    public Task<AdminVendorApplicationsPage?> ListApplicationsAsync(int? status, int page, int pageSize, CancellationToken ct)
+    {
+        var url = $"/api/admin/vendors/applications/?page={page}&pageSize={pageSize}";
+        if (status.HasValue) url += $"&status={status}";
+        return http.GetFromJsonAsync<AdminVendorApplicationsPage>(url, ct);
+    }
+
+    public Task<HttpResponseMessage> ApproveApplicationAsync(long id, AdminVendorApplicationDecision req, CancellationToken ct) =>
+        http.PostAsJsonAsync($"/api/admin/vendors/applications/{id}/approve", req, ct);
+
+    public Task<HttpResponseMessage> RejectApplicationAsync(long id, AdminVendorApplicationDecision req, CancellationToken ct) =>
+        http.PostAsJsonAsync($"/api/admin/vendors/applications/{id}/reject", req, ct);
 }
 
 public interface IAdminTaxApi

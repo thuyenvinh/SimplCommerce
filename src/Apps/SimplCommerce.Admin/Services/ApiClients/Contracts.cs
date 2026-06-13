@@ -44,6 +44,17 @@ public record UpdateOrderStatusRequest(int NewStatus);
 public record AdminOrderItemDto(long ProductId, string ProductName, int Quantity, decimal ProductPrice, decimal DiscountAmount);
 public record AdminOrderItemLite(long Id, long ProductId, string ProductName, int Quantity);
 
+// --- Vendor applications (Wave 7) ---
+public record AdminVendorApplicationItem(
+    long Id, long ApplicantUserId, string? ApplicantEmail,
+    string BusinessName, string Slug, string? Description,
+    string? ContactEmail, string? ContactPhone,
+    int Status, DateTimeOffset CreatedOn,
+    long? DecidedByUserId, DateTimeOffset? DecidedOn, string? DecisionNote,
+    long? CreatedVendorId);
+public record AdminVendorApplicationsPage(int Total, int Page, int PageSize, IReadOnlyList<AdminVendorApplicationItem> Items);
+public record AdminVendorApplicationDecision(string? Note);
+
 // --- Shipments admin ---
 public record AdminShipmentListItem(long Id, long OrderId, string? TrackingNumber, long WarehouseId, int Status, DateTimeOffset CreatedOn, int ItemCount);
 public record AdminShipmentLine(long Id, long OrderItemId, long ProductId, string ProductName, int Quantity);
