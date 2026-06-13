@@ -38,6 +38,20 @@ namespace SimplCommerce.Module.Core.Models
         // follow-up; this single rate covers the marketplace MVP.
         public decimal CommissionPercent { get; set; }
 
+        // Wave 11: payout-rail identifier. Stripe Connect example: "acct_xxx".
+        // VNPay merchant ID, MoMo partner code etc. share the same field; the
+        // payout endpoint picks the right rail based on which is non-null.
+        // Storing the raw provider id keeps the platform-side schema simple while
+        // the actual SDK call happens at settlement time (Wave 11+ follow-up).
+        [StringLength(450)]
+        public string StripeAccountId { get; set; }
+
+        [StringLength(450)]
+        public string VnpayMerchantId { get; set; }
+
+        [StringLength(450)]
+        public string MomoPartnerCode { get; set; }
+
         public IList<User> Users { get; set; } = new List<User>();
     }
 }

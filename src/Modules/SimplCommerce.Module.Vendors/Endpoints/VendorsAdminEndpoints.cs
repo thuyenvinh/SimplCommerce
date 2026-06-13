@@ -17,8 +17,13 @@ namespace SimplCommerce.Module.Vendors.Endpoints;
 
 public static class VendorsAdminEndpoints
 {
-    public record VendorInput(string Name, string Slug, string? Description, string? Email, bool IsActive, decimal CommissionPercent = 0m);
-    public record VendorDetail(long Id, string Name, string Slug, string? Description, string? Email, bool IsActive, decimal CommissionPercent, System.DateTimeOffset CreatedOn);
+    public record VendorInput(string Name, string Slug, string? Description, string? Email, bool IsActive,
+        decimal CommissionPercent = 0m,
+        string? StripeAccountId = null, string? VnpayMerchantId = null, string? MomoPartnerCode = null);
+    public record VendorDetail(long Id, string Name, string Slug, string? Description, string? Email, bool IsActive,
+        decimal CommissionPercent,
+        string? StripeAccountId, string? VnpayMerchantId, string? MomoPartnerCode,
+        System.DateTimeOffset CreatedOn);
 
     // Wave 9: dashboard "self" endpoint. Vendor logs in, gets back their own
     // profile + pending balance for the dashboard top strip. AdminOnly tier
@@ -27,8 +32,10 @@ public static class VendorsAdminEndpoints
 
     // Wave 8: payout reporting + creation
     public record VendorBalanceSummary(long VendorId, string VendorName, decimal PendingPayoutGross, decimal PendingCommission, int EligibleOrderCount);
-    public record CreatePayoutRequest(string? ExternalTransferReference, string? Note);
-    public record PayoutItem(long Id, long VendorId, DateTimeOffset CreatedOn, decimal GrossAmount, decimal CommissionAmount, decimal NetAmount, int OrderCount, string? ExternalTransferReference);
+    public record CreatePayoutRequest(string? ExternalTransferReference, string? Note, int Method = (int)PayoutMethod.Manual);
+    public record PayoutItem(long Id, long VendorId, DateTimeOffset CreatedOn, decimal GrossAmount, decimal CommissionAmount, decimal NetAmount, int OrderCount, string? ExternalTransferReference,
+        int Method, int Status, DateTimeOffset? SentOn, DateTimeOffset? CompletedOn);
+    public record UpdatePayoutStatusRequest(int NewStatus, string? ExternalTransferReference, string? ProviderResponse);
 
     public static IEndpointRouteBuilder MapVendorsAdminEndpoints(this IEndpointRouteBuilder app)
     {
@@ -60,7 +67,7 @@ public static class VendorsAdminEndpoints
             var commission = await eligible.SumAsync(o => (decimal?)o.CommissionAmount) ?? 0m;
             var count = await eligible.CountAsync();
             return Results.Ok(new VendorSelfResponse(
-                new VendorDetail(v.Id, v.Name, v.Slug, v.Description, v.Email, v.IsActive, v.CommissionPercent, v.CreatedOn),
+                new VendorDetail(v.Id, v.Name, v.Slug, v.Description, v.Email, v.IsActive, v.CommissionPercent, v.StripeAccountId, v.VnpayMerchantId, v.MomoPartnerCode, v.CreatedOn),
                 new VendorBalanceSummary(v.Id, v.Name, grossSubtotal, commission, count)));
         }).RequireAuthorization("AdminOrVendor");
 
@@ -69,7 +76,7 @@ public static class VendorsAdminEndpoints
             var v = await repo.Query().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
             return v is null
                 ? Results.NotFound()
-                : Results.Ok(new VendorDetail(v.Id, v.Name, v.Slug, v.Description, v.Email, v.IsActive, v.CommissionPercent, v.CreatedOn));
+                : Results.Ok(new VendorDetail(v.Id, v.Name, v.Slug, v.Description, v.Email, v.IsActive, v.CommissionPercent, v.StripeAccountId, v.VnpayMerchantId, v.MomoPartnerCode, v.CreatedOn));
         });
 
         group.MapPost("/", async (VendorInput input, IRepository<Vendor> repo) =>
@@ -86,6 +93,9 @@ public static class VendorsAdminEndpoints
                 Email = input.Email ?? string.Empty,
                 IsActive = input.IsActive,
                 CommissionPercent = input.CommissionPercent,
+                StripeAccountId = input.StripeAccountId ?? string.Empty,
+                VnpayMerchantId = input.VnpayMerchantId ?? string.Empty,
+                MomoPartnerCode = input.MomoPartnerCode ?? string.Empty,
             };
             repo.Add(vendor);
             await repo.SaveChangesAsync();
@@ -109,6 +119,9 @@ public static class VendorsAdminEndpoints
             // already have CommissionAmount stamped at the rate-at-the-time; we
             // never retroactively re-rate completed transactions.
             vendor.CommissionPercent = input.CommissionPercent;
+            vendor.StripeAccountId = input.StripeAccountId ?? string.Empty;
+            vendor.VnpayMerchantId = input.VnpayMerchantId ?? string.Empty;
+            vendor.MomoPartnerCode = input.MomoPartnerCode ?? string.Empty;
             vendor.LatestUpdatedOn = System.DateTimeOffset.UtcNow;
             await repo.SaveChangesAsync();
             return Results.NoContent();
@@ -150,7 +163,8 @@ public static class VendorsAdminEndpoints
             var total = await query.CountAsync();
             var rows = await query.OrderByDescending(p => p.CreatedOn)
                 .Skip((page - 1) * pageSize).Take(pageSize)
-                .Select(p => new PayoutItem(p.Id, p.VendorId, p.CreatedOn, p.GrossAmount, p.CommissionAmount, p.NetAmount, p.OrderCount, p.ExternalTransferReference))
+                .Select(p => new PayoutItem(p.Id, p.VendorId, p.CreatedOn, p.GrossAmount, p.CommissionAmount, p.NetAmount, p.OrderCount, p.ExternalTransferReference,
+                    (int)p.Method, (int)p.Status, p.SentOn, p.CompletedOn))
                 .ToListAsync();
             return Results.Ok(new { total, page, pageSize, items = rows });
         });
@@ -180,6 +194,22 @@ public static class VendorsAdminEndpoints
             }
             var gross = eligibleOrders.Sum(o => o.SubTotal);
             var commission = eligibleOrders.Sum(o => o.CommissionAmount);
+            // Method picked by admin; if Stripe/Vnpay/Momo selected but the
+            // vendor has no provider id set, refuse — better an early 400 than
+            // a stuck Pending row that admin has to clean up later.
+            var method = Enum.IsDefined(typeof(PayoutMethod), req.Method) ? (PayoutMethod)req.Method : PayoutMethod.Manual;
+            string? missingProvider = method switch
+            {
+                PayoutMethod.StripeConnect when string.IsNullOrWhiteSpace(vendor.StripeAccountId) => "StripeAccountId",
+                PayoutMethod.VnpayVendor when string.IsNullOrWhiteSpace(vendor.VnpayMerchantId) => "VnpayMerchantId",
+                PayoutMethod.MomoVendor when string.IsNullOrWhiteSpace(vendor.MomoPartnerCode) => "MomoPartnerCode",
+                _ => null,
+            };
+            if (missingProvider is not null)
+            {
+                return Results.BadRequest(new { error = $"Vendor has no {missingProvider} configured for the chosen method." });
+            }
+
             var payout = new VendorPayout
             {
                 VendorId = vendor.Id,
@@ -190,6 +220,8 @@ public static class VendorsAdminEndpoints
                 OrderCount = eligibleOrders.Count,
                 ExternalTransferReference = req.ExternalTransferReference ?? string.Empty,
                 Note = req.Note ?? string.Empty,
+                Method = method,
+                Status = PayoutStatus.Pending,
             };
             payouts.Add(payout);
             await payouts.SaveChangesAsync();
@@ -205,9 +237,59 @@ public static class VendorsAdminEndpoints
 
             return Results.Created($"/api/admin/vendors/{id}/payouts/{payout.Id}",
                 new PayoutItem(payout.Id, payout.VendorId, payout.CreatedOn, payout.GrossAmount,
-                    payout.CommissionAmount, payout.NetAmount, payout.OrderCount, payout.ExternalTransferReference));
+                    payout.CommissionAmount, payout.NetAmount, payout.OrderCount, payout.ExternalTransferReference,
+                    (int)payout.Method, (int)payout.Status, payout.SentOn, payout.CompletedOn));
+        });
+
+        // Wave 11: admin marks payout as sent / completed / failed once the actual
+        // provider transfer happens. Transition gate prevents accidental rewinds.
+        group.MapPatch("/payouts/{payoutId:long}/status", async (
+            long payoutId,
+            UpdatePayoutStatusRequest req,
+            IRepository<VendorPayout> payouts) =>
+        {
+            var p = await payouts.Query().FirstOrDefaultAsync(x => x.Id == payoutId);
+            if (p is null) return Results.NotFound();
+            if (!Enum.IsDefined(typeof(PayoutStatus), req.NewStatus))
+            {
+                return Results.BadRequest(new { error = "Invalid status." });
+            }
+            var next = (PayoutStatus)req.NewStatus;
+            if (!IsPayoutTransitionAllowed(p.Status, next))
+            {
+                return Results.BadRequest(new { error = $"Invalid transition {p.Status} → {next}." });
+            }
+            p.Status = next;
+            if (next == PayoutStatus.Sent && p.SentOn is null) p.SentOn = DateTimeOffset.UtcNow;
+            if (next == PayoutStatus.Completed && p.CompletedOn is null) p.CompletedOn = DateTimeOffset.UtcNow;
+            if (!string.IsNullOrWhiteSpace(req.ExternalTransferReference))
+            {
+                p.ExternalTransferReference = req.ExternalTransferReference;
+            }
+            if (!string.IsNullOrWhiteSpace(req.ProviderResponse))
+            {
+                // Truncate to fit the column instead of erroring — provider blobs
+                // can be huge and we'd rather keep the audit than reject the
+                // status update.
+                p.ProviderResponse = req.ProviderResponse.Length > 4000
+                    ? req.ProviderResponse[..4000]
+                    : req.ProviderResponse;
+            }
+            await payouts.SaveChangesAsync();
+            return Results.NoContent();
         });
 
         return app;
     }
+
+    private static bool IsPayoutTransitionAllowed(PayoutStatus from, PayoutStatus to) =>
+        (from, to) switch
+        {
+            (PayoutStatus.Pending, PayoutStatus.Sent) => true,
+            (PayoutStatus.Pending, PayoutStatus.Failed) => true,
+            (PayoutStatus.Sent, PayoutStatus.Completed) => true,
+            (PayoutStatus.Sent, PayoutStatus.Failed) => true,
+            (PayoutStatus.Failed, PayoutStatus.Pending) => true,   // admin retries
+            _ => false,
+        };
 }
