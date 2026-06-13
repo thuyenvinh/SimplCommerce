@@ -52,10 +52,22 @@ the three application projects (api, admin, storefront). Wait for the Aspire
 dashboard to mark all resources `Running`. Note the port that `admin` is bound
 to and set `E2E__AdminBaseUrl` accordingly (Aspire picks a port on each launch).
 
+## CI gating
+
+Every test in this project is tagged with `[Category("RequiresDocker")]` at
+the assembly level, matching the existing `Testcontainers.MsSql` integration
+suite. The main CI `build-test` job filters them out with
+`--filter "Category!=RequiresDocker"` so it doesn't try to drive a Blazor app
+that isn't running on the runner. A dedicated integration-tests job (with
+Docker-in-Docker) is where E2E + Testcontainers tests belong.
+
 ## Running the tests
 
 ```bash
-# Full suite
+# Full suite — only runs when category filter doesn't exclude
+dotnet test tests/SimplCommerce.E2ETests --filter "Category=RequiresDocker"
+
+# Same as above (no filter — runs everything in the project)
 dotnet test tests/SimplCommerce.E2ETests
 
 # Single class
