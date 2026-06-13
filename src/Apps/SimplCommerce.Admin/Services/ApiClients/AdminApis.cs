@@ -327,6 +327,9 @@ public interface IAdminVendorsApi
     Task<AdminVendorApplicationsPage?> ListApplicationsAsync(int? status = null, int page = 1, int pageSize = 20, CancellationToken ct = default);
     Task<HttpResponseMessage> ApproveApplicationAsync(long id, AdminVendorApplicationDecision req, CancellationToken ct = default);
     Task<HttpResponseMessage> RejectApplicationAsync(long id, AdminVendorApplicationDecision req, CancellationToken ct = default);
+
+    // Wave 9: dashboard bootstrap. Returns null on 204 (admin caller, no vendor context).
+    Task<AdminVendorSelfResponse?> GetSelfAsync(CancellationToken ct = default);
 }
 
 public sealed class AdminVendorsApi(HttpClient http) : IAdminVendorsApi
@@ -358,6 +361,16 @@ public sealed class AdminVendorsApi(HttpClient http) : IAdminVendorsApi
 
     public Task<HttpResponseMessage> RejectApplicationAsync(long id, AdminVendorApplicationDecision req, CancellationToken ct) =>
         http.PostAsJsonAsync($"/api/admin/vendors/applications/{id}/reject", req, ct);
+
+    public async Task<AdminVendorSelfResponse?> GetSelfAsync(CancellationToken ct)
+    {
+        // 204 No Content = admin / no vendor context; treat as null so the
+        // dashboard renders its admin view.
+        using var resp = await http.GetAsync("/api/admin/vendors/me", ct);
+        if (resp.StatusCode == System.Net.HttpStatusCode.NoContent) return null;
+        if (!resp.IsSuccessStatusCode) return null;
+        return await resp.Content.ReadFromJsonAsync<AdminVendorSelfResponse>(cancellationToken: ct);
+    }
 }
 
 public interface IAdminTaxApi

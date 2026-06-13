@@ -54,6 +54,9 @@ public record AdminVendorApplicationItem(
     long? CreatedVendorId);
 public record AdminVendorApplicationsPage(int Total, int Page, int PageSize, IReadOnlyList<AdminVendorApplicationItem> Items);
 public record AdminVendorApplicationDecision(string? Note);
+public record AdminVendorBalanceSummary(long VendorId, string VendorName, decimal PendingPayoutGross, decimal PendingCommission, int EligibleOrderCount);
+public record AdminVendorPayoutItem(long Id, long VendorId, DateTimeOffset CreatedOn, decimal GrossAmount, decimal CommissionAmount, decimal NetAmount, int OrderCount, string? ExternalTransferReference);
+public record AdminVendorSelfResponse(AdminVendorDetail Vendor, AdminVendorBalanceSummary Balance);
 
 // --- Shipments admin ---
 public record AdminShipmentListItem(long Id, long OrderId, string? TrackingNumber, long WarehouseId, int Status, DateTimeOffset CreatedOn, int ItemCount);
@@ -97,7 +100,7 @@ public record AdminActivityPage(int Total, int Page, int PageSize, IReadOnlyList
 
 // --- Vendors admin ---
 public record AdminVendorItem(long Id, string Name, string Slug, string? Description, bool IsActive);
-public record AdminVendorDetail(long Id, string Name, string Slug, string? Description, string? Email, bool IsActive, DateTimeOffset CreatedOn);
+public record AdminVendorDetail(long Id, string Name, string Slug, string? Description, string? Email, bool IsActive, decimal CommissionPercent, DateTimeOffset CreatedOn);
 public record AdminVendorInput(string Name, string Slug, string? Description, string? Email, bool IsActive);
 
 // --- Tax admin ---

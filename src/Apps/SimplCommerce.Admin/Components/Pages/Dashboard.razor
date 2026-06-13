@@ -2,86 +2,153 @@
 @rendermode RenderMode.InteractiveServer
 @inject IAdminOrdersApi Orders
 @inject IAdminCatalogApi Catalog
+@inject IAdminVendorsApi Vendors
 
 <PageTitle>Dashboard — Admin</PageTitle>
-<MudText Typo="Typo.h4" Class="mb-4">Dashboard</MudText>
 
-<MudGrid>
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Class="pa-4">
-            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Orders (recent page)</MudText>
-            <MudText Typo="Typo.h4">@(_orders?.Total.ToString() ?? "…")</MudText>
-        </MudPaper>
-    </MudItem>
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Class="pa-4">
-            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Products indexed</MudText>
-            <MudText Typo="Typo.h4">@(_products?.Total.ToString() ?? "…")</MudText>
-        </MudPaper>
-    </MudItem>
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Class="pa-4">
-            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Brands</MudText>
-            <MudText Typo="Typo.h4">@(_brandsCount?.ToString() ?? "…")</MudText>
-        </MudPaper>
-    </MudItem>
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Class="pa-4">
-            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Categories</MudText>
-            <MudText Typo="Typo.h4">@(_categoriesCount?.ToString() ?? "…")</MudText>
-        </MudPaper>
-    </MudItem>
-    <MudItem xs="12" md="8">
-        <MudPaper Class="pa-4">
-            <MudText Typo="Typo.h6" Class="mb-2">Recent orders</MudText>
-            @if (_orders?.Items is null)
-            {
-                <MudProgressCircular Indeterminate="true" />
-            }
-            else if (_orders.Items.Count == 0)
-            {
-                <MudAlert Severity="Severity.Info">No orders yet.</MudAlert>
-            }
-            else
-            {
-                <MudSimpleTable Hover="true" Dense="true">
-                    <thead>
-                        <tr><th>#</th><th>Placed</th><th>Customer</th><th>Total</th><th>Status</th></tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var o in _orders.Items.Take(8))
-                        {
-                            <tr>
-                                <td>@o.Id</td>
-                                <td>@o.CreatedOn.ToLocalTime().ToString("g")</td>
-                                <td>@o.Customer.FullName (@o.Customer.Email)</td>
-                                <td>@o.OrderTotal.ToString("C")</td>
-                                <td>@o.OrderStatus</td>
-                            </tr>
-                        }
-                    </tbody>
-                </MudSimpleTable>
-            }
-        </MudPaper>
-    </MudItem>
-</MudGrid>
+@if (_loading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_self is { } self)
+{
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudText Typo="Typo.h4">@self.Vendor.Name</MudText>
+        <MudChip T="string" Color="Color.Primary" Size="Size.Small">Vendor</MudChip>
+        <MudSpacer />
+        <MudText Typo="Typo.caption">Commission rate: @self.Vendor.CommissionPercent.ToString("0.##")%</MudText>
+    </MudStack>
+
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Pending payout (net)</MudText>
+                <MudText Typo="Typo.h4">@((self.Balance.PendingPayoutGross - self.Balance.PendingCommission).ToString("C"))</MudText>
+                <MudText Typo="Typo.caption">@self.Balance.EligibleOrderCount eligible orders</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Pending gross</MudText>
+                <MudText Typo="Typo.h4">@self.Balance.PendingPayoutGross.ToString("C")</MudText>
+                <MudText Typo="Typo.caption">Commission: @self.Balance.PendingCommission.ToString("C")</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Orders (this page)</MudText>
+                <MudText Typo="Typo.h4">@(_orders?.Total.ToString() ?? "…")</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Products</MudText>
+                <MudText Typo="Typo.h4">@(_products?.Total.ToString() ?? "…")</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-2">Recent orders</MudText>
+                @if (_orders?.Items is null) { <MudProgressCircular Indeterminate="true" /> }
+                else if (_orders.Items.Count == 0) { <MudAlert Severity="Severity.Info">No orders yet.</MudAlert> }
+                else
+                {
+                    <MudSimpleTable Hover="true" Dense="true">
+                        <thead><tr><th>#</th><th>Placed</th><th>Customer</th><th>Total</th><th>Status</th></tr></thead>
+                        <tbody>
+                            @foreach (var o in _orders.Items.Take(8))
+                            {
+                                <tr><td>@o.Id</td><td>@o.CreatedOn.ToLocalTime().ToString("g")</td><td>@o.Customer.FullName (@o.Customer.Email)</td><td>@o.OrderTotal.ToString("C")</td><td>@o.OrderStatus</td></tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+else
+{
+    @* Wave 9: admin (no vendor context) — original platform-wide KPIs *@
+    <MudText Typo="Typo.h4" Class="mb-4">Dashboard</MudText>
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Orders (recent page)</MudText>
+                <MudText Typo="Typo.h4">@(_orders?.Total.ToString() ?? "…")</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Products indexed</MudText>
+                <MudText Typo="Typo.h4">@(_products?.Total.ToString() ?? "…")</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Brands</MudText>
+                <MudText Typo="Typo.h4">@(_brandsCount?.ToString() ?? "…")</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Categories</MudText>
+                <MudText Typo="Typo.h4">@(_categoriesCount?.ToString() ?? "…")</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-2">Recent orders</MudText>
+                @if (_orders?.Items is null) { <MudProgressCircular Indeterminate="true" /> }
+                else if (_orders.Items.Count == 0) { <MudAlert Severity="Severity.Info">No orders yet.</MudAlert> }
+                else
+                {
+                    <MudSimpleTable Hover="true" Dense="true">
+                        <thead><tr><th>#</th><th>Placed</th><th>Customer</th><th>Total</th><th>Status</th></tr></thead>
+                        <tbody>
+                            @foreach (var o in _orders.Items.Take(8))
+                            {
+                                <tr><td>@o.Id</td><td>@o.CreatedOn.ToLocalTime().ToString("g")</td><td>@o.Customer.FullName (@o.Customer.Email)</td><td>@o.OrderTotal.ToString("C")</td><td>@o.OrderStatus</td></tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
 
 @code {
+    private AdminVendorSelfResponse? _self;
     private AdminOrdersPage? _orders;
     private ProductsPage? _products;
     private int? _brandsCount;
     private int? _categoriesCount;
+    private bool _loading = true;
 
     protected override async Task OnInitializedAsync()
     {
+        // Bootstrap path: ask /vendors/me first so we know whether to render
+        // the vendor or admin dashboard. Other API calls then run in parallel.
+        _self = await Vendors.GetSelfAsync();
         var ordersTask = Orders.ListAsync(pageSize: 20);
         var productsTask = Catalog.ListProductsAsync(pageSize: 1);
-        var brandsTask = Catalog.ListBrandsAsync();
-        var categoriesTask = Catalog.ListCategoriesAsync();
-        await Task.WhenAll(ordersTask, productsTask, brandsTask, categoriesTask);
-        _orders = ordersTask.Result;
-        _products = productsTask.Result;
-        _brandsCount = brandsTask.Result?.Count;
-        _categoriesCount = categoriesTask.Result?.Count;
+        if (_self is null)
+        {
+            var brandsTask = Catalog.ListBrandsAsync();
+            var categoriesTask = Catalog.ListCategoriesAsync();
+            await Task.WhenAll(ordersTask, productsTask, brandsTask, categoriesTask);
+            _orders = ordersTask.Result;
+            _products = productsTask.Result;
+            _brandsCount = brandsTask.Result?.Count;
+            _categoriesCount = categoriesTask.Result?.Count;
+        }
+        else
+        {
+            await Task.WhenAll(ordersTask, productsTask);
+            _orders = ordersTask.Result;
+            _products = productsTask.Result;
+        }
+        _loading = false;
     }
 }

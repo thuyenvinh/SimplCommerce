@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using SimplCommerce.Infrastructure.Data;
+using SimplCommerce.Infrastructure.Web;
 using SimplCommerce.Module.Core.Models;
 using SimplCommerce.Module.Orders.Models;
 using SimplCommerce.Module.Vendors.Models;
@@ -18,6 +19,11 @@ public static class VendorsAdminEndpoints
 {
     public record VendorInput(string Name, string Slug, string? Description, string? Email, bool IsActive, decimal CommissionPercent = 0m);
     public record VendorDetail(long Id, string Name, string Slug, string? Description, string? Email, bool IsActive, decimal CommissionPercent, System.DateTimeOffset CreatedOn);
+
+    // Wave 9: dashboard "self" endpoint. Vendor logs in, gets back their own
+    // profile + pending balance for the dashboard top strip. AdminOnly tier
+    // returns 204 — the dashboard then renders its admin view instead.
+    public record VendorSelfResponse(VendorDetail Vendor, VendorBalanceSummary Balance);
 
     // Wave 8: payout reporting + creation
     public record VendorBalanceSummary(long VendorId, string VendorName, decimal PendingPayoutGross, decimal PendingCommission, int EligibleOrderCount);
@@ -38,6 +44,25 @@ public static class VendorsAdminEndpoints
                 .ToListAsync();
             return Results.Ok(list);
         });
+
+        // Wave 9: vendor dashboard bootstrap. Both admin and vendor can hit this;
+        // admin gets 204 (no vendor context), vendor gets profile + pending balance.
+        group.MapGet("/me", async (IRepository<Vendor> vendors, IRepository<Order> orders, IVendorScope scope) =>
+        {
+            if (scope.CurrentVendorId is not { } vid) return Results.NoContent();
+            var v = await vendors.Query().FirstOrDefaultAsync(x => x.Id == vid && !x.IsDeleted);
+            if (v is null) return Results.NotFound();
+            var eligible = orders.Query()
+                .Where(o => o.VendorId == vid
+                    && o.OrderStatus == OrderStatus.Complete
+                    && o.VendorPayoutId == null);
+            var grossSubtotal = await eligible.SumAsync(o => (decimal?)o.SubTotal) ?? 0m;
+            var commission = await eligible.SumAsync(o => (decimal?)o.CommissionAmount) ?? 0m;
+            var count = await eligible.CountAsync();
+            return Results.Ok(new VendorSelfResponse(
+                new VendorDetail(v.Id, v.Name, v.Slug, v.Description, v.Email, v.IsActive, v.CommissionPercent, v.CreatedOn),
+                new VendorBalanceSummary(v.Id, v.Name, grossSubtotal, commission, count)));
+        }).RequireAuthorization("AdminOrVendor");
 
         group.MapGet("/{id:long}", async (long id, IRepository<Vendor> repo) =>
         {
