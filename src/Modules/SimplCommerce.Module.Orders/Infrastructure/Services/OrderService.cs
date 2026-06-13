@@ -330,15 +330,27 @@ namespace SimplCommerce.Module.Orders.Services
                 order.IsMasterOrder = true;
             }
 
-            // Wave 8: pull commission rates for every vendor involved in one shot
-            // so each sub-order doesn't issue its own SELECT. Missing vendor row
-            // (deleted between cart-add and checkout) → 0% commission (vendor
-            // keeps everything; admin will catch the orphan in payouts UI).
-            var vendorCommissions = vendorIds.Count == 0
-                ? new Dictionary<long, decimal>()
+            // Wave 8 + 16: pull commission rates AND shipping flat fees for every
+            // vendor involved in one shot so each sub-order doesn't issue its own
+            // SELECT. Missing vendor row (deleted between cart-add and checkout)
+            // → 0% commission and 0 shipping fee (vendor keeps everything; admin
+            // catches the orphan in payouts UI).
+            var vendorMeta = vendorIds.Count == 0
+                ? new Dictionary<long, VendorPricingMeta>()
                 : await _vendorRepository.Query()
                     .Where(v => vendorIds.Contains(v.Id))
-                    .ToDictionaryAsync(v => v.Id, v => v.CommissionPercent);
+                    .Select(v => new VendorPricingMeta(v.Id, v.CommissionPercent, v.ShippingFlatFee))
+                    .ToDictionaryAsync(v => v.VendorId, v => v);
+
+            // Wave 16: sum vendor shipping fees so the master order's total
+            // includes them — customer pays platform shipping + every vendor's
+            // handling charge in one transaction.
+            var vendorShippingTotal = vendorMeta.Values.Sum(m => m.ShippingFlatFee);
+            if (vendorShippingTotal > 0m)
+            {
+                order.ShippingFeeAmount += vendorShippingTotal;
+                order.OrderTotal += vendorShippingTotal;
+            }
 
             IList<Order> subOrders = new List<Order>();
             foreach (var vendorId in vendorIds)
@@ -384,12 +396,16 @@ namespace SimplCommerce.Module.Orders.Services
 
                 subOrder.SubTotal = subOrder.OrderItems.Sum(x => x.ProductPrice * x.Quantity);
                 subOrder.TaxAmount = subOrder.OrderItems.Sum(x => x.TaxAmount);
+                // Wave 16: stamp the vendor's flat shipping fee on the sub-order
+                // so payout reports attribute correctly (the customer-side total
+                // already added it to the master in the bulk-load step above).
+                var meta = vendorMeta.TryGetValue(vendorId, out var m) ? m : new VendorPricingMeta(vendorId, 0m, 0m);
+                subOrder.ShippingFeeAmount = meta.ShippingFlatFee;
                 subOrder.OrderTotal = subOrder.SubTotal + subOrder.TaxAmount + subOrder.ShippingFeeAmount - subOrder.DiscountAmount;
                 // Wave 8: commission on the goods subtotal (not on tax/shipping —
                 // platform doesn't claim a cut on the tax it remits or the carrier
                 // fee it forwards). Truncated to 2 decimals to match the column.
-                var rate = vendorCommissions.TryGetValue(vendorId, out var r) ? r : 0m;
-                subOrder.CommissionAmount = System.Math.Round(subOrder.SubTotal * rate / 100m, 2);
+                subOrder.CommissionAmount = System.Math.Round(subOrder.SubTotal * meta.CommissionPercent / 100m, 2);
                 _orderRepository.Add(subOrder);
                 subOrders.Add(subOrder);
             }
@@ -489,5 +505,11 @@ namespace SimplCommerce.Module.Orders.Services
 
             return Result.Ok(shippingMethod);
         }
+
+        // Tiny projection so the bulk vendor-meta load preserves named members
+        // through ToDictionary. A regular ValueTuple loses property names once
+        // it travels through generic Dictionary value type — making the call site
+        // unreadable.
+        private sealed record VendorPricingMeta(long VendorId, decimal CommissionPercent, decimal ShippingFlatFee);
     }
 }

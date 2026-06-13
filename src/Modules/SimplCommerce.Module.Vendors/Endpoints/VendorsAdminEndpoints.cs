@@ -22,10 +22,12 @@ public static class VendorsAdminEndpoints
 {
     public record VendorInput(string Name, string Slug, string? Description, string? Email, bool IsActive,
         decimal CommissionPercent = 0m,
-        string? StripeAccountId = null, string? VnpayMerchantId = null, string? MomoPartnerCode = null);
+        string? StripeAccountId = null, string? VnpayMerchantId = null, string? MomoPartnerCode = null,
+        decimal ShippingFlatFee = 0m);
     public record VendorDetail(long Id, string Name, string Slug, string? Description, string? Email, bool IsActive,
         decimal CommissionPercent,
         string? StripeAccountId, string? VnpayMerchantId, string? MomoPartnerCode,
+        decimal ShippingFlatFee,
         System.DateTimeOffset CreatedOn);
 
     // Wave 9: dashboard "self" endpoint. Vendor logs in, gets back their own
@@ -70,7 +72,7 @@ public static class VendorsAdminEndpoints
             var commission = await eligible.SumAsync(o => (decimal?)o.CommissionAmount) ?? 0m;
             var count = await eligible.CountAsync();
             return Results.Ok(new VendorSelfResponse(
-                new VendorDetail(v.Id, v.Name, v.Slug, v.Description, v.Email, v.IsActive, v.CommissionPercent, v.StripeAccountId, v.VnpayMerchantId, v.MomoPartnerCode, v.CreatedOn),
+                new VendorDetail(v.Id, v.Name, v.Slug, v.Description, v.Email, v.IsActive, v.CommissionPercent, v.StripeAccountId, v.VnpayMerchantId, v.MomoPartnerCode, v.ShippingFlatFee, v.CreatedOn),
                 new VendorBalanceSummary(v.Id, v.Name, grossSubtotal, commission, count)));
         }).RequireAuthorization("AdminOrVendor");
 
@@ -79,7 +81,7 @@ public static class VendorsAdminEndpoints
             var v = await repo.Query().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
             return v is null
                 ? Results.NotFound()
-                : Results.Ok(new VendorDetail(v.Id, v.Name, v.Slug, v.Description, v.Email, v.IsActive, v.CommissionPercent, v.StripeAccountId, v.VnpayMerchantId, v.MomoPartnerCode, v.CreatedOn));
+                : Results.Ok(new VendorDetail(v.Id, v.Name, v.Slug, v.Description, v.Email, v.IsActive, v.CommissionPercent, v.StripeAccountId, v.VnpayMerchantId, v.MomoPartnerCode, v.ShippingFlatFee, v.CreatedOn));
         });
 
         group.MapPost("/", async (VendorInput input, IRepository<Vendor> repo) =>
@@ -99,6 +101,7 @@ public static class VendorsAdminEndpoints
                 StripeAccountId = input.StripeAccountId ?? string.Empty,
                 VnpayMerchantId = input.VnpayMerchantId ?? string.Empty,
                 MomoPartnerCode = input.MomoPartnerCode ?? string.Empty,
+                ShippingFlatFee = input.ShippingFlatFee,
             };
             repo.Add(vendor);
             await repo.SaveChangesAsync();
@@ -125,6 +128,7 @@ public static class VendorsAdminEndpoints
             vendor.StripeAccountId = input.StripeAccountId ?? string.Empty;
             vendor.VnpayMerchantId = input.VnpayMerchantId ?? string.Empty;
             vendor.MomoPartnerCode = input.MomoPartnerCode ?? string.Empty;
+            vendor.ShippingFlatFee = input.ShippingFlatFee;
             vendor.LatestUpdatedOn = System.DateTimeOffset.UtcNow;
             await repo.SaveChangesAsync();
             return Results.NoContent();

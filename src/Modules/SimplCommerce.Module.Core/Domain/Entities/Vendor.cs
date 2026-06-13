@@ -52,6 +52,12 @@ namespace SimplCommerce.Module.Core.Models
         [StringLength(450)]
         public string MomoPartnerCode { get; set; }
 
+        // Wave 16: per-vendor shipping override. Flat fee added to the cart total
+        // for every order containing this vendor's items. Defaults to 0 — the
+        // platform-level shipping provider still applies on top; the vendor fee
+        // is a vendor-side handling charge, not a replacement.
+        public decimal ShippingFlatFee { get; set; }
+
         public IList<User> Users { get; set; } = new List<User>();
     }
 }
