@@ -373,6 +373,8 @@ app.MapVendorApplicationAdminEndpoints();
 app.MapVendorApplicationStorefrontEndpoints();
 // Wave 10: public vendor pages on the storefront.
 app.MapVendorsStorefrontEndpoints();
+// Wave 14: KYC document upload + verification workflow.
+app.MapVendorDocumentEndpoints();
 app.MapLocalizationAdminEndpoints();
 app.MapActivityLogAdminEndpoints();
 
