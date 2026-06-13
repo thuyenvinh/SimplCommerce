@@ -144,6 +144,12 @@ builder.Services
 
 builder.Services.AddScoped<JwtTokenService>();
 
+// Wave 6: vendor scoping. IVendorScope reads the JWT vendor_id claim per request
+// so admin endpoints can filter to the caller's own vendor without each handler
+// re-parsing the principal.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<SimplCommerce.Infrastructure.Web.IVendorScope, SimplCommerce.Infrastructure.Web.VendorScope>();
+
 builder.Services.AddWebhookVerifiers(builder.Configuration);
 builder.Services.AddMediaImagePipeline(resolvedWebRoot);
 

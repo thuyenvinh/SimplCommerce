@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using SimplCommerce.Infrastructure.Data;
+using SimplCommerce.Infrastructure.Web;
 using SimplCommerce.Module.Orders.Events;
 using SimplCommerce.Module.Orders.Models;
 using SimplCommerce.Module.Payments.Models;
@@ -57,12 +58,18 @@ public static class PaymentsAdminEndpoints
             return Results.NoContent();
         });
 
-        group.MapGet("/", async (IRepository<Payment> repo, int page = 1, int pageSize = 20) =>
+        group.MapGet("/", async (IRepository<Payment> repo, IRepository<Order> orders, IVendorScope scope, int page = 1, int pageSize = 20) =>
         {
             page = System.Math.Max(1, page);
             pageSize = System.Math.Clamp(pageSize, 1, 100);
-            var total = await repo.Query().CountAsync();
-            var rows = await repo.Query().OrderByDescending(p => p.CreatedOn)
+            var query = repo.Query();
+            // Wave 6: Payment carries OrderId but no VendorId; correlate via Order.
+            if (scope.CurrentVendorId is { } vid)
+            {
+                query = query.Where(p => orders.Query().Any(o => o.Id == p.OrderId && o.VendorId == vid));
+            }
+            var total = await query.CountAsync();
+            var rows = await query.OrderByDescending(p => p.CreatedOn)
                 .Skip((page - 1) * pageSize).Take(pageSize)
                 .Select(p => new { p.Id, p.OrderId, p.PaymentMethod, p.PaymentFee, p.Amount, p.RefundedAmount, p.Status, p.CreatedOn })
                 .ToListAsync();
@@ -73,6 +80,7 @@ public static class PaymentsAdminEndpoints
             RefundRequest req,
             IRepository<Payment> payments,
             IRepository<Order> orders,
+            IVendorScope scope,
             IMediator mediator) =>
         {
             if (req.Amount <= 0)
@@ -100,6 +108,8 @@ public static class PaymentsAdminEndpoints
             }
             var order = await orders.Query().FirstOrDefaultAsync(o => o.Id == req.OrderId);
             if (order is null) return Results.NotFound();
+            // Wave 6: vendor refund must target the vendor's own (sub-)order.
+            if (scope.CurrentVendorId is { } vid && order.VendorId != vid) return Results.NotFound();
 
             payment.RefundedAmount = refundedSoFar + req.Amount;
             payment.RefundedOn = DateTimeOffset.UtcNow;

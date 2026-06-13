@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using SimplCommerce.Infrastructure.Data;
+using SimplCommerce.Infrastructure.Web;
 using SimplCommerce.Module.Orders.Models;
 using SimplCommerce.Module.Shipments.Models;
 
@@ -44,9 +45,13 @@ public static class ShipmentsAdminEndpoints
             .WithTags("Admin.Shipments")
             .RequireAuthorization("AdminOrVendor");
 
-        group.MapGet("/", async (IRepository<Shipment> repo, long? orderId = null) =>
+        group.MapGet("/", async (IRepository<Shipment> repo, IVendorScope scope, long? orderId = null) =>
         {
             var query = repo.Query();
+            // Wave 6: vendor sees only shipments they created. Shipment.VendorId is
+            // stamped at creation time below (when running as vendor) — historical
+            // rows with null VendorId stay admin-only.
+            if (scope.CurrentVendorId is { } vid) query = query.Where(s => s.VendorId == vid);
             if (orderId.HasValue) query = query.Where(s => s.OrderId == orderId);
             var list = await query.OrderByDescending(s => s.CreatedOn)
                 .Select(s => new AdminShipmentItem(s.Id, s.OrderId, s.TrackingNumber,
@@ -55,22 +60,24 @@ public static class ShipmentsAdminEndpoints
             return Results.Ok(list);
         });
 
-        group.MapGet("/{id:long}", async (long id, IRepository<Shipment> repo) =>
+        group.MapGet("/{id:long}", async (long id, IRepository<Shipment> repo, IVendorScope scope) =>
         {
             var s = await repo.Query()
                 .Include(x => x.Items).ThenInclude(i => i.Product)
                 .FirstOrDefaultAsync(x => x.Id == id);
             if (s is null) return Results.NotFound();
+            if (scope.CurrentVendorId is { } vid && s.VendorId != vid) return Results.NotFound();
             return Results.Ok(new AdminShipmentDetail(s.Id, s.OrderId, s.TrackingNumber,
                 s.WarehouseId, s.Status, s.CreatedOn,
                 s.Items.Select(i => new AdminShipmentLine(i.Id, i.OrderItemId, i.ProductId,
                     i.Product?.Name ?? string.Empty, i.Quantity)).ToList()));
         });
 
-        group.MapPatch("/{id:long}/status", async (long id, UpdateShipmentStatusRequest req, IRepository<Shipment> repo) =>
+        group.MapPatch("/{id:long}/status", async (long id, UpdateShipmentStatusRequest req, IRepository<Shipment> repo, IVendorScope scope) =>
         {
             var s = await repo.Query().FirstOrDefaultAsync(x => x.Id == id);
             if (s is null) return Results.NotFound();
+            if (scope.CurrentVendorId is { } vid && s.VendorId != vid) return Results.NotFound();
             if (!IsValidTransition(s.Status, req.NewStatus))
             {
                 return Results.BadRequest(new { error = $"Invalid transition {s.Status} → {req.NewStatus}." });
@@ -85,11 +92,18 @@ public static class ShipmentsAdminEndpoints
             ShipmentInput input,
             IRepository<Shipment> repo,
             IRepository<Order> orderRepo,
+            IVendorScope scope,
             ClaimsPrincipal principal) =>
         {
-            if (!await orderRepo.Query().AnyAsync(o => o.Id == input.OrderId))
+            var order = await orderRepo.Query().FirstOrDefaultAsync(o => o.Id == input.OrderId);
+            if (order is null)
             {
                 return Results.BadRequest(new { error = "OrderId does not resolve to an order." });
+            }
+            // Wave 6: vendor can only ship an order that belongs to them.
+            if (scope.CurrentVendorId is { } vid && order.VendorId != vid)
+            {
+                return Results.BadRequest(new { error = "Order is not owned by this vendor." });
             }
             if (input.Items is null || input.Items.Count == 0)
             {
@@ -105,6 +119,8 @@ public static class ShipmentsAdminEndpoints
                 WarehouseId = input.WarehouseId,
                 TrackingNumber = input.TrackingNumber ?? string.Empty,
                 CreatedById = userId,
+                // Stamp VendorId so subsequent vendor queries can find this row.
+                VendorId = scope.CurrentVendorId ?? order.VendorId,
             };
             foreach (var line in input.Items)
             {
@@ -120,10 +136,11 @@ public static class ShipmentsAdminEndpoints
             return Results.Created($"/api/admin/shipments/{shipment.Id}", new { shipment.Id });
         });
 
-        group.MapDelete("/{id:long}", async (long id, IRepository<Shipment> repo) =>
+        group.MapDelete("/{id:long}", async (long id, IRepository<Shipment> repo, IVendorScope scope) =>
         {
             var s = await repo.Query().FirstOrDefaultAsync(x => x.Id == id);
             if (s is null) return Results.NotFound();
+            if (scope.CurrentVendorId is { } vid && s.VendorId != vid) return Results.NotFound();
             repo.Remove(s);
             await repo.SaveChangesAsync();
             return Results.NoContent();

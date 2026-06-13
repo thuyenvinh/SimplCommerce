@@ -52,6 +52,14 @@ public sealed class JwtTokenService
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
         };
         claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
+        // Wave 6: stamp vendor_id when the principal is a vendor user. Admin endpoints
+        // read this via VendorScope to filter queries down to the caller's own data.
+        // Absent claim → not a vendor → full admin visibility (still gated by the
+        // role check at the endpoint).
+        if (user.VendorId is { } vid)
+        {
+            claims.Add(new Claim("vendor_id", vid.ToString()));
+        }
 
         var signingCredentials = new SigningCredentials(
             new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_settings.SigningKey)),
