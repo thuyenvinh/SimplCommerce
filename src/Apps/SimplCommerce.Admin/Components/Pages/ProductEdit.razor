@@ -342,7 +342,11 @@ else
                 }
             }
             Snackbar.Add(Id is null ? "Product created." : "Product saved.", Severity.Success);
-            Nav.NavigateTo("/products");
+            // forceLoad: true triggers a full HTTP navigation rather than an
+            // in-circuit one. The in-circuit path disposes MainLayout (and its
+            // MudPopoverProvider) before the Snackbar's popover finishes
+            // rendering, which throws "Missing <MudPopoverProvider />".
+            Nav.NavigateTo("/products", forceLoad: true);
         }
         finally
         {
@@ -360,7 +364,7 @@ else
             return;
         }
         Snackbar.Add("Product deleted.", Severity.Success);
-        Nav.NavigateTo("/products");
+        Nav.NavigateTo("/products", forceLoad: true);
     }
 
     private static FormModel FromDto(ProductEditDto d) => new()

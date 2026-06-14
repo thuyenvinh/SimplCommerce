@@ -10,10 +10,11 @@
     <HeadOutlet />
 </head>
 <body>
-    @* No @rendermode at the Routes level so the per-page directive wins. Every
-       admin page declares @rendermode RenderMode.InteractiveServer except Login,
-       which stays SSR — cookie auth requires HttpContext.SignInAsync to set
-       headers before the response starts (impossible inside a SignalR circuit). *@
+    @* No @rendermode at the Routes level — each @page declares its own. Login
+       stays SSR (so its form post can set the auth cookie); every other page
+       declares @rendermode RenderMode.InteractiveServer and is rendered through
+       MainLayout, which itself opts into interactive mode so MudBlazor's
+       providers and the page components share the same circuit. *@
     <Routes />
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>

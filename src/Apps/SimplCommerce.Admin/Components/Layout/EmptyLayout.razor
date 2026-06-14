@@ -1,8 +1,6 @@
 @inherits LayoutComponentBase
 
-<MudThemeProvider IsDarkMode="false" Theme="AdminTheme.Instance" />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
+@* Providers moved to App.razor's MudProviders so they survive across pages —
+   especially the SSR /login → interactive admin transition. *@
 
 @Body
