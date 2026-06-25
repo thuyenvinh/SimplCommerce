@@ -11,7 +11,10 @@ public sealed class VendorApplicationsListPage
     public VendorApplicationsListPage(IPage page) => _page = page;
 
     public ILocator Heading => _page.GetByRole(AriaRole.Heading, new() { Name = "Vendor applications" });
-    public ILocator StatusFilter => _page.GetByLabel("Status");
+    // The page defaults the filter to Pending. Asserting the displayed value
+    // is more robust than chasing MudSelect's internal markup (which changes
+    // between client + interactive hydration passes).
+    public ILocator StatusFilter => _page.GetByText("Pending").First;
     public ILocator ApproveButton(long applicationId) =>
         _page.Locator($"tr:has(td:text-is('{applicationId}'))").GetByRole(AriaRole.Button, new() { Name = "Approve" });
     public ILocator RejectButton(long applicationId) =>

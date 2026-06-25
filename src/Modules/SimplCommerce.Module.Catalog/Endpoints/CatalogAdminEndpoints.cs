@@ -195,12 +195,20 @@ public static class CatalogAdminEndpoints
             return Results.Ok(dto);
         });
 
-        group.MapPost("/products", async (ProductInput input, IRepository<Product> repo, IVendorScope scope) =>
+        group.MapPost("/products", async (ProductInput input, IRepository<Product> repo, IVendorScope scope, System.Security.Claims.ClaimsPrincipal principal) =>
         {
             if (string.IsNullOrWhiteSpace(input.Name) || string.IsNullOrWhiteSpace(input.Slug))
             {
                 return Results.BadRequest(new { error = "Name and slug are required." });
             }
+            // Stamp CreatedById from the JWT sub so SQLite/SQL Server FK checks
+            // pass. Falling back to 0 was tolerated by SQL Server seed data (no FK)
+            // but rejected by Sqlite's strict FK enforcement and is wrong either
+            // way — the audit trail wants a real user id.
+            var rawUserId = principal.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value
+                ?? principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            long.TryParse(rawUserId, out var actingUserId);
+
             var product = new Product
             {
                 Name = input.Name, Slug = input.Slug, Sku = input.Sku,
@@ -216,6 +224,8 @@ public static class CatalogAdminEndpoints
                 StockQuantity = input.StockQuantity,
                 BrandId = input.BrandId,
                 IsVisibleIndividually = true,
+                CreatedById = actingUserId,
+                LatestUpdatedById = actingUserId,
                 // Wave 6: stamp VendorId from the caller's scope. Admins creating
                 // on behalf of a vendor must explicitly act-as via a future
                 // X-Vendor-As header; for now admin-created products are platform
@@ -234,13 +244,17 @@ public static class CatalogAdminEndpoints
             return Results.Created($"/api/admin/catalog/products/{product.Id}", new { product.Id });
         });
 
-        group.MapPut("/products/{id:long}", async (long id, ProductInput input, IRepository<Product> repo, IVendorScope scope) =>
+        group.MapPut("/products/{id:long}", async (long id, ProductInput input, IRepository<Product> repo, IVendorScope scope, System.Security.Claims.ClaimsPrincipal principal) =>
         {
             var product = await repo.Query()
                 .Include(p => p.Categories)
                 .FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
             if (product is null) return Results.NotFound();
             if (scope.CurrentVendorId is { } vid && product.VendorId != vid) return Results.NotFound();
+
+            var rawUserId = principal.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value
+                ?? principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            long.TryParse(rawUserId, out var actingUserId);
 
             product.Name = input.Name;
             product.Slug = input.Slug;
@@ -257,6 +271,7 @@ public static class CatalogAdminEndpoints
             product.StockTrackingIsEnabled = input.StockTrackingIsEnabled;
             product.StockQuantity = input.StockQuantity;
             product.BrandId = input.BrandId;
+            product.LatestUpdatedById = actingUserId;
             product.LatestUpdatedOn = System.DateTimeOffset.UtcNow;
 
             // G08: sync ProductCategory rows when the client sends an explicit list.

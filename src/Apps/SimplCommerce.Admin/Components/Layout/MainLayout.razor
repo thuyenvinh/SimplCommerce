@@ -1,17 +1,13 @@
 @inherits LayoutComponentBase
-@rendermode RenderMode.InteractiveServer
+@* No layout-level @rendermode: Blazor refuses RenderFragment 'Body' across the
+   SSR/Interactive boundary. App.razor's <Routes @rendermode="InteractiveServer"/>
+   makes the whole layout subtree interactive instead. *@
 
-@* MudBlazor providers — kept in the interactive Layout so popover services
-   register inside the same circuit that hosts the page's MudButton, MudTextField,
-   MudSelect etc. Layouts can carry @rendermode in .NET 9; without it the layout
-   renders SSR while each @page inside is interactive, leading to provider/service
-   scope mismatch and "Missing <MudPopoverProvider />" when a popover initialises. *@
 <MudThemeProvider IsDarkMode="_isDark" Theme="AdminTheme.Instance" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
-@* (Old comment block below is left in place for reference.) *@
 @* MudBlazor providers live in App.razor / MudProviders.razor now so popover
    registration survives across navigations and per-page interactive components
    always find them. Originally hosted here, but a save handler combining

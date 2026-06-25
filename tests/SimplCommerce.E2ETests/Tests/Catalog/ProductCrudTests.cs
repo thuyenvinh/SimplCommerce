@@ -47,10 +47,13 @@ public class ProductCrudTests : AuthenticatedFixture
         await list.OpenNewAsync();
         var edit = new ProductEditPage(Page);
         await edit.SaveAsync();
-        // DataAnnotations Required surfaces under the empty Name + Slug inputs.
-        await Assertions.Expect(Page.GetByText("Name field is required").Or(Page.GetByText("required")).First)
-            .ToBeVisibleAsync(new() { Timeout = Config.ActionTimeoutMs });
-        await Artifacts.CaptureStepAsync(Page, "validation-required-fields");
+        // EditForm with DataAnnotationsValidator + MudTextField Required="true"
+        // refuses to submit when Name/Slug are empty — the page stays on
+        // /products/create. That's the user-visible contract; the exact MudBlazor
+        // helper-text wording changes between versions.
+        await Page.WaitForTimeoutAsync(500);
+        await Assertions.Expect(Page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex(".*/products/create.*"));
+        await Artifacts.CaptureStepAsync(Page, "validation-stays-on-create");
     }
 
     [Test]

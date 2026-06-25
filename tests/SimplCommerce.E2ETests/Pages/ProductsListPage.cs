@@ -17,7 +17,10 @@ public sealed class ProductsListPage
     public ILocator NewProductButton => _page.GetByRole(AriaRole.Link, new() { Name = "New product" });
     public ILocator Table => _page.Locator("table.mud-table-root");
 
-    public ILocator RowByName(string name) => _page.GetByRole(AriaRole.Row, new() { Name = name });
+    // GetByRole(Row, Name=...) matches accessibility name which is the row's
+    // full text. Plain text-content match on the Name column is more reliable
+    // because the row also contains ID + price columns that change between runs.
+    public ILocator RowByName(string name) => _page.Locator("tbody tr").Filter(new() { HasText = name });
 
     public async Task GoToAsync()
     {
@@ -28,8 +31,10 @@ public sealed class ProductsListPage
     public async Task SearchAsync(string term)
     {
         await SearchField.FillAsync(term);
-        // ProductsList uses ValueChanged debounce; press Enter to force.
-        await SearchField.PressAsync("Enter");
+        // MudTextField uses Immediate=false + 400 ms debounce on
+        // OnDebounceIntervalElapsed; Enter doesn't bypass it. Wait the debounce
+        // window out, then for the network call to settle.
+        await _page.WaitForTimeoutAsync(500);
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
     }
 
@@ -41,7 +46,10 @@ public sealed class ProductsListPage
 
     public async Task OpenAsync(string productName)
     {
-        await RowByName(productName).First.ClickAsync();
+        // The MudTable row has no whole-row click — Edit lives behind the
+        // pencil MudIconButton (aria-label="Edit") in the Actions column.
+        await RowByName(productName).GetByLabel("Edit").First.ClickAsync();
+        await _page.WaitForURLAsync(u => u.Contains("/products/edit/"));
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
     }
 }

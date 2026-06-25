@@ -7,15 +7,17 @@
     <link rel="icon" type="image/png" href="favicon.png" />
     <link rel="stylesheet" href="_content/MudBlazor/MudBlazor.min.css" />
     <link rel="stylesheet" href="app.css" />
-    <HeadOutlet />
+    <HeadOutlet @rendermode="RenderMode.InteractiveServer" />
 </head>
 <body>
-    @* No @rendermode at the Routes level — each @page declares its own. Login
-       stays SSR (so its form post can set the auth cookie); every other page
-       declares @rendermode RenderMode.InteractiveServer and is rendered through
-       MainLayout, which itself opts into interactive mode so MudBlazor's
-       providers and the page components share the same circuit. *@
-    <Routes />
+    @* Routes back to InteractiveServer at the root so MainLayout (and its
+       MudPopoverProvider / MudSnackbarProvider / MudDialogProvider) registers
+       in the same circuit as every page. Login.razor used to throw "Headers
+       are read-only" when its OnValidSubmit handler called SignInAsync —
+       that's fixed differently: the Login form now submits as plain HTML
+       POST action="/signin" (a minimal-API endpoint), so it works regardless
+       of whether the page is interactive. *@
+    <Routes @rendermode="RenderMode.InteractiveServer" />
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
 </body>
