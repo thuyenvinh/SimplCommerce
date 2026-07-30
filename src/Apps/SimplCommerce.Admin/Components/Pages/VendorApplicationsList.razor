@@ -58,6 +58,8 @@ else
                 else { <span>—</span> }
             </MudTd>
             <MudTd>
+                <MudButton Size="Size.Small" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Description"
+                           OnClick="@(() => OpenDocuments(context))" Class="mr-1">Docs</MudButton>
                 @if (context.Status == 1)
                 {
                     <MudButton Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined"
@@ -67,7 +69,7 @@ else
                 }
                 else if (context.CreatedVendorId is { } vid)
                 {
-                    <MudButton Size="Size.Small" Variant="Variant.Text" Href="@($"/vendors")">View vendor #@vid</MudButton>
+                    <MudButton Size="Size.Small" Variant="Variant.Text" Href="@($"/vendors/{vid}/payouts")">Payouts</MudButton>
                 }
             </MudTd>
         </RowTemplate>
@@ -108,6 +110,47 @@ else
     </DialogActions>
 </MudDialog>
 
+<MudDialog @bind-Visible="_docsDialog" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })">
+    <TitleContent>KYC documents — @(_docsTarget?.BusinessName)</TitleContent>
+    <DialogContent>
+        @if (_docs is null)
+        {
+            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+        }
+        else if (_docs.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info">Applicant hasn't uploaded any documents.</MudAlert>
+        }
+        else
+        {
+            <MudTable T="AdminVendorDocumentItem" Items="_docs" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>Type</MudTh><MudTh>Status</MudTh><MudTh>Uploaded</MudTh>
+                    <MudTh>File</MudTh><MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@DocTypeLabel(context.DocumentType)</MudTd>
+                    <MudTd><MudChip T="string" Size="Size.Small" Color="@DocStatusColor(context.Status)">@DocStatusLabel(context.Status)</MudChip></MudTd>
+                    <MudTd>@context.CreatedOn.LocalDateTime.ToString("g")</MudTd>
+                    <MudTd><MudLink Href="@context.Url" Target="_blank">Open</MudLink></MudTd>
+                    <MudTd>
+                        @if (context.Status == 1)
+                        {
+                            <MudButton Size="Size.Small" Color="Color.Success" Variant="Variant.Text"
+                                       OnClick="@(() => SetDocStatus(context.Id, 5))">Verify</MudButton>
+                            <MudButton Size="Size.Small" Color="Color.Error" Variant="Variant.Text"
+                                       OnClick="@(() => SetDocStatus(context.Id, 10))">Reject</MudButton>
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _docsDialog = false)">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
     private AdminVendorApplicationsPage? _page;
     private int? _statusFilter = 1; // default: pending
@@ -116,6 +159,11 @@ else
     private bool _submitting;
     private AdminVendorApplicationItem? _target;
     private string? _decisionNote;
+
+    // Wave 18: KYC document review
+    private bool _docsDialog;
+    private AdminVendorApplicationItem? _docsTarget;
+    private IReadOnlyList<AdminVendorDocumentItem>? _docs;
 
     protected override async Task OnInitializedAsync() => await Reload();
 
@@ -165,6 +213,44 @@ else
             _submitting = false;
         }
     }
+
+    private async Task OpenDocuments(AdminVendorApplicationItem item)
+    {
+        _docsTarget = item;
+        _docs = null;
+        _docsDialog = true;
+        _docs = await Vendors.ListApplicationDocumentsAsync(item.Id);
+        StateHasChanged();
+    }
+
+    private async Task SetDocStatus(long docId, int newStatus)
+    {
+        using var resp = await Vendors.UpdateDocumentStatusAsync(docId, new AdminDocumentStatusUpdateRequest(newStatus, null));
+        if (!resp.IsSuccessStatusCode)
+        {
+            Snackbar.Add($"Update failed (HTTP {(int)resp.StatusCode}).", Severity.Error);
+            return;
+        }
+        Snackbar.Add(newStatus == 5 ? "Document verified." : "Document rejected.", Severity.Success);
+        if (_docsTarget is not null) _docs = await Vendors.ListApplicationDocumentsAsync(_docsTarget.Id);
+        StateHasChanged();
+    }
+
+    private static string DocTypeLabel(int t) => t switch
+    {
+        1 => "Business registration", 5 => "Tax ID", 10 => "Identity proof",
+        15 => "Bank statement", 20 => "Address proof", 90 => "Other", _ => t.ToString(),
+    };
+
+    private static string DocStatusLabel(int s) => s switch
+    {
+        1 => "Submitted", 5 => "Verified", 10 => "Rejected", _ => s.ToString(),
+    };
+
+    private static Color DocStatusColor(int s) => s switch
+    {
+        1 => Color.Warning, 5 => Color.Success, 10 => Color.Error, _ => Color.Default,
+    };
 
     private static Color StatusColor(int s) => s switch
     {

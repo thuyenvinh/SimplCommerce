@@ -55,8 +55,33 @@ public record AdminVendorApplicationItem(
 public record AdminVendorApplicationsPage(int Total, int Page, int PageSize, IReadOnlyList<AdminVendorApplicationItem> Items);
 public record AdminVendorApplicationDecision(string? Note);
 public record AdminVendorBalanceSummary(long VendorId, string VendorName, decimal PendingPayoutGross, decimal PendingCommission, int EligibleOrderCount);
-public record AdminVendorPayoutItem(long Id, long VendorId, DateTimeOffset CreatedOn, decimal GrossAmount, decimal CommissionAmount, decimal NetAmount, int OrderCount, string? ExternalTransferReference);
+// Wave 11 added Method/Status/SentOn/CompletedOn to the backend PayoutItem;
+// mirror them here so the Wave 18 payout UI can render the settlement lifecycle.
+public record AdminVendorPayoutItem(
+    long Id, long VendorId, DateTimeOffset CreatedOn,
+    decimal GrossAmount, decimal CommissionAmount, decimal NetAmount, int OrderCount,
+    string? ExternalTransferReference, int Method, int Status,
+    DateTimeOffset? SentOn, DateTimeOffset? CompletedOn);
+public record AdminVendorPayoutsPage(int Total, int Page, int PageSize, IReadOnlyList<AdminVendorPayoutItem> Items);
+public record AdminCreatePayoutRequest(string? ExternalTransferReference, string? Note, int Method = 1);
+public record AdminUpdatePayoutStatusRequest(int NewStatus, string? ExternalTransferReference, string? ProviderResponse);
 public record AdminVendorSelfResponse(AdminVendorDetail Vendor, AdminVendorBalanceSummary Balance);
+
+// --- Vendor KYC documents (Wave 14) ---
+public record AdminVendorDocumentItem(
+    long Id, int DocumentType, int Status, long MediaId, string Url,
+    DateTimeOffset CreatedOn, long? VendorApplicationId, long? VendorId,
+    DateTimeOffset? VerifiedOn, string? AdminNote);
+public record AdminDocumentStatusUpdateRequest(int NewStatus, string? AdminNote);
+
+// --- Vendor ↔ buyer messaging (Wave 15) ---
+public record AdminMessageThreadSummary(
+    long CounterpartUserId, string? CounterpartName, long VendorId, string VendorName,
+    DateTimeOffset LastMessageOn, string LastSnippet, int UnreadCount);
+public record AdminMessageItem(
+    long Id, int SenderKind, long FromUserId, string? FromName, long? OrderId,
+    string Body, DateTimeOffset CreatedOn, DateTimeOffset? ReadAt);
+public record AdminSendMessageRequest(string Body, long? OrderId);
 
 // --- Shipments admin ---
 public record AdminShipmentListItem(long Id, long OrderId, string? TrackingNumber, long WarehouseId, int Status, DateTimeOffset CreatedOn, int ItemCount);

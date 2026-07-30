@@ -3,6 +3,34 @@
 > Bản mirror của MIGRATION_TODO.md, tick trạng thái thực tế qua từng phase.
 > Legend: `[x]` = done, `[ ]` = pending, `[~]` = BLOCKED (cần user làm tay — ghi chú ngay dưới task), `[-]` = skipped/N/A (lý do ghi chú ngay dưới).
 
+## POST-MIGRATION WAVES (sau Phase 8 cutover)
+
+> Phase 0–8 migration đã xong. Các "wave" dưới đây build TRÊN nền post-cutover
+> (branch `claude/phase-8-destructive`), gồm gap-fix e-commerce + chuyển thành
+> marketplace multi-vendor + E2E test đầy đủ.
+
+- **Waves 1–5 + G09** — gap-analysis fixes (order events, refund flow, shipment
+  lifecycle, VNPay idempotency, variant CRUD, stock race, cart guards, Stripe
+  webhook side-effects, checkout price-lock, inline HTML email). 2 EF migrations.
+- **Waves 6–11** — marketplace: vendor scoping (JWT `vendor_id` + IVendorScope
+  trên mọi admin endpoint), self-onboarding + approval queue, commission engine,
+  vendor dashboard, public vendor storefront pages, payout settlement lifecycle.
+  4 EF migrations.
+- **Waves 12–17** — Stripe Connect SDK payout dispatch (IPayoutGateway), vendor-
+  scoped SignalR, KYC document upload/verify, buyer↔vendor messaging, per-vendor
+  flat shipping fee, CMS-editable email templates. 3 EF migrations.
+- **Wave 18** — vendor admin UI: per-vendor payouts page (balance + create +
+  settlement status), messaging inbox (thread list + reply), KYC document review
+  dialog on the applications queue.
+- **E2E (P7-04 → done)** — `tests/SimplCommerce.E2ETests/` Playwright-for-.NET
+  (NUnit) suite, **25/25 green**. No-Docker dev mode via `SIMPL_E2E_SQLITE` on the
+  ApiService lets the full stack run without SQL Server. Screenshots + videos +
+  traces under `Artifacts/`. Gated behind `Category=RequiresDocker` so the main CI
+  build-test job skips it (needs the running app stack).
+- **Unit/integration** — 196 non-Docker tests green throughout.
+
+---
+
 ## TRẠNG THÁI HIỆN TẠI
 - **Phase đang chạy:** Phase 0..7 done + **Phase 8 non-destructive done** (3 Dockerfiles + compose.yaml + .env.sample + .github/workflows/ci.yml + rewritten azure-pipelines.yml + CHANGELOG v2.0.0 + README rewrite + phase8-cutover-checklist.md). Destructive cutover (xóa WebHost, AngularJS templates, Razor Views, Controllers) **defer đến user** — cần runtime verify trên máy Docker trước. Full runbook trong `docs/migration/phase8-cutover-checklist.md`.
 - **Branch:** `claude/phase-0-migration-pX925`
@@ -493,7 +521,7 @@ Storefront endpoint groups đã tạo (9 groups):
 - [x] P7-01 | Unit tests (target ≥ 60%): **total 159 tests across 16 projects** (0 failing). New in this pass: Tax (7 — TaxService with MockQueryable async IQueryable), ShoppingCart (7 — CartService AddToCart paths + AddToCartResult), Orders (24 — Order/OrderItem invariants, all 12 OrderStatus enum values, OrderCreated/AfterOrderCreated/OrderChanged DTOs, OrderEmailService via mocked IEmailSender + IRazorViewRenderer), Reviews (13 — Review/Reply defaults, ReviewStatus/ReplyStatus enum stability, ReviewListItemDto field mapping), Payments (9 — Payment timestamps, PaymentStatus enum, PaymentProvider ctor). Coverlet + reportgenerator wired into CI (`tests/coverlet.runsettings`, `.github/workflows/ci.yml` emits cobertura + markdown summary + artifact). Prior pass (99 tests across 11 projects) retained: `SimplCommerce.ApiService.UnitTests` (41), `SimplCommerce.Module.Catalog.Tests` (8), `SimplCommerce.Storefront.UnitTests` (8)
 - [x] P7-02 | Integration E2E per flow: Testcontainers.MsSql + `WebApplicationFactory<Program>` live (P3-59..62). 3 happy-path tests in `HealthAndWebhookTests`; new flows are 1-class additions
 - [x] P7-03 | API contract tests: same factory used for endpoint contract assertions (Stripe webhook returns 401/503, products endpoint shape). Future contract tests just add `[Fact]`s under the same `[Collection("ApiServiceDb")]`
-- [~] P7-04 | Playwright E2E — BLOCKED-Docker
+- [x] P7-04 | Playwright E2E — **DONE** (`tests/SimplCommerce.E2ETests/`, NUnit + Microsoft.Playwright). 25/25 pass. No-Docker path via `SIMPL_E2E_SQLITE` on ApiService. Auth/Navigation/Catalog-CRUD/Orders/Vendors + documentation-flow captures. See Post-Migration Waves section above.
 
 ### 7.2 Performance
 - [x] P7-05 | k6 script tại `tools/loadtest/storefront.js`: 5 hot endpoints (/, /category/{slug}, /product/{slug}, /api/storefront/catalog/products, /api/storefront/search), ramp 50 VU, threshold p95<500ms + error rate <1%

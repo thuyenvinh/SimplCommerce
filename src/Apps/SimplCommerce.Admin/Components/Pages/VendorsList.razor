@@ -36,6 +36,8 @@
                 <MudTd>@context.Description</MudTd>
                 <MudTd>@(context.IsActive ? "✓" : "—")</MudTd>
                 <MudTd @onclick:stopPropagation="true">
+                    <MudIconButton Icon="@Icons.Material.Filled.Payments" Color="Color.Primary" Size="Size.Small"
+                                   Href="@($"/vendors/{context.Id}/payouts")" aria-label="Payouts" />
                     <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
                                    OnClick="@(() => Delete(context.Id))" aria-label="Delete" />
                 </MudTd>

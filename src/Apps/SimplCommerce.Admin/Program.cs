@@ -81,6 +81,9 @@ builder.Services.AddHttpClient<IAdminActivityApi, AdminActivityApi>(c => c.BaseA
     .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
 builder.Services.AddHttpClient<IAdminVendorsApi, AdminVendorsApi>(c => c.BaseAddress = new Uri(apiBase))
     .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
+// Wave 18: vendor ↔ buyer messaging inbox client.
+builder.Services.AddHttpClient<IAdminMessagesApi, AdminMessagesApi>(c => c.BaseAddress = new Uri(apiBase))
+    .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
 builder.Services.AddHttpClient<IAdminTaxApi, AdminTaxApi>(c => c.BaseAddress = new Uri(apiBase))
     .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
 builder.Services.AddHttpClient<IAdminShippingApi, AdminShippingApi>(c => c.BaseAddress = new Uri(apiBase))
