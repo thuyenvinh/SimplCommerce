@@ -48,6 +48,24 @@ public record CmsPageDto(long Id, string Name, string Slug, string? Body);
 public record NewsSummary(long Id, string Name, string Slug, string? ShortContent);
 public record NewsDetail(long Id, string Name, string Slug, string? ShortContent, string? FullContent);
 
+// --- Marketplace: public vendor pages (Wave 10) ---
+public record StorefrontVendorItem(long Id, string Name, string Slug, string? Description);
+public record StorefrontVendorDetail(long Id, string Name, string Slug, string? Description);
+public record StorefrontVendorProductItem(
+    long Id, string Name, string Slug, decimal Price, decimal? OldPrice,
+    string? ThumbnailUrl, bool IsCallForPricing, bool IsAllowToOrder,
+    double? RatingAverage, int ReviewsCount);
+public record StorefrontVendorProductsPage(int Total, int Page, int PageSize, IReadOnlyList<StorefrontVendorProductItem> Items);
+
+// --- Marketplace: become-a-vendor onboarding (Wave 7) ---
+public record VendorApplyRequest(string BusinessName, string Slug, string? Description, string? ContactEmail, string? ContactPhone, string? RegistrationNote);
+public record MyVendorApplication(long Id, string BusinessName, string Slug, int Status, DateTimeOffset CreatedOn, DateTimeOffset? DecidedOn, string? DecisionNote, long? CreatedVendorId);
+
+// --- Marketplace: buyer ↔ vendor messaging (Wave 15) ---
+public record VendorMessageThread(long CounterpartUserId, string? CounterpartName, long VendorId, string VendorName, DateTimeOffset LastMessageOn, string LastSnippet, int UnreadCount);
+public record VendorMessage(long Id, int SenderKind, long FromUserId, string? FromName, long? OrderId, string Body, DateTimeOffset CreatedOn, DateTimeOffset? ReadAt);
+public record SendVendorMessageRequest(string Body, long? OrderId);
+
 public record CheckoutStartResponse(Guid CheckoutId);
 public record CheckoutSummaryDto(
     Guid Id, decimal SubTotal, decimal Discount, decimal? ShippingAmount,

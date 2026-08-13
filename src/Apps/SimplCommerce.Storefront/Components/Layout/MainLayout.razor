@@ -11,6 +11,7 @@
             <MudText Typo="Typo.h5" Class="ml-2">SimplCommerce</MudText>
         </MudLink>
         <MudSpacer />
+        <MudButton Variant="Variant.Text" Color="Color.Inherit" Href="/vendors" StartIcon="@Icons.Material.Filled.Store" Class="mr-2">Shops</MudButton>
         <MudTextField T="string" @bind-Value="_search" Placeholder="Search products…"
             Variant="Variant.Outlined" Margin="Margin.Dense" Class="mr-4" Style="max-width: 400px"
             Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
@@ -21,6 +22,8 @@
                 <MudMenu Icon="@Icons.Material.Filled.Person" Color="Color.Inherit">
                     <MudMenuItem Href="/account">My account</MudMenuItem>
                     <MudMenuItem Href="/account/orders">Orders</MudMenuItem>
+                    <MudMenuItem Href="/account/messages">Messages</MudMenuItem>
+                    <MudMenuItem Href="/account/become-vendor">Become a vendor</MudMenuItem>
                     <MudMenuItem Href="/account/logout">Logout</MudMenuItem>
                 </MudMenu>
             </Authorized>

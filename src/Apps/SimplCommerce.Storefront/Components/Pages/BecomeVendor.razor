@@ -1,0 +1,120 @@
+@page "/account/become-vendor"
+@attribute [Authorize]
+@rendermode RenderMode.InteractiveServer
+@inject IVendorsApi Vendors
+@inject ISnackbar Snackbar
+
+<PageTitle>Become a vendor — SimplCommerce</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Sell on SimplCommerce</MudText>
+
+@if (!_loaded)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_existing is not null)
+{
+    <MudCard>
+        <MudCardContent>
+            <MudText Typo="Typo.h6">@_existing.BusinessName</MudText>
+            <MudText Typo="Typo.body2" Class="mb-2">/@_existing.Slug</MudText>
+            <MudChip T="string" Color="@StatusColor(_existing.Status)">@StatusLabel(_existing.Status)</MudChip>
+            <MudText Typo="Typo.caption" Class="mt-2">Submitted @_existing.CreatedOn.LocalDateTime.ToString("g")</MudText>
+            @if (_existing.DecidedOn is { } d)
+            {
+                <MudText Typo="Typo.body2" Class="mt-2">Reviewed @d.LocalDateTime.ToString("g")</MudText>
+                @if (!string.IsNullOrWhiteSpace(_existing.DecisionNote))
+                {
+                    <MudAlert Severity="Severity.Info" Class="mt-2">@_existing.DecisionNote</MudAlert>
+                }
+            }
+            @if (_existing.Status == 5)
+            {
+                <MudAlert Severity="Severity.Success" Class="mt-3">
+                    Your shop is live. Sign out and back in to pick up your vendor role,
+                    then open the admin app to manage products + orders.
+                </MudAlert>
+            }
+            else if (_existing.Status == 10)
+            {
+                <MudButton Class="mt-3" Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => _existing = null)">
+                    Re-apply
+                </MudButton>
+            }
+        </MudCardContent>
+    </MudCard>
+}
+else
+{
+    <MudText Typo="Typo.body1" Class="mb-4">
+        Open your own shop on the marketplace. Fill in your business details —
+        an admin reviews every application before your shop goes live.
+    </MudText>
+    <EditForm Model="_form" OnValidSubmit="Submit">
+        <DataAnnotationsValidator />
+        <MudGrid>
+            <MudItem xs="12" md="6"><MudTextField @bind-Value="_form.BusinessName" Label="Business name" Required="true" /></MudItem>
+            <MudItem xs="12" md="6"><MudTextField @bind-Value="_form.Slug" Label="Shop URL slug" Required="true" HelperText="Lowercase, hyphenated (e.g. acme-store)." /></MudItem>
+            <MudItem xs="12"><MudTextField @bind-Value="_form.Description" Label="Description" Lines="3" /></MudItem>
+            <MudItem xs="12" md="6"><MudTextField @bind-Value="_form.ContactEmail" Label="Contact email" /></MudItem>
+            <MudItem xs="12" md="6"><MudTextField @bind-Value="_form.ContactPhone" Label="Contact phone" /></MudItem>
+            <MudItem xs="12"><MudTextField @bind-Value="_form.RegistrationNote" Label="Business registration note" Lines="2" HelperText="Registration number / tax id — you can upload documents after applying." /></MudItem>
+        </MudGrid>
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-3">@_error</MudAlert>
+        }
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Class="mt-4" Disabled="_busy">
+            @(_busy ? "Submitting…" : "Submit application")
+        </MudButton>
+    </EditForm>
+}
+
+@code {
+    private MyVendorApplication? _existing;
+    private bool _loaded;
+    private bool _busy;
+    private string? _error;
+    private FormModel _form = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _existing = await Vendors.GetMyApplicationAsync();
+        // If the most recent application was rejected, let the customer re-apply
+        // by treating it as "no active application" for the form default.
+        if (_existing is { Status: 10 }) { /* keep showing rejected card with re-apply */ }
+        _loaded = true;
+    }
+
+    private async Task Submit()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var req = new VendorApplyRequest(_form.BusinessName, _form.Slug, _form.Description,
+                _form.ContactEmail, _form.ContactPhone, _form.RegistrationNote);
+            using var resp = await Vendors.ApplyAsync(req);
+            if (!resp.IsSuccessStatusCode)
+            {
+                _error = $"Application failed (HTTP {(int)resp.StatusCode}): {await resp.Content.ReadAsStringAsync()}";
+                return;
+            }
+            Snackbar.Add("Application submitted — we'll review it shortly.", Severity.Success);
+            _existing = await Vendors.GetMyApplicationAsync();
+        }
+        finally { _busy = false; }
+    }
+
+    private static string StatusLabel(int s) => s switch { 1 => "Pending review", 5 => "Approved", 10 => "Rejected", _ => s.ToString() };
+    private static Color StatusColor(int s) => s switch { 1 => Color.Warning, 5 => Color.Success, 10 => Color.Error, _ => Color.Default };
+
+    private sealed class FormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required] public string BusinessName { get; set; } = string.Empty;
+        [System.ComponentModel.DataAnnotations.Required] public string Slug { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public string? ContactEmail { get; set; }
+        public string? ContactPhone { get; set; }
+        public string? RegistrationNote { get; set; }
+    }
+}
