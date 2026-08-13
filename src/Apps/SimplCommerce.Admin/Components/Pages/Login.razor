@@ -1,57 +1,40 @@
 @page "/login"
 @layout SimplCommerce.Admin.Components.Layout.EmptyLayout
-@rendermode RenderMode.InteractiveServer
 @attribute [AllowAnonymous]
-@inject CookieAuthStateService AuthState
-@inject NavigationManager Nav
+@* Plain HTML form posting to /signin (a separate minimal API endpoint) is the
+   only way to set an auth cookie in Blazor Server: HttpContext.SignInAsync
+   needs the response headers to still be open, which they aren't once any
+   component has started rendering. *@
 
 <PageTitle>Sign in — Admin</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.ExtraSmall" Class="mt-16">
     <MudPaper Class="pa-6">
         <MudText Typo="Typo.h5" Class="mb-4">SimplCommerce admin</MudText>
-        <EditForm Model="_input" OnValidSubmit="HandleLogin" FormName="adminLogin">
-            <DataAnnotationsValidator />
-            <MudTextField @bind-Value="_input.Email" Label="Email" Required="true" />
-            <MudTextField @bind-Value="_input.Password" Label="Password" InputType="InputType.Password" Required="true" Class="mt-2" />
-            @if (_error is not null)
+        <form method="post" action="/signin" data-testid="login-form">
+            <input type="hidden" name="returnUrl" value="@ReturnUrl" />
+            <div class="mud-input-control mud-input-required mt-2">
+                <label class="mud-input-label" for="login-email">Email</label>
+                <input id="login-email" name="email" type="email" required="required" autofocus
+                    class="mud-input-slot mud-input-root mud-input-root-text" style="width:100%;padding:8px;border:0;border-bottom:1px solid #888;background:transparent;font-size:16px" />
+            </div>
+            <div class="mud-input-control mud-input-required mt-3">
+                <label class="mud-input-label" for="login-password">Password</label>
+                <input id="login-password" name="password" type="password" required="required"
+                    class="mud-input-slot mud-input-root mud-input-root-text" style="width:100%;padding:8px;border:0;border-bottom:1px solid #888;background:transparent;font-size:16px" />
+            </div>
+            @if (!string.IsNullOrEmpty(ErrorMessage))
             {
-                <MudAlert Severity="Severity.Error" Class="mt-3">@_error</MudAlert>
+                <MudAlert Severity="Severity.Error" Class="mt-3" role="alert">@ErrorMessage</MudAlert>
             }
-            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Class="mt-4" Disabled="_busy">Sign in</MudButton>
-        </EditForm>
+            <button type="submit" class="mud-button-root mud-button mud-button-filled mud-button-filled-primary mud-button-filled-size-medium mud-width-full mt-4">
+                <span class="mud-button-label">Sign in</span>
+            </button>
+        </form>
     </MudPaper>
 </MudContainer>
 
 @code {
     [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
-    private LoginInput _input = new();
-    private string? _error;
-    private bool _busy;
-
-    private async Task HandleLogin()
-    {
-        _busy = true;
-        _error = null;
-        var (ok, err) = await AuthState.SignInAsync(_input.Email, _input.Password);
-        _busy = false;
-        if (ok)
-        {
-            Nav.NavigateTo(string.IsNullOrWhiteSpace(ReturnUrl) ? "/" : "/" + ReturnUrl.TrimStart('/'), forceLoad: true);
-        }
-        else
-        {
-            _error = err;
-        }
-    }
-
-    public sealed class LoginInput
-    {
-        [System.ComponentModel.DataAnnotations.Required]
-        [System.ComponentModel.DataAnnotations.EmailAddress]
-        public string Email { get; set; } = string.Empty;
-
-        [System.ComponentModel.DataAnnotations.Required]
-        public string Password { get; set; } = string.Empty;
-    }
+    [SupplyParameterFromQuery(Name = "error")] public string? ErrorMessage { get; set; }
 }

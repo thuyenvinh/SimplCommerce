@@ -1,0 +1,66 @@
+@*
+    Generic presentational data-grid wrapper around MudTable.
+    No data fetching — the parent supplies Items / Loading.
+
+    Usage:
+
+      <EntityDataGrid T="ProductListItem" Items="_rows" Title="Products"
+                      NewHref="/products/create" NewText="New product">
+          <HeaderContent>
+              <MudTh>Name</MudTh>
+          </HeaderContent>
+          <RowTemplate>
+              <MudTd>@context.Name</MudTd>
+          </RowTemplate>
+      </EntityDataGrid>
+*@
+@typeparam T
+
+<MudPaper Class="pa-4">
+    @if (!string.IsNullOrEmpty(Title) || !string.IsNullOrEmpty(NewHref))
+    {
+        <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3">
+            @if (!string.IsNullOrEmpty(Title))
+            {
+                <MudText Typo="Typo.h6">@Title</MudText>
+            }
+            <MudSpacer />
+            @if (!string.IsNullOrEmpty(NewHref))
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add" Href="@NewHref">@NewText</MudButton>
+            }
+        </MudStack>
+    }
+
+    @if (Items is null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (Items.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">@EmptyText</MudAlert>
+    }
+    else
+    {
+        <MudTable T="T" Items="Items" Hover="true" Dense="true" Loading="Loading">
+            <HeaderContent>
+                @HeaderContent
+            </HeaderContent>
+            <RowTemplate>
+                @RowTemplate(context)
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    [Parameter] public IReadOnlyList<T>? Items { get; set; }
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public RenderFragment? HeaderContent { get; set; }
+    [Parameter] public RenderFragment<T> RowTemplate { get; set; } = default!;
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? NewHref { get; set; }
+    [Parameter] public string NewText { get; set; } = "New";
+    [Parameter] public string EmptyText { get; set; } = "No items to display.";
+}

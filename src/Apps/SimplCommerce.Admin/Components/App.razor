@@ -10,6 +10,13 @@
     <HeadOutlet @rendermode="RenderMode.InteractiveServer" />
 </head>
 <body>
+    @* Routes back to InteractiveServer at the root so MainLayout (and its
+       MudPopoverProvider / MudSnackbarProvider / MudDialogProvider) registers
+       in the same circuit as every page. Login.razor used to throw "Headers
+       are read-only" when its OnValidSubmit handler called SignInAsync —
+       that's fixed differently: the Login form now submits as plain HTML
+       POST action="/signin" (a minimal-API endpoint), so it works regardless
+       of whether the page is interactive. *@
     <Routes @rendermode="RenderMode.InteractiveServer" />
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>

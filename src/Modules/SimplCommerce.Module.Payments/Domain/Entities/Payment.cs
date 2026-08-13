@@ -34,5 +34,12 @@ namespace SimplCommerce.Module.Payments.Models
         public PaymentStatus Status { get; set; }
 
         public string FailureMessage { get; set; }
+
+        // G03: how much of Amount has actually been refunded. Null = no refunds.
+        // Status flips to Refunded only when RefundedAmount == Amount; partials
+        // keep Status = Succeeded so capture-vs-refund stays distinguishable.
+        public decimal? RefundedAmount { get; set; }
+
+        public DateTimeOffset? RefundedOn { get; set; }
     }
 }

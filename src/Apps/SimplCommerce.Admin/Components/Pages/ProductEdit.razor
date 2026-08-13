@@ -77,6 +77,98 @@ else
             </MudItem>
         </MudGrid>
     </EditForm>
+
+    @if (Id is { } parentId)
+    {
+        <MudPaper Class="pa-4 mt-4">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3">
+                <MudText Typo="Typo.h6">Variants</MudText>
+                <MudSpacer />
+                <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Outlined"
+                           Color="Color.Primary" OnClick="@StartNewVariant">Add variant</MudButton>
+            </MudStack>
+
+            @if (_variants is null)
+            {
+                <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+            }
+            else if (_variants.Count == 0 && _newVariant is null)
+            {
+                <MudAlert Severity="Severity.Info">
+                    No variants yet. Variants share the parent's brand + categories
+                    and only override per-SKU fields (name, SKU, price, stock).
+                </MudAlert>
+            }
+            else
+            {
+                <MudTable T="ProductVariantDto" Items="_variants" Dense="true" Hover="true">
+                    <HeaderContent>
+                        <MudTh>ID</MudTh><MudTh>Name</MudTh><MudTh>SKU</MudTh>
+                        <MudTh>Price</MudTh><MudTh>Stock</MudTh><MudTh>Published</MudTh><MudTh>Actions</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        @if (_editingVariantId == context.Id && _editForm is not null)
+                        {
+                            <MudTd>@context.Id</MudTd>
+                            <MudTd><MudTextField @bind-Value="_editForm.Name" Required="true" Margin="Margin.Dense" /></MudTd>
+                            <MudTd><MudTextField @bind-Value="_editForm.Sku" Margin="Margin.Dense" /></MudTd>
+                            <MudTd><MudNumericField @bind-Value="_editForm.Price" Format="F2" Min="0m" Margin="Margin.Dense" /></MudTd>
+                            <MudTd><MudNumericField @bind-Value="_editForm.StockQuantity" Min="0" Margin="Margin.Dense" /></MudTd>
+                            <MudTd><MudSwitch @bind-Value="_editForm.IsPublished" Color="Color.Primary" /></MudTd>
+                            <MudTd>
+                                <MudIconButton Icon="@Icons.Material.Filled.Save" Color="Color.Primary" Size="Size.Small"
+                                               OnClick="@(() => SaveEditedVariant(parentId, context.Id))"
+                                               Disabled="_savingVariant" aria-label="Save" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                                               OnClick="@CancelEdit" aria-label="Cancel" />
+                            </MudTd>
+                        }
+                        else
+                        {
+                            <MudTd>@context.Id</MudTd>
+                            <MudTd>@context.Name</MudTd>
+                            <MudTd>@context.Sku</MudTd>
+                            <MudTd>@context.Price.ToString("C")</MudTd>
+                            <MudTd>@context.StockQuantity</MudTd>
+                            <MudTd>
+                                <MudIcon Icon="@(context.IsPublished ? Icons.Material.Filled.Check : Icons.Material.Filled.Close)"
+                                         Color="@(context.IsPublished ? Color.Success : Color.Default)" Size="Size.Small" />
+                            </MudTd>
+                            <MudTd>
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                               OnClick="@(() => StartEditVariant(context))" aria-label="Edit variant" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                               OnClick="@(() => DeleteVariant(parentId, context.Id))" aria-label="Delete variant" />
+                            </MudTd>
+                        }
+                    </RowTemplate>
+                </MudTable>
+            }
+
+            @if (_newVariant is not null)
+            {
+                <MudPaper Class="pa-3 mt-3" Elevation="0" Outlined="true">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">New variant</MudText>
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" md="4"><MudTextField @bind-Value="_newVariant.Name" Label="Name" Required="true" /></MudItem>
+                        <MudItem xs="12" md="3"><MudTextField @bind-Value="_newVariant.Sku" Label="SKU" /></MudItem>
+                        <MudItem xs="6" md="2"><MudNumericField @bind-Value="_newVariant.Price" Label="Price" Format="F2" Min="0m" /></MudItem>
+                        <MudItem xs="6" md="2"><MudNumericField @bind-Value="_newVariant.StockQuantity" Label="Stock" Min="0" /></MudItem>
+                        <MudItem xs="12" md="1" Class="d-flex align-center">
+                            <MudSwitch @bind-Value="_newVariant.IsPublished" Color="Color.Primary" />
+                        </MudItem>
+                    </MudGrid>
+                    <MudStack Row="true" Class="mt-2">
+                        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                                   OnClick="@(() => SaveNewVariant(parentId))" Disabled="_savingVariant">
+                            @(_savingVariant ? "Saving…" : "Save variant")
+                        </MudButton>
+                        <MudButton OnClick="@(() => _newVariant = null)">Cancel</MudButton>
+                    </MudStack>
+                </MudPaper>
+            }
+        </MudPaper>
+    }
 }
 
 @code {
@@ -86,6 +178,12 @@ else
     private IReadOnlyList<BrandItem>? _brands;
     private bool _loading = true;
     private bool _saving;
+
+    private IReadOnlyList<ProductVariantDto>? _variants;
+    private VariantFormModel? _newVariant;
+    private long? _editingVariantId;
+    private VariantFormModel? _editForm;
+    private bool _savingVariant;
 
     protected override async Task OnInitializedAsync()
     {
@@ -100,8 +198,124 @@ else
                 return;
             }
             _form = FromDto(dto);
+            await ReloadVariants(id);
         }
         _loading = false;
+    }
+
+    private async Task ReloadVariants(long parentId)
+    {
+        _variants = await Catalog.ListVariantsAsync(parentId);
+        StateHasChanged();
+    }
+
+    private void StartNewVariant()
+    {
+        // Seed price + published from parent so the common case ("add a size that
+        // costs the same") is one click; admin can override before saving.
+        _newVariant = new VariantFormModel
+        {
+            Price = _form.Price,
+            IsPublished = _form.IsPublished,
+        };
+    }
+
+    private async Task SaveNewVariant(long parentId)
+    {
+        if (_newVariant is null) return;
+        if (string.IsNullOrWhiteSpace(_newVariant.Name))
+        {
+            Snackbar.Add("Variant name is required.", Severity.Warning);
+            return;
+        }
+        _savingVariant = true;
+        try
+        {
+            using var resp = await Catalog.CreateVariantAsync(parentId, _newVariant.ToInput());
+            if (!resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add($"Create failed (HTTP {(int)resp.StatusCode}).", Severity.Error);
+                return;
+            }
+            Snackbar.Add("Variant created.", Severity.Success);
+            _newVariant = null;
+            await ReloadVariants(parentId);
+        }
+        finally
+        {
+            _savingVariant = false;
+        }
+    }
+
+    private async Task DeleteVariant(long parentId, long variantId)
+    {
+        using var resp = await Catalog.DeleteVariantAsync(parentId, variantId);
+        if (!resp.IsSuccessStatusCode)
+        {
+            Snackbar.Add($"Delete failed (HTTP {(int)resp.StatusCode}).", Severity.Error);
+            return;
+        }
+        Snackbar.Add("Variant deleted.", Severity.Success);
+        await ReloadVariants(parentId);
+    }
+
+    private void StartEditVariant(ProductVariantDto v)
+    {
+        // Materialize a fresh form from the row so cancelling reverts cleanly. The
+        // dto is immutable (record) so we don't need to clone defensively.
+        _editingVariantId = v.Id;
+        _editForm = new VariantFormModel
+        {
+            Name = v.Name,
+            Sku = v.Sku,
+            Price = v.Price,
+            StockQuantity = v.StockQuantity,
+            IsPublished = v.IsPublished,
+        };
+    }
+
+    private void CancelEdit()
+    {
+        _editingVariantId = null;
+        _editForm = null;
+    }
+
+    private async Task SaveEditedVariant(long parentId, long variantId)
+    {
+        if (_editForm is null) return;
+        if (string.IsNullOrWhiteSpace(_editForm.Name))
+        {
+            Snackbar.Add("Variant name is required.", Severity.Warning);
+            return;
+        }
+        _savingVariant = true;
+        try
+        {
+            using var resp = await Catalog.UpdateVariantAsync(parentId, variantId, _editForm.ToInput());
+            if (!resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add($"Save failed (HTTP {(int)resp.StatusCode}).", Severity.Error);
+                return;
+            }
+            Snackbar.Add("Variant updated.", Severity.Success);
+            CancelEdit();
+            await ReloadVariants(parentId);
+        }
+        finally
+        {
+            _savingVariant = false;
+        }
+    }
+
+    private class VariantFormModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string? Sku { get; set; }
+        public decimal Price { get; set; }
+        public int StockQuantity { get; set; }
+        public bool IsPublished { get; set; } = true;
+
+        public ProductVariantInput ToInput() => new(Name, Sku, Price, OldPrice: null, StockQuantity, IsPublished);
     }
 
     private async Task Save()
@@ -128,7 +342,11 @@ else
                 }
             }
             Snackbar.Add(Id is null ? "Product created." : "Product saved.", Severity.Success);
-            Nav.NavigateTo("/products");
+            // forceLoad: true triggers a full HTTP navigation rather than an
+            // in-circuit one. The in-circuit path disposes MainLayout (and its
+            // MudPopoverProvider) before the Snackbar's popover finishes
+            // rendering, which throws "Missing <MudPopoverProvider />".
+            Nav.NavigateTo("/products", forceLoad: true);
         }
         finally
         {
@@ -146,7 +364,7 @@ else
             return;
         }
         Snackbar.Add("Product deleted.", Severity.Success);
-        Nav.NavigateTo("/products");
+        Nav.NavigateTo("/products", forceLoad: true);
     }
 
     private static FormModel FromDto(ProductEditDto d) => new()

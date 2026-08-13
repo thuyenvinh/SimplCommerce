@@ -31,6 +31,10 @@ public record ProductEditDto(
     bool StockTrackingIsEnabled, int StockQuantity,
     long? BrandId, IReadOnlyList<long> CategoryIds);
 
+// --- Product variants (G07) ---
+public record ProductVariantInput(string Name, string? Sku, decimal Price, decimal? OldPrice, int StockQuantity, bool IsPublished);
+public record ProductVariantDto(long Id, string Name, string Slug, string? Sku, decimal Price, decimal? OldPrice, int StockQuantity, bool IsPublished);
+
 // --- Orders admin ---
 public record AdminCustomerSummary(long Id, string? FullName, string? Email);
 public record AdminOrderListItem(long Id, DateTimeOffset CreatedOn, decimal OrderTotal, int OrderStatus, AdminCustomerSummary Customer);
@@ -38,6 +42,59 @@ public record AdminOrdersPage(int Total, int Page, int PageSize, IReadOnlyList<A
 public record UpdateOrderStatusRequest(int NewStatus);
 
 public record AdminOrderItemDto(long ProductId, string ProductName, int Quantity, decimal ProductPrice, decimal DiscountAmount);
+public record AdminOrderItemLite(long Id, long ProductId, string ProductName, int Quantity);
+
+// --- Vendor applications (Wave 7) ---
+public record AdminVendorApplicationItem(
+    long Id, long ApplicantUserId, string? ApplicantEmail,
+    string BusinessName, string Slug, string? Description,
+    string? ContactEmail, string? ContactPhone,
+    int Status, DateTimeOffset CreatedOn,
+    long? DecidedByUserId, DateTimeOffset? DecidedOn, string? DecisionNote,
+    long? CreatedVendorId);
+public record AdminVendorApplicationsPage(int Total, int Page, int PageSize, IReadOnlyList<AdminVendorApplicationItem> Items);
+public record AdminVendorApplicationDecision(string? Note);
+public record AdminVendorBalanceSummary(long VendorId, string VendorName, decimal PendingPayoutGross, decimal PendingCommission, int EligibleOrderCount);
+// Wave 11 added Method/Status/SentOn/CompletedOn to the backend PayoutItem;
+// mirror them here so the Wave 18 payout UI can render the settlement lifecycle.
+public record AdminVendorPayoutItem(
+    long Id, long VendorId, DateTimeOffset CreatedOn,
+    decimal GrossAmount, decimal CommissionAmount, decimal NetAmount, int OrderCount,
+    string? ExternalTransferReference, int Method, int Status,
+    DateTimeOffset? SentOn, DateTimeOffset? CompletedOn);
+public record AdminVendorPayoutsPage(int Total, int Page, int PageSize, IReadOnlyList<AdminVendorPayoutItem> Items);
+public record AdminCreatePayoutRequest(string? ExternalTransferReference, string? Note, int Method = 1);
+public record AdminUpdatePayoutStatusRequest(int NewStatus, string? ExternalTransferReference, string? ProviderResponse);
+public record AdminVendorSelfResponse(AdminVendorDetail Vendor, AdminVendorBalanceSummary Balance);
+
+// --- Vendor KYC documents (Wave 14) ---
+public record AdminVendorDocumentItem(
+    long Id, int DocumentType, int Status, long MediaId, string Url,
+    DateTimeOffset CreatedOn, long? VendorApplicationId, long? VendorId,
+    DateTimeOffset? VerifiedOn, string? AdminNote);
+public record AdminDocumentStatusUpdateRequest(int NewStatus, string? AdminNote);
+
+// --- Vendor ↔ buyer messaging (Wave 15) ---
+public record AdminMessageThreadSummary(
+    long CounterpartUserId, string? CounterpartName, long VendorId, string VendorName,
+    DateTimeOffset LastMessageOn, string LastSnippet, int UnreadCount);
+public record AdminMessageItem(
+    long Id, int SenderKind, long FromUserId, string? FromName, long? OrderId,
+    string Body, DateTimeOffset CreatedOn, DateTimeOffset? ReadAt);
+public record AdminSendMessageRequest(string Body, long? OrderId);
+
+// --- Shipments admin ---
+public record AdminShipmentListItem(long Id, long OrderId, string? TrackingNumber, long WarehouseId, int Status, DateTimeOffset CreatedOn, int ItemCount);
+public record AdminShipmentLine(long Id, long OrderItemId, long ProductId, string ProductName, int Quantity);
+public record AdminShipmentDetail(long Id, long OrderId, string? TrackingNumber, long WarehouseId, int Status, DateTimeOffset CreatedOn, IReadOnlyList<AdminShipmentLine> Items);
+public record AdminShipmentItemInput(long OrderItemId, long ProductId, int Quantity);
+public record AdminShipmentInput(long OrderId, long WarehouseId, string? TrackingNumber, IReadOnlyList<AdminShipmentItemInput> Items);
+public record AdminUpdateShipmentStatusRequest(int NewStatus);
+
+// --- Sales report ---
+public record AdminSalesReportRow(DateTime Day, int OrderCount, decimal Revenue);
+public record AdminSalesReportTotals(int OrderCount, decimal Revenue, DateTimeOffset From, DateTimeOffset To);
+public record AdminSalesReport(AdminSalesReportTotals Totals, IReadOnlyList<AdminSalesReportRow> Rows);
 public record AdminOrderAddressDto(string ContactName, string Phone, string AddressLine1, string? AddressLine2, string? City, string? ZipCode);
 public record AdminOrderDetail(
     long Id, DateTimeOffset CreatedOn, DateTimeOffset LatestUpdatedOn,
@@ -68,7 +125,7 @@ public record AdminActivityPage(int Total, int Page, int PageSize, IReadOnlyList
 
 // --- Vendors admin ---
 public record AdminVendorItem(long Id, string Name, string Slug, string? Description, bool IsActive);
-public record AdminVendorDetail(long Id, string Name, string Slug, string? Description, string? Email, bool IsActive, DateTimeOffset CreatedOn);
+public record AdminVendorDetail(long Id, string Name, string Slug, string? Description, string? Email, bool IsActive, decimal CommissionPercent, DateTimeOffset CreatedOn);
 public record AdminVendorInput(string Name, string Slug, string? Description, string? Email, bool IsActive);
 
 // --- Tax admin ---
@@ -97,8 +154,10 @@ public record AdminTableRateInput(string CountryId, long? StateOrProvinceId, lon
 public record AdminPaymentProviderItem(string Id, string Name, bool IsEnabled);
 public record AdminPaymentProviderDetail(string Id, string Name, bool IsEnabled, string? AdditionalSettings);
 public record AdminPaymentProviderInput(bool IsEnabled, string? AdditionalSettings);
-public record AdminPaymentItem(long Id, long OrderId, string? PaymentMethod, decimal PaymentFee, decimal Amount, int Status, DateTimeOffset CreatedOn);
+public record AdminPaymentItem(long Id, long OrderId, string? PaymentMethod, decimal PaymentFee, decimal Amount, decimal? RefundedAmount, int Status, DateTimeOffset CreatedOn);
 public record AdminPaymentsPage(int Total, int Page, int PageSize, IReadOnlyList<AdminPaymentItem> Items);
+public record AdminRefundRequest(long OrderId, decimal Amount, string? Reason);
+public record AdminRefundResponse(long PaymentId, decimal? RefundedAmount, decimal Remaining, int PaymentStatus, int OrderStatus);
 
 // --- News admin ---
 public record AdminNewsItemListItem(long Id, string Name, string Slug, bool IsPublished, DateTimeOffset CreatedOn);

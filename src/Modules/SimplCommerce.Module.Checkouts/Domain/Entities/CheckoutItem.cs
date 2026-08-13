@@ -17,5 +17,14 @@ namespace SimplCommerce.Module.Checkouts.Models
         public Guid CheckoutId { get; set; }
 
         public Checkout Checkout { get; set; }
+
+        // G14: snapshot of the product's calculated price at the moment the
+        // CheckoutItem was created. OrderService.CreateOrder compares this against
+        // the current Product.Price; a drift larger than the configured threshold
+        // (Catalog:PriceDriftThresholdPercent) rejects the order so the buyer
+        // doesn't get charged a different amount than they saw at checkout.
+        public decimal? LockedPrice { get; set; }
+
+        public DateTimeOffset? LockedPriceOn { get; set; }
     }
 }

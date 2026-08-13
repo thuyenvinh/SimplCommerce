@@ -30,6 +30,12 @@ public interface IAdminCatalogApi
     Task<HttpResponseMessage> CreateProductAsync(ProductInput input, CancellationToken ct = default);
     Task<HttpResponseMessage> UpdateProductAsync(long id, ProductInput input, CancellationToken ct = default);
     Task<HttpResponseMessage> DeleteProductAsync(long id, CancellationToken ct = default);
+
+    // G07: variant CRUD
+    Task<IReadOnlyList<ProductVariantDto>?> ListVariantsAsync(long parentId, CancellationToken ct = default);
+    Task<HttpResponseMessage> CreateVariantAsync(long parentId, ProductVariantInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> UpdateVariantAsync(long parentId, long variantId, ProductVariantInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> DeleteVariantAsync(long parentId, long variantId, CancellationToken ct = default);
 }
 
 public sealed class AdminCatalogApi(HttpClient http) : IAdminCatalogApi
@@ -76,6 +82,18 @@ public sealed class AdminCatalogApi(HttpClient http) : IAdminCatalogApi
 
     public Task<HttpResponseMessage> DeleteProductAsync(long id, CancellationToken ct) =>
         http.DeleteAsync($"/api/admin/catalog/products/{id}", ct);
+
+    public async Task<IReadOnlyList<ProductVariantDto>?> ListVariantsAsync(long parentId, CancellationToken ct) =>
+        await http.GetFromJsonAsync<List<ProductVariantDto>>($"/api/admin/catalog/products/{parentId}/variants", ct);
+
+    public Task<HttpResponseMessage> CreateVariantAsync(long parentId, ProductVariantInput input, CancellationToken ct) =>
+        http.PostAsJsonAsync($"/api/admin/catalog/products/{parentId}/variants", input, ct);
+
+    public Task<HttpResponseMessage> UpdateVariantAsync(long parentId, long variantId, ProductVariantInput input, CancellationToken ct) =>
+        http.PutAsJsonAsync($"/api/admin/catalog/products/{parentId}/variants/{variantId}", input, ct);
+
+    public Task<HttpResponseMessage> DeleteVariantAsync(long parentId, long variantId, CancellationToken ct) =>
+        http.DeleteAsync($"/api/admin/catalog/products/{parentId}/variants/{variantId}", ct);
 }
 
 public interface IAdminOrdersApi
@@ -83,6 +101,7 @@ public interface IAdminOrdersApi
     Task<AdminOrdersPage?> ListAsync(int? status = null, string? customerSearch = null, int page = 1, int pageSize = 20, CancellationToken ct = default);
     Task<AdminOrderDetail?> GetAsync(long id, CancellationToken ct = default);
     Task<HttpResponseMessage> UpdateStatusAsync(long id, UpdateOrderStatusRequest req, CancellationToken ct = default);
+    Task<AdminSalesReport?> GetSalesReportAsync(DateTimeOffset? from = null, DateTimeOffset? to = null, CancellationToken ct = default);
 }
 
 public sealed class AdminOrdersApi(HttpClient http) : IAdminOrdersApi
@@ -100,6 +119,48 @@ public sealed class AdminOrdersApi(HttpClient http) : IAdminOrdersApi
 
     public Task<HttpResponseMessage> UpdateStatusAsync(long id, UpdateOrderStatusRequest req, CancellationToken ct) =>
         http.PatchAsJsonAsync($"/api/admin/orders/{id}/status", req, ct);
+
+    public Task<AdminSalesReport?> GetSalesReportAsync(DateTimeOffset? from, DateTimeOffset? to, CancellationToken ct)
+    {
+        var url = "/api/admin/orders/sales-report";
+        var qs = new List<string>();
+        if (from.HasValue) qs.Add($"from={Uri.EscapeDataString(from.Value.ToString("o"))}");
+        if (to.HasValue) qs.Add($"to={Uri.EscapeDataString(to.Value.ToString("o"))}");
+        if (qs.Count > 0) url += "?" + string.Join("&", qs);
+        return http.GetFromJsonAsync<AdminSalesReport>(url, ct);
+    }
+}
+
+public interface IAdminShipmentsApi
+{
+    Task<IReadOnlyList<AdminShipmentListItem>?> ListAsync(long? orderId = null, CancellationToken ct = default);
+    Task<AdminShipmentDetail?> GetAsync(long id, CancellationToken ct = default);
+    Task<HttpResponseMessage> CreateAsync(AdminShipmentInput input, CancellationToken ct = default);
+    Task<HttpResponseMessage> DeleteAsync(long id, CancellationToken ct = default);
+    // G01: ShipmentStatus lifecycle transitions
+    Task<HttpResponseMessage> UpdateStatusAsync(long id, AdminUpdateShipmentStatusRequest req, CancellationToken ct = default);
+}
+
+public sealed class AdminShipmentsApi(HttpClient http) : IAdminShipmentsApi
+{
+    public async Task<IReadOnlyList<AdminShipmentListItem>?> ListAsync(long? orderId, CancellationToken ct)
+    {
+        var url = "/api/admin/shipments/";
+        if (orderId.HasValue) url += $"?orderId={orderId}";
+        return await http.GetFromJsonAsync<List<AdminShipmentListItem>>(url, ct);
+    }
+
+    public Task<AdminShipmentDetail?> GetAsync(long id, CancellationToken ct) =>
+        http.GetFromJsonAsync<AdminShipmentDetail>($"/api/admin/shipments/{id}", ct);
+
+    public Task<HttpResponseMessage> CreateAsync(AdminShipmentInput input, CancellationToken ct) =>
+        http.PostAsJsonAsync("/api/admin/shipments/", input, ct);
+
+    public Task<HttpResponseMessage> DeleteAsync(long id, CancellationToken ct) =>
+        http.DeleteAsync($"/api/admin/shipments/{id}", ct);
+
+    public Task<HttpResponseMessage> UpdateStatusAsync(long id, AdminUpdateShipmentStatusRequest req, CancellationToken ct) =>
+        http.PatchAsJsonAsync($"/api/admin/shipments/{id}/status", req, ct);
 }
 
 public interface IAdminCoreApi
@@ -261,6 +322,25 @@ public interface IAdminVendorsApi
     Task<HttpResponseMessage> CreateAsync(AdminVendorInput input, CancellationToken ct = default);
     Task<HttpResponseMessage> UpdateAsync(long id, AdminVendorInput input, CancellationToken ct = default);
     Task<HttpResponseMessage> DeleteAsync(long id, CancellationToken ct = default);
+
+    // Wave 7: onboarding queue
+    Task<AdminVendorApplicationsPage?> ListApplicationsAsync(int? status = null, int page = 1, int pageSize = 20, CancellationToken ct = default);
+    Task<HttpResponseMessage> ApproveApplicationAsync(long id, AdminVendorApplicationDecision req, CancellationToken ct = default);
+    Task<HttpResponseMessage> RejectApplicationAsync(long id, AdminVendorApplicationDecision req, CancellationToken ct = default);
+
+    // Wave 9: dashboard bootstrap. Returns null on 204 (admin caller, no vendor context).
+    Task<AdminVendorSelfResponse?> GetSelfAsync(CancellationToken ct = default);
+
+    // Wave 8/11/18: payouts + settlement lifecycle
+    Task<AdminVendorBalanceSummary?> GetBalanceAsync(long vendorId, CancellationToken ct = default);
+    Task<AdminVendorPayoutsPage?> ListPayoutsAsync(long vendorId, int page = 1, int pageSize = 20, CancellationToken ct = default);
+    Task<HttpResponseMessage> CreatePayoutAsync(long vendorId, AdminCreatePayoutRequest req, CancellationToken ct = default);
+    Task<HttpResponseMessage> UpdatePayoutStatusAsync(long payoutId, AdminUpdatePayoutStatusRequest req, CancellationToken ct = default);
+
+    // Wave 14/18: KYC documents
+    Task<IReadOnlyList<AdminVendorDocumentItem>?> ListApplicationDocumentsAsync(long appId, CancellationToken ct = default);
+    Task<IReadOnlyList<AdminVendorDocumentItem>?> ListVendorDocumentsAsync(long vendorId, CancellationToken ct = default);
+    Task<HttpResponseMessage> UpdateDocumentStatusAsync(long docId, AdminDocumentStatusUpdateRequest req, CancellationToken ct = default);
 }
 
 public sealed class AdminVendorsApi(HttpClient http) : IAdminVendorsApi
@@ -279,6 +359,80 @@ public sealed class AdminVendorsApi(HttpClient http) : IAdminVendorsApi
 
     public Task<HttpResponseMessage> DeleteAsync(long id, CancellationToken ct) =>
         http.DeleteAsync($"/api/admin/vendors/{id}", ct);
+
+    public Task<AdminVendorApplicationsPage?> ListApplicationsAsync(int? status, int page, int pageSize, CancellationToken ct)
+    {
+        var url = $"/api/admin/vendors/applications/?page={page}&pageSize={pageSize}";
+        if (status.HasValue) url += $"&status={status}";
+        return http.GetFromJsonAsync<AdminVendorApplicationsPage>(url, ct);
+    }
+
+    public Task<HttpResponseMessage> ApproveApplicationAsync(long id, AdminVendorApplicationDecision req, CancellationToken ct) =>
+        http.PostAsJsonAsync($"/api/admin/vendors/applications/{id}/approve", req, ct);
+
+    public Task<HttpResponseMessage> RejectApplicationAsync(long id, AdminVendorApplicationDecision req, CancellationToken ct) =>
+        http.PostAsJsonAsync($"/api/admin/vendors/applications/{id}/reject", req, ct);
+
+    public async Task<AdminVendorSelfResponse?> GetSelfAsync(CancellationToken ct)
+    {
+        // 204 No Content = admin / no vendor context; treat as null so the
+        // dashboard renders its admin view.
+        using var resp = await http.GetAsync("/api/admin/vendors/me", ct);
+        if (resp.StatusCode == System.Net.HttpStatusCode.NoContent) return null;
+        if (!resp.IsSuccessStatusCode) return null;
+        return await resp.Content.ReadFromJsonAsync<AdminVendorSelfResponse>(cancellationToken: ct);
+    }
+
+    public async Task<AdminVendorBalanceSummary?> GetBalanceAsync(long vendorId, CancellationToken ct)
+    {
+        // Return null (rather than throwing) when the vendor doesn't exist so the
+        // payouts page can render a "not found" empty state instead of faulting.
+        using var resp = await http.GetAsync($"/api/admin/vendors/{vendorId}/balance", ct);
+        if (!resp.IsSuccessStatusCode) return null;
+        return await resp.Content.ReadFromJsonAsync<AdminVendorBalanceSummary>(cancellationToken: ct);
+    }
+
+    public async Task<AdminVendorPayoutsPage?> ListPayoutsAsync(long vendorId, int page, int pageSize, CancellationToken ct)
+    {
+        using var resp = await http.GetAsync($"/api/admin/vendors/{vendorId}/payouts?page={page}&pageSize={pageSize}", ct);
+        if (!resp.IsSuccessStatusCode) return null;
+        return await resp.Content.ReadFromJsonAsync<AdminVendorPayoutsPage>(cancellationToken: ct);
+    }
+
+    public Task<HttpResponseMessage> CreatePayoutAsync(long vendorId, AdminCreatePayoutRequest req, CancellationToken ct) =>
+        http.PostAsJsonAsync($"/api/admin/vendors/{vendorId}/payouts", req, ct);
+
+    public Task<HttpResponseMessage> UpdatePayoutStatusAsync(long payoutId, AdminUpdatePayoutStatusRequest req, CancellationToken ct) =>
+        http.PatchAsJsonAsync($"/api/admin/vendors/payouts/{payoutId}/status", req, ct);
+
+    public async Task<IReadOnlyList<AdminVendorDocumentItem>?> ListApplicationDocumentsAsync(long appId, CancellationToken ct) =>
+        await http.GetFromJsonAsync<List<AdminVendorDocumentItem>>($"/api/admin/vendors/applications/{appId}/documents", ct);
+
+    public async Task<IReadOnlyList<AdminVendorDocumentItem>?> ListVendorDocumentsAsync(long vendorId, CancellationToken ct) =>
+        await http.GetFromJsonAsync<List<AdminVendorDocumentItem>>($"/api/admin/vendors/{vendorId}/documents", ct);
+
+    public Task<HttpResponseMessage> UpdateDocumentStatusAsync(long docId, AdminDocumentStatusUpdateRequest req, CancellationToken ct) =>
+        http.PatchAsJsonAsync($"/api/admin/vendors/documents/{docId}/status", req, ct);
+}
+
+// Wave 15/18: vendor ↔ buyer messaging inbox for admin + vendor staff.
+public interface IAdminMessagesApi
+{
+    Task<IReadOnlyList<AdminMessageThreadSummary>?> ListThreadsAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<AdminMessageItem>?> GetThreadAsync(long customerUserId, CancellationToken ct = default);
+    Task<HttpResponseMessage> ReplyAsync(long customerUserId, AdminSendMessageRequest req, CancellationToken ct = default);
+}
+
+public sealed class AdminMessagesApi(HttpClient http) : IAdminMessagesApi
+{
+    public async Task<IReadOnlyList<AdminMessageThreadSummary>?> ListThreadsAsync(CancellationToken ct) =>
+        await http.GetFromJsonAsync<List<AdminMessageThreadSummary>>("/api/admin/messages", ct);
+
+    public async Task<IReadOnlyList<AdminMessageItem>?> GetThreadAsync(long customerUserId, CancellationToken ct) =>
+        await http.GetFromJsonAsync<List<AdminMessageItem>>($"/api/admin/messages/{customerUserId}", ct);
+
+    public Task<HttpResponseMessage> ReplyAsync(long customerUserId, AdminSendMessageRequest req, CancellationToken ct) =>
+        http.PostAsJsonAsync($"/api/admin/messages/{customerUserId}", req, ct);
 }
 
 public interface IAdminTaxApi
@@ -362,6 +516,8 @@ public interface IAdminPaymentsApi
     Task<AdminPaymentProviderDetail?> GetProviderAsync(string id, CancellationToken ct = default);
     Task<HttpResponseMessage> UpdateProviderAsync(string id, AdminPaymentProviderInput input, CancellationToken ct = default);
     Task<AdminPaymentsPage?> ListPaymentsAsync(int page = 1, int pageSize = 20, CancellationToken ct = default);
+    // G03: full or partial refund against an order's captured Payment.
+    Task<HttpResponseMessage> CreateRefundAsync(AdminRefundRequest req, CancellationToken ct = default);
 }
 
 public sealed class AdminPaymentsApi(HttpClient http) : IAdminPaymentsApi
@@ -377,6 +533,9 @@ public sealed class AdminPaymentsApi(HttpClient http) : IAdminPaymentsApi
 
     public Task<AdminPaymentsPage?> ListPaymentsAsync(int page, int pageSize, CancellationToken ct) =>
         http.GetFromJsonAsync<AdminPaymentsPage>($"/api/admin/payments/?page={page}&pageSize={pageSize}", ct);
+
+    public Task<HttpResponseMessage> CreateRefundAsync(AdminRefundRequest req, CancellationToken ct) =>
+        http.PostAsJsonAsync("/api/admin/payments/refunds", req, ct);
 }
 
 public interface IAdminPricingApi

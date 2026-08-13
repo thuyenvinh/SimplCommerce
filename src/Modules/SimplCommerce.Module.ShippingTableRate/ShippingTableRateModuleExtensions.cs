@@ -10,7 +10,6 @@ namespace SimplCommerce.Module.ShippingTableRate
         public static IServiceCollection AddShippingTableRateModule(this IServiceCollection services)
         {
             services.AddTransient<IShippingPriceServiceProvider, TableRateShippingServiceProvider>();
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.shipping-tablerate");
             return services;
         }
     }

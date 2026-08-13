@@ -1,10 +1,8 @@
 # SimplCommerce — .NET 9 + Aspire + Blazor
 
-> A cross-platform, modulith ecommerce system. The codebase is mid-migration
-> from ASP.NET Core 8 MVC + AngularJS (1.x) onto .NET 9 + Aspire 13 + Blazor
-> (2.0). See `CHANGELOG.md` for the release summary, `MIGRATION_PROGRESS.md`
-> for phase-by-phase status, `docs/architecture.md` for the target
-> architecture.
+> A cross-platform, modulith ecommerce system.
+> v2.0 runs on .NET 9 + Aspire 13 + Blazor. The legacy ASP.NET Core 8 MVC + AngularJS
+> stack has been removed in Phase 8 (see `MIGRATION_PROGRESS.md` / `CHANGELOG.md`).
 
 ![SimpleCommerce - Modulith architecture](https://raw.githubusercontent.com/simplcommerce/SimplCommerce/master/modular-architecture.png)
 
@@ -14,8 +12,8 @@
 # one-time
 dotnet tool install --global dotnet-ef --version 9.0.0
 
-# run the whole stack: SQL, Redis, Azurite, MailPit, Seq + ApiService +
-# Storefront + Admin + the legacy WebHost (still included for cutover parity)
+# run the whole stack: SQL, Redis, Azurite, MailPit, Seq +
+# ApiService + Storefront + Admin
 dotnet run --project src/AppHost/SimplCommerce.AppHost
 ```
 
@@ -60,18 +58,24 @@ src/
   AppHost/                 Aspire orchestrator
   ServiceDefaults/         OTel + health + service discovery shared by every app
   Migrations/              Consolidated EF Core migrations (target for dotnet ef)
+  SimplCommerce.Infrastructure/   Repos, value objects, EF abstractions
+  SimplCommerce.RealTime/         Cross-host SignalR contracts (AdminNotificationHub)
   Apps/
     SimplCommerce.ApiService          Minimal-API JWT backend (OpenAPI /scalar/v1)
     SimplCommerce.Storefront          Blazor Web App, Interactive Auto + WASM client
     SimplCommerce.Storefront.Client   WASM companion to Storefront
-    SimplCommerce.Admin               Blazor Web App, Interactive Server
-  Modules/                  43 domain modules (Clean-architecture-lite layout)
-  SimplCommerce.Infrastructure/
-  SimplCommerce.WebHost/    Legacy ASP.NET Core 8 MVC host — kept during cutover
+    SimplCommerce.Admin               Blazor Web App, Interactive Server (+ NotificationBell hub client)
+  Modules/                  41 domain modules: Catalog / Orders / Checkouts / Shipping /
+                            Tax / Payments (+8 providers incl. VNPay) / Inventory /
+                            Reviews / Comments / Contacts / CMS / News / Pricing /
+                            Vendors / Localization / SampleData / Search / Storage /
+                            WishList / DinkToPdf / EmailSenderSmtp / SignalR / etc.
 
-tests/
-  SimplCommerce.ApiService.IntegrationTests  Integration test scaffold
-test/                       Existing unit test projects (Infrastructure + 6 modules)
+tests/                       New-stack tests (xUnit + WebApplicationFactory)
+  SimplCommerce.ApiService.UnitTests          Auth, hardening, webhooks, checkout, media
+  SimplCommerce.ApiService.IntegrationTests   Testcontainers.MsSql + real SQL
+  SimplCommerce.Storefront.UnitTests          API client + sitemap
+test/                       Legacy-era unit test projects (Infrastructure + 12 modules)
 
 tools/
   migrate-data.ps1          PowerShell data-migration helper (see runbook)
@@ -96,12 +100,20 @@ CI: `.github/workflows/ci.yml` (GitHub Actions) + `azure-pipelines.yml`
 `master` pushes container images to `ghcr.io/<owner>/simpl-{api,
 storefront, admin}:<sha>`.
 
-## Online demo (v1.x)
+## Build & test (with coverage)
 
-- Store front: `http://demo.simplcommerce.com` (legacy build)
-- Admin: `http://demo.simplcommerce.com/admin`
+```bash
+# Default suite (no Docker required)
+dotnet test SimplCommerce.sln --filter "Category!=RequiresDocker"
 
-A v2.0 demo will replace the v1.x demo after Phase 8 cutover completes.
+# Integration suite (needs Docker for Testcontainers.MsSql)
+dotnet test tests/SimplCommerce.ApiService.IntegrationTests --filter "Category=RequiresDocker"
+```
+
+## Online demo
+
+A v2.0 demo will be linked here after the next release tag. The legacy v1.x demo
+(`demo.simplcommerce.com`) is being decommissioned.
 
 ## Technologies
 

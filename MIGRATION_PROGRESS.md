@@ -3,6 +3,34 @@
 > Bản mirror của MIGRATION_TODO.md, tick trạng thái thực tế qua từng phase.
 > Legend: `[x]` = done, `[ ]` = pending, `[~]` = BLOCKED (cần user làm tay — ghi chú ngay dưới task), `[-]` = skipped/N/A (lý do ghi chú ngay dưới).
 
+## POST-MIGRATION WAVES (sau Phase 8 cutover)
+
+> Phase 0–8 migration đã xong. Các "wave" dưới đây build TRÊN nền post-cutover
+> (branch `claude/phase-8-destructive`), gồm gap-fix e-commerce + chuyển thành
+> marketplace multi-vendor + E2E test đầy đủ.
+
+- **Waves 1–5 + G09** — gap-analysis fixes (order events, refund flow, shipment
+  lifecycle, VNPay idempotency, variant CRUD, stock race, cart guards, Stripe
+  webhook side-effects, checkout price-lock, inline HTML email). 2 EF migrations.
+- **Waves 6–11** — marketplace: vendor scoping (JWT `vendor_id` + IVendorScope
+  trên mọi admin endpoint), self-onboarding + approval queue, commission engine,
+  vendor dashboard, public vendor storefront pages, payout settlement lifecycle.
+  4 EF migrations.
+- **Waves 12–17** — Stripe Connect SDK payout dispatch (IPayoutGateway), vendor-
+  scoped SignalR, KYC document upload/verify, buyer↔vendor messaging, per-vendor
+  flat shipping fee, CMS-editable email templates. 3 EF migrations.
+- **Wave 18** — vendor admin UI: per-vendor payouts page (balance + create +
+  settlement status), messaging inbox (thread list + reply), KYC document review
+  dialog on the applications queue.
+- **E2E (P7-04 → done)** — `tests/SimplCommerce.E2ETests/` Playwright-for-.NET
+  (NUnit) suite, **25/25 green**. No-Docker dev mode via `SIMPL_E2E_SQLITE` on the
+  ApiService lets the full stack run without SQL Server. Screenshots + videos +
+  traces under `Artifacts/`. Gated behind `Category=RequiresDocker` so the main CI
+  build-test job skips it (needs the running app stack).
+- **Unit/integration** — 196 non-Docker tests green throughout.
+
+---
+
 ## TRẠNG THÁI HIỆN TẠI
 - **Phase đang chạy:** Phase 0..7 done + **Phase 8 non-destructive done** (3 Dockerfiles + compose.yaml + .env.sample + .github/workflows/ci.yml + rewritten azure-pipelines.yml + CHANGELOG v2.0.0 + README rewrite + phase8-cutover-checklist.md). Destructive cutover (xóa WebHost, AngularJS templates, Razor Views, Controllers) **defer đến user** — cần runtime verify trên máy Docker trước. Full runbook trong `docs/migration/phase8-cutover-checklist.md`.
 - **Branch:** `claude/phase-0-migration-pX925`
@@ -379,11 +407,11 @@ Storefront endpoint groups đã tạo (9 groups):
 ### 5.3 Shared components
 - [ ] P5-09 | `<EntityDataGrid<T>>` wrapper MudDataGrid với server-side pagination/sort/filter chuẩn
 - [ ] P5-10 | `<MediaPicker>` upload + chọn từ thư viện
-- [ ] P5-11 | `<SlugInput>` auto-generate from name
+- [x] P5-11 | `<SlugInput>` live in `Components/Shared/`. Auto-slugifies from a Source param until the user types manually; uses MudTextField + ValueChanged
 - [ ] P5-12 | `<RichTextEditor>` (TinyMCE Blazor wrapper hoặc QuillJS interop)
 - [ ] P5-13 | `<EntityPicker<T>>` autocomplete chọn entity (dùng cho FK)
-- [ ] P5-14 | `<ConfirmDialog>` xác nhận xoá
-- [ ] P5-15 | `<FormCard>` chuẩn validation + save/cancel buttons
+- [x] P5-14 | `<ConfirmDialog>` live in `Components/Shared/`. Used via `IDialogService.ShowAsync<ConfirmDialog>(...)` with DialogParameters for Message/ConfirmText/ConfirmColor; returns `DialogResult.Ok(true)` on confirm
+- [x] P5-15 | `<FormCard>` live in `Components/Shared/`. MudPaper wrapper with optional Title + Save/Cancel button row + Saving spinner toggle
 - [ ] P5-16 | Toast wrapper qua MudSnackbar
 
 ### 5.4 Pages
@@ -402,7 +430,9 @@ Storefront endpoint groups đã tạo (9 groups):
 **5.4.3 Orders**
 - [x] P5-25 | `/orders` list with status + customer-search filter + paging
 - [x] P5-26 | `/orders/{id}` admin detail page live. Backend `GET /api/admin/orders/{id}` now projects to `AdminOrderDetail` DTO (items + shipping address + billing address + customer + totals). UI has clickable list rows, MudTable line items, inline status dropdown that PATCHes via `IAdminOrdersApi.UpdateStatusAsync`, MudSnackbar on success/failure. Timeline (audit-log per order) is still a follow-up
-- [ ] P5-27..P5-29 | shipments / refunds / sales-report — deferred (endpoint scaffold needed first)
+- [x] P5-27 | **Shipments admin** live. New `ShipmentsAdminEndpoints` (GET / + GET/{id} + POST + DELETE) on `/api/admin/shipments`. Order detail page (`/orders/{id}`) gets a "Shipments" panel + "New shipment" dialog (warehouse picker + tracking number + per-item include checkbox with qty caps from the order). Per-row delete on existing shipments
+- [x] P5-28 | **Refunds** = state transition Refunded (status=90) on the order. Order detail page gains a red "Refund" button that PATCHes `/orders/{id}/status` to 90 (disabled when already refunded). Domain doesn't have a separate Refund entity — keeping the simple status flow is matched to the legacy behavior
+- [x] P5-29 | **Sales report** live at `/sales-report`. Backend `GET /api/admin/orders/sales-report?from=&to=` groups orders by day, filters to paid+ states (PaymentReceived..Complete), returns daily counts + revenue + totals. UI: date pickers + MudChart line graph + tabular breakdown
 
 **5.4.4 Customers**
 - [~] P5-30..P5-31 | `/customers/*` — the list IS surfaced as `/users` (Core admin endpoint returns Identity users). Customer/vendor role split + detail page deferred
@@ -491,7 +521,7 @@ Storefront endpoint groups đã tạo (9 groups):
 - [x] P7-01 | Unit tests (target ≥ 60%): **total 159 tests across 16 projects** (0 failing). New in this pass: Tax (7 — TaxService with MockQueryable async IQueryable), ShoppingCart (7 — CartService AddToCart paths + AddToCartResult), Orders (24 — Order/OrderItem invariants, all 12 OrderStatus enum values, OrderCreated/AfterOrderCreated/OrderChanged DTOs, OrderEmailService via mocked IEmailSender + IRazorViewRenderer), Reviews (13 — Review/Reply defaults, ReviewStatus/ReplyStatus enum stability, ReviewListItemDto field mapping), Payments (9 — Payment timestamps, PaymentStatus enum, PaymentProvider ctor). Coverlet + reportgenerator wired into CI (`tests/coverlet.runsettings`, `.github/workflows/ci.yml` emits cobertura + markdown summary + artifact). Prior pass (99 tests across 11 projects) retained: `SimplCommerce.ApiService.UnitTests` (41), `SimplCommerce.Module.Catalog.Tests` (8), `SimplCommerce.Storefront.UnitTests` (8)
 - [x] P7-02 | Integration E2E per flow: Testcontainers.MsSql + `WebApplicationFactory<Program>` live (P3-59..62). 3 happy-path tests in `HealthAndWebhookTests`; new flows are 1-class additions
 - [x] P7-03 | API contract tests: same factory used for endpoint contract assertions (Stripe webhook returns 401/503, products endpoint shape). Future contract tests just add `[Fact]`s under the same `[Collection("ApiServiceDb")]`
-- [~] P7-04 | Playwright E2E — BLOCKED-Docker
+- [x] P7-04 | Playwright E2E — **DONE** (`tests/SimplCommerce.E2ETests/`, NUnit + Microsoft.Playwright). 25/25 pass. No-Docker path via `SIMPL_E2E_SQLITE` on ApiService. Auth/Navigation/Catalog-CRUD/Orders/Vendors + documentation-flow captures. See Post-Migration Waves section above.
 
 ### 7.2 Performance
 - [x] P7-05 | k6 script tại `tools/loadtest/storefront.js`: 5 hot endpoints (/, /category/{slug}, /product/{slug}, /api/storefront/catalog/products, /api/storefront/search), ramp 50 VU, threshold p95<500ms + error rate <1%
@@ -516,7 +546,7 @@ Storefront endpoint groups đã tạo (9 groups):
 - [~] P7-20 | Aspire dashboard trace verify — BLOCKED-Docker (traces generated, chỉ cần runtime pour verify)
 
 ### 7.5 Documentation
-- [~] P7-21 | README root — cần cập nhật chọn lọc (file hiện tại còn instruction .NET 8 + AngularJS); không touch trong commit này để giảm scope, làm riêng follow-up
+- [x] P7-21 | README root rewritten — bỏ legacy WebHost references, intro nói rõ Phase 8 đã xóa AngularJS + MVC, repo layout cập nhật cho post-cutover structure (4 host + 41 module), thêm test commands cho 2 suite
 - [x] P7-22 | `docs/architecture.md` — topology diagram + projects table + hardening table + trace-path example
 - [x] P7-23 | `docs/deployment.md` — Aspire local, Azure Container Apps via `aspire publish`, k8s, Docker Compose reference, secrets list, observability + scaling knobs
 - [x] P7-24 | `docs/development.md` — clone/build/run, adding new module (7-step), endpoint convention, Blazor page convention, migration tooling shortcuts
@@ -540,10 +570,10 @@ Storefront endpoint groups đã tạo (9 groups):
 - [~] P8-02 | Production DB backup — user responsibility; reminder đã có trong `tools/migrate-data.ps1` + `docs/migration/data-migration-runbook.md`
 
 ### 8.2 Xoá WebHost cũ — **DEFERRED to user**
-- [~] P8-03..P8-05 | Xoá `src/SimplCommerce.WebHost/`, unhook khỏi AppHost, xoá legacy `Dockerfile` / `Dockerfile-sqlite` / `docker-entrypoint.sh` — **không thực hiện tự động vì destructive + runtime của stack mới chưa verified BLOCKED-Docker**. Runbook từng bước trong `docs/migration/phase8-cutover-checklist.md` §1
+- [x] P8-03..P8-05 | **Done** — `src/SimplCommerce.WebHost/` removed (1234 files), unhooked from AppHost (Program.cs + csproj ProjectReference), removed from `SimplCommerce.sln`. Baseline tagged at `pre-cutover-backup` for rollback. Branch `claude/phase-8-destructive`
 
 ### 8.3 Xoá legacy code trong modules — **DEFERRED to user**
-- [~] P8-06..P8-10 | Xoá `wwwroot/admin/` (98 files AngularJS), `Views/` (181 files cshtml), `Controllers/` (104 files), bundling, `modules.json` — tất cả **destructive**, defer đến sau runtime verification. `modules.json` đã xử lý ở Phase 2 (archived). `CustomAssemblyLoadContextProvider` không tồn tại trong codebase (đã verify Phase 2). Checklist đầy đủ trong `phase8-cutover-checklist.md` §2-§6
+- [x] P8-06..P8-10 | **Done** — Xóa toàn bộ legacy code khỏi modules: 33 `Areas/` directories (455 files Controllers+Views), 41 `wwwroot/admin/` AngularJS folders, 27 `bundleconfig.json`, tất cả `module.json` manifest files, tất cả `ModuleInitializer.cs` + interface `IModuleInitializer`. 44 module csproj chuyển từ `Microsoft.NET.Sdk.Razor` → `Microsoft.NET.Sdk`. `AddRazorSupportForMvc` + `GlobalConfiguration.RegisterAngularModule` đã xóa. Legacy `ThemeService` + `ICategoryService` + `ISampleDataService` (chỉ dùng bởi WebHost) đã xóa cùng. Tổng cộng **~892 files deleted**. Build clean (0 warning / 0 error), 180/180 tests pass
 
 ### 8.4 Generate deployment artifacts — **DONE**
 - [~] P8-11 | `aspire publish` — **BLOCKED-Docker** để chạy lệnh, nhưng csproj đã sẵn sàng; runbook `docs/deployment.md` §Azure Container Apps carries the exact command
@@ -561,7 +591,7 @@ Storefront endpoint groups đã tạo (9 groups):
 - [x] P8-17 | `dotnet test SimplCommerce.sln --no-build` PASS — 42/42
 - [~] P8-18 | `aspire run` — BLOCKED-Docker
 - [~] P8-19 | Runtime smoke test — BLOCKED-Docker
-- [~] P8-20 | Solution chỉ còn project mới — chưa, vì destructive steps 8.2/8.3 defer đến user
+- [x] P8-20 | Solution chỉ còn project mới (ApiService, Admin, Storefront, AppHost, Migrations, Infrastructure, RealTime, ServiceDefaults + 41 modules). WebHost gone
 
 ### 8.6 Release — **Partial**
 - [x] P8-21 | MIGRATION_PROGRESS.md updated (this commit)

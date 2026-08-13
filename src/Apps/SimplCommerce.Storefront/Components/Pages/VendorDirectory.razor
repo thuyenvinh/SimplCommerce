@@ -1,0 +1,48 @@
+@page "/vendors"
+@rendermode RenderMode.InteractiveAuto
+@inject IVendorsApi Vendors
+
+<PageTitle>Shops — SimplCommerce</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Shops</MudText>
+
+@if (_vendors is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_vendors.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">No shops are open yet.</MudAlert>
+}
+else
+{
+    <MudGrid>
+        @foreach (var v in _vendors)
+        {
+            <MudItem xs="12" sm="6" md="4">
+                <MudCard>
+                    <MudCardContent>
+                        <MudLink Href="@($"/vendors/{v.Slug}")">
+                            <MudText Typo="Typo.h6">@v.Name</MudText>
+                        </MudLink>
+                        @if (!string.IsNullOrWhiteSpace(v.Description))
+                        {
+                            <MudText Typo="Typo.body2" Class="mt-1">@v.Description</MudText>
+                        }
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudButton Href="@($"/vendors/{v.Slug}")" Variant="Variant.Text" Color="Color.Primary">Visit shop</MudButton>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private IReadOnlyList<StorefrontVendorItem>? _vendors;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _vendors = await Vendors.ListAsync();
+    }
+}

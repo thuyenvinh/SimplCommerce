@@ -9,7 +9,6 @@ namespace SimplCommerce.Module.PaymentBraintree
         public static IServiceCollection AddPaymentBraintreeModule(this IServiceCollection services)
         {
             services.AddTransient<IBraintreeConfiguration, BraintreeConfiguration>();
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.paymentBraintree");
             return services;
         }
     }

@@ -15,7 +15,6 @@ namespace SimplCommerce.Module.Localization
         {
             services.AddTransient<INotificationHandler<UserSignedIn>, UserSignedInHandler>();
             services.AddTransient<IContentLocalizationService, ContentLocalizationService>();
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.localization");
             return services;
         }
     }

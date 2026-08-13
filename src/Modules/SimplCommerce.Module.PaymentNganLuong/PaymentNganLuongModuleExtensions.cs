@@ -7,7 +7,6 @@ namespace SimplCommerce.Module.PaymentNganLuong
     {
         public static IServiceCollection AddPaymentNganLuongModule(this IServiceCollection services)
         {
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.paymentNganLuong");
             return services;
         }
     }

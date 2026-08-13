@@ -25,6 +25,7 @@ namespace SimplCommerce.Module.Orders.Services
     public class OrderService : IOrderService
     {
         private readonly IRepository<Order> _orderRepository;
+        private readonly IRepository<Vendor> _vendorRepository;
         private readonly ICouponService _couponService;
         private readonly IRepository<CheckoutItem> _checkoutItemRepository;
         private readonly IRepository<OrderItem> _orderItemRepository;
@@ -46,7 +47,8 @@ namespace SimplCommerce.Module.Orders.Services
             IShippingPriceService shippingPriceService,
             IRepository<UserAddress> userAddressRepository,
             IMediator mediator,
-            IProductPricingService productPricingService)
+            IProductPricingService productPricingService,
+            IRepository<Vendor> vendorRepository)
         {
             _orderRepository = orderRepository;
             _couponService = couponService;
@@ -59,6 +61,7 @@ namespace SimplCommerce.Module.Orders.Services
             _userAddressRepository = userAddressRepository;
             _mediator = mediator;
             _productPricingService = productPricingService;
+            _vendorRepository = vendorRepository;
         }
 
         public async Task<Result<Order>> CreateOrder(Guid checkoutId, string paymentMethod, decimal paymentFeeAmount, OrderStatus orderStatus = OrderStatus.New)
@@ -70,6 +73,21 @@ namespace SimplCommerce.Module.Orders.Services
             if (checkout == null)
             {
                 return Result.Fail<Order>($"Checkout id {checkoutId} cannot be found");
+            }
+
+            // G04: idempotency guard. VNPay (and any future redirect-then-callback
+            // provider) fires both the browser-return and the server-to-server IPN
+            // on the same checkout. Without this, each call creates a fresh Order
+            // row. We stamp Checkout.OrderCreatedId after the first successful
+            // creation and replay it on subsequent calls.
+            if (checkout.OrderCreatedId is { } existingOrderId)
+            {
+                var existing = await _orderRepository.Query()
+                    .FirstOrDefaultAsync(o => o.Id == existingOrderId);
+                if (existing is not null)
+                {
+                    return Result.Ok(existing);
+                }
             }
 
             var shippingData = JsonConvert.DeserializeObject<DeliveryInformationVm>(checkout.ShippingData ?? string.Empty);
@@ -231,6 +249,22 @@ namespace SimplCommerce.Module.Orders.Services
                     return Result.Fail<Order>($"The product {checkoutItem.Product.Name} is not available any more");
                 }
 
+                // G14: reject the order if the live price has drifted >5% from the
+                // price the buyer saw at checkout. Without this an admin price update
+                // (or a flash-sale ending mid-checkout) silently overcharges or
+                // undercharges. Null LockedPrice (legacy rows or snapshot failed)
+                // skips the check — we never block on missing data, only on conflict.
+                if (checkoutItem.LockedPrice is { } locked && locked > 0m)
+                {
+                    var current = _productPricingService.CalculateProductPrice(checkoutItem.Product).Price;
+                    var drift = System.Math.Abs(current - locked) / locked;
+                    if (drift > 0.05m)
+                    {
+                        return Result.Fail<Order>(
+                            $"The price of {checkoutItem.Product.Name} changed (was {locked:0.##}, now {current:0.##}). Please review your cart.");
+                    }
+                }
+
                 if (checkoutItem.Product.StockTrackingIsEnabled && checkoutItem.Product.StockQuantity < checkoutItem.Quantity)
                 {
                     return Result.Fail<Order>($"There are only {checkoutItem.Product.StockQuantity} items available for {checkoutItem.Product.Name}");
@@ -290,10 +324,32 @@ namespace SimplCommerce.Module.Orders.Services
             order.OrderTotal = order.SubTotal + order.TaxAmount + order.ShippingFeeAmount + order.PaymentFeeAmount - order.DiscountAmount;
             _orderRepository.Add(order);
 
-            var vendorIds = checkout.CheckoutItems.Where(x => x.Product.VendorId.HasValue).Select(x => x.Product.VendorId.Value).Distinct();
+            var vendorIds = checkout.CheckoutItems.Where(x => x.Product.VendorId.HasValue).Select(x => x.Product.VendorId.Value).Distinct().ToList();
             if (vendorIds.Any())
             {
                 order.IsMasterOrder = true;
+            }
+
+            // Wave 8 + 16: pull commission rates AND shipping flat fees for every
+            // vendor involved in one shot so each sub-order doesn't issue its own
+            // SELECT. Missing vendor row (deleted between cart-add and checkout)
+            // → 0% commission and 0 shipping fee (vendor keeps everything; admin
+            // catches the orphan in payouts UI).
+            var vendorMeta = vendorIds.Count == 0
+                ? new Dictionary<long, VendorPricingMeta>()
+                : await _vendorRepository.Query()
+                    .Where(v => vendorIds.Contains(v.Id))
+                    .Select(v => new VendorPricingMeta(v.Id, v.CommissionPercent, v.ShippingFlatFee))
+                    .ToDictionaryAsync(v => v.VendorId, v => v);
+
+            // Wave 16: sum vendor shipping fees so the master order's total
+            // includes them — customer pays platform shipping + every vendor's
+            // handling charge in one transaction.
+            var vendorShippingTotal = vendorMeta.Values.Sum(m => m.ShippingFlatFee);
+            if (vendorShippingTotal > 0m)
+            {
+                order.ShippingFeeAmount += vendorShippingTotal;
+                order.OrderTotal += vendorShippingTotal;
             }
 
             IList<Order> subOrders = new List<Order>();
@@ -340,7 +396,16 @@ namespace SimplCommerce.Module.Orders.Services
 
                 subOrder.SubTotal = subOrder.OrderItems.Sum(x => x.ProductPrice * x.Quantity);
                 subOrder.TaxAmount = subOrder.OrderItems.Sum(x => x.TaxAmount);
+                // Wave 16: stamp the vendor's flat shipping fee on the sub-order
+                // so payout reports attribute correctly (the customer-side total
+                // already added it to the master in the bulk-load step above).
+                var meta = vendorMeta.TryGetValue(vendorId, out var m) ? m : new VendorPricingMeta(vendorId, 0m, 0m);
+                subOrder.ShippingFeeAmount = meta.ShippingFlatFee;
                 subOrder.OrderTotal = subOrder.SubTotal + subOrder.TaxAmount + subOrder.ShippingFeeAmount - subOrder.DiscountAmount;
+                // Wave 8: commission on the goods subtotal (not on tax/shipping —
+                // platform doesn't claim a cut on the tax it remits or the carrier
+                // fee it forwards). Truncated to 2 decimals to match the column.
+                subOrder.CommissionAmount = System.Math.Round(subOrder.SubTotal * meta.CommissionPercent / 100m, 2);
                 _orderRepository.Add(subOrder);
                 subOrders.Add(subOrder);
             }
@@ -355,6 +420,10 @@ namespace SimplCommerce.Module.Orders.Services
                 }
 
                 _couponService.AddCouponUsage(checkout.CustomerId, order.Id, checkingDiscountResult);
+                // G04: persist the checkout→order link inside the same transaction
+                // so a crash between SaveChanges and Commit doesn't leave a created
+                // order with no idempotency stamp.
+                checkout.OrderCreatedId = order.Id;
                 _orderRepository.SaveChanges();
                 transaction.Commit();
             }
@@ -436,5 +505,11 @@ namespace SimplCommerce.Module.Orders.Services
 
             return Result.Ok(shippingMethod);
         }
+
+        // Tiny projection so the bulk vendor-meta load preserves named members
+        // through ToDictionary. A regular ValueTuple loses property names once
+        // it travels through generic Dictionary value type — making the call site
+        // unreadable.
+        private sealed record VendorPricingMeta(long VendorId, decimal CommissionPercent, decimal ShippingFlatFee);
     }
 }

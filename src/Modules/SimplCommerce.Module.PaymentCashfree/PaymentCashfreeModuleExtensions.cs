@@ -7,7 +7,6 @@ namespace SimplCommerce.Module.PaymentCashfree
     {
         public static IServiceCollection AddPaymentCashfreeModule(this IServiceCollection services)
         {
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.paymentCashfree");
             return services;
         }
     }

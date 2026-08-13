@@ -1,6 +1,9 @@
 @page "/orders/{Id:long}"
 @rendermode RenderMode.InteractiveServer
 @inject IAdminOrdersApi Orders
+@inject IAdminShipmentsApi Shipments
+@inject IAdminInventoryApi Inventory
+@inject IAdminPaymentsApi Payments
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
 
@@ -23,6 +26,8 @@ else
                 <MudSelectItem T="int" Value="@s.Value">@s.Label</MudSelectItem>
             }
         </MudSelect>
+        <MudButton Color="Color.Error" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Undo"
+                   Disabled="@(_order.OrderStatus == 90)" OnClick="@OpenRefundDialog">Refund</MudButton>
     </MudStack>
 
     <MudGrid>
@@ -85,7 +90,112 @@ else
                 </MudPaper>
             }
         </MudItem>
+
+        <MudItem xs="12">
+            <MudPaper Class="pa-4">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3">
+                    <MudText Typo="Typo.h6">Shipments</MudText>
+                    <MudSpacer />
+                    <MudButton StartIcon="@Icons.Material.Filled.LocalShipping" Variant="Variant.Outlined" Color="Color.Primary"
+                               OnClick="@(() => _shipDialog = true)" Disabled="@(_warehouses is null || _warehouses.Count == 0)">
+                        New shipment
+                    </MudButton>
+                </MudStack>
+
+                @if (_shipments is null)
+                {
+                    <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                }
+                else if (_shipments.Count == 0)
+                {
+                    <MudAlert Severity="Severity.Info">No shipments yet for this order.</MudAlert>
+                }
+                else
+                {
+                    <MudTable T="AdminShipmentListItem" Items="_shipments" Dense="true" Hover="true">
+                        <HeaderContent>
+                            <MudTh>ID</MudTh><MudTh>Tracking #</MudTh><MudTh>Warehouse</MudTh>
+                            <MudTh>Lines</MudTh><MudTh>Status</MudTh><MudTh>Created</MudTh><MudTh>Actions</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.Id</MudTd>
+                            <MudTd>@context.TrackingNumber</MudTd>
+                            <MudTd>@WarehouseName(context.WarehouseId)</MudTd>
+                            <MudTd>@context.ItemCount</MudTd>
+                            <MudTd>
+                                <MudSelect T="int" Value="context.Status" Dense="true" Variant="Variant.Text" Margin="Margin.None"
+                                           ValueChanged="@(v => OnShipmentStatusChanged(context.Id, v))"
+                                           Style="min-width:140px;">
+                                    @foreach (var s in ShipmentStatusOptions)
+                                    {
+                                        <MudSelectItem T="int" Value="@s.Value">@s.Label</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </MudTd>
+                            <MudTd>@context.CreatedOn.LocalDateTime.ToString("g")</MudTd>
+                            <MudTd>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                               OnClick="@(() => DeleteShipment(context.Id))" aria-label="Delete" />
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </MudPaper>
+        </MudItem>
     </MudGrid>
+
+    <MudDialog @bind-Visible="_shipDialog" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })">
+        <TitleContent>New shipment for order #@_order.Id</TitleContent>
+        <DialogContent>
+            <MudSelect T="long" @bind-Value="_newShip.WarehouseId" Label="Warehouse" Required="true">
+                @if (_warehouses is not null)
+                {
+                    @foreach (var w in _warehouses) { <MudSelectItem T="long" Value="@w.Id">@w.Name</MudSelectItem> }
+                }
+            </MudSelect>
+            <MudTextField @bind-Value="_newShip.TrackingNumber" Label="Tracking number (optional)" Class="mt-3" />
+            <MudText Typo="Typo.subtitle2" Class="mt-3 mb-2">Items to ship</MudText>
+            @foreach (var line in _newShipLines)
+            {
+                <MudStack Row="true" Class="mb-1" AlignItems="AlignItems.Center">
+                    <MudCheckBox T="bool" @bind-Value="line.Include" />
+                    <MudText Style="flex:1">@line.ProductName <MudText Typo="Typo.caption">(ordered: @line.MaxQty)</MudText></MudText>
+                    <MudNumericField T="int" @bind-Value="line.Qty" Min="1" Max="@line.MaxQty" Disabled="@(!line.Include)" Style="width:120px" />
+                </MudStack>
+            }
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="@(() => _shipDialog = false)">Cancel</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="CreateShipment" Disabled="_creatingShip">
+                @(_creatingShip ? "Saving…" : "Create shipment")
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
+
+    <MudDialog @bind-Visible="_refundDialog" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+        <TitleContent>Refund order #@_order.Id</TitleContent>
+        <DialogContent>
+            <MudText Typo="Typo.body2" Class="mb-2">
+                Order total: <strong>@_order.OrderTotal.ToString("C")</strong>.
+                A full refund flips the order to <em>Refunded</em>; a partial
+                refund leaves the order open and is recorded against the linked Payment.
+            </MudText>
+            <MudNumericField T="decimal" @bind-Value="_refundAmount" Label="Refund amount"
+                             Min="0" Max="@_order.OrderTotal" Required="true" />
+            <MudTextField @bind-Value="_refundReason" Label="Reason (optional)"
+                          Class="mt-3" Lines="2" />
+            @if (!string.IsNullOrEmpty(_refundError))
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-3">@_refundError</MudAlert>
+            }
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="@(() => _refundDialog = false)">Cancel</MudButton>
+            <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="SubmitRefund" Disabled="_refunding">
+                @(_refunding ? "Submitting…" : "Issue refund")
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
 }
 
 @code {
@@ -93,6 +203,15 @@ else
 
     private AdminOrderDetail? _order;
     private int _targetStatus;
+
+    private IReadOnlyList<AdminShipmentListItem>? _shipments;
+    private IReadOnlyList<AdminWarehouseItem>? _warehouses;
+    private bool _shipDialog;
+    private bool _creatingShip;
+    private NewShipForm _newShip = new();
+    private List<NewShipLine> _newShipLines = new();
+
+    private string WarehouseName(long id) => _warehouses?.FirstOrDefault(w => w.Id == id)?.Name ?? id.ToString();
 
     private static readonly (int Value, string Label)[] StatusOptions =
     {
@@ -120,6 +239,162 @@ else
             return;
         }
         _targetStatus = _order.OrderStatus;
+        _warehouses = await Inventory.ListWarehousesAsync();
+        if (_warehouses is { Count: > 0 }) _newShip.WarehouseId = _warehouses[0].Id;
+        await ReloadShipments();
+        RebuildShipLines();
+    }
+
+    private async Task ReloadShipments()
+    {
+        _shipments = await Shipments.ListAsync(orderId: Id);
+        StateHasChanged();
+    }
+
+    private void RebuildShipLines()
+    {
+        if (_order is null) return;
+        _newShipLines = _order.Items.Select(i => new NewShipLine
+        {
+            OrderItemId = 0,
+            ProductId = i.ProductId,
+            ProductName = i.ProductName,
+            MaxQty = i.Quantity,
+            Qty = i.Quantity,
+            Include = true,
+        }).ToList();
+    }
+
+    private async Task CreateShipment()
+    {
+        if (_order is null) return;
+        _creatingShip = true;
+        try
+        {
+            var lines = _newShipLines.Where(l => l.Include && l.Qty > 0)
+                .Select(l => new AdminShipmentItemInput(l.OrderItemId, l.ProductId, l.Qty))
+                .ToList();
+            if (lines.Count == 0)
+            {
+                Snackbar.Add("Pick at least one item.", Severity.Warning);
+                return;
+            }
+            using var resp = await Shipments.CreateAsync(new AdminShipmentInput(
+                Id, _newShip.WarehouseId, _newShip.TrackingNumber, lines));
+            if (!resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add($"Create failed (HTTP {(int)resp.StatusCode}).", Severity.Error);
+                return;
+            }
+            Snackbar.Add("Shipment created.", Severity.Success);
+            _shipDialog = false;
+            await ReloadShipments();
+        }
+        finally
+        {
+            _creatingShip = false;
+        }
+    }
+
+    private async Task DeleteShipment(long id)
+    {
+        using var resp = await Shipments.DeleteAsync(id);
+        if (resp.IsSuccessStatusCode)
+        {
+            Snackbar.Add("Shipment removed.", Severity.Success);
+            await ReloadShipments();
+        }
+        else { Snackbar.Add($"Delete failed (HTTP {(int)resp.StatusCode}).", Severity.Error); }
+    }
+
+    private bool _refundDialog;
+    private bool _refunding;
+    private decimal _refundAmount;
+    private string? _refundReason;
+    private string? _refundError;
+
+    // ShipmentStatus enum mirror (G01): keep aligned with
+    // SimplCommerce.Module.Shipments.Models.ShipmentStatus. Gap values left
+    // intentionally so future Picking/AtCarrier states slot in.
+    private static readonly (int Value, string Label)[] ShipmentStatusOptions =
+    {
+        (1,  "Pending"),
+        (20, "Shipped"),
+        (40, "Delivered"),
+        (60, "Returned"),
+        (80, "Cancelled"),
+    };
+
+    private void OpenRefundDialog()
+    {
+        if (_order is null) return;
+        _refundAmount = _order.OrderTotal;
+        _refundReason = null;
+        _refundError = null;
+        _refundDialog = true;
+    }
+
+    private async Task SubmitRefund()
+    {
+        if (_order is null) return;
+        if (_refundAmount <= 0)
+        {
+            _refundError = "Refund amount must be positive.";
+            return;
+        }
+        _refunding = true;
+        _refundError = null;
+        try
+        {
+            using var resp = await Payments.CreateRefundAsync(new AdminRefundRequest(Id, _refundAmount, _refundReason));
+            if (!resp.IsSuccessStatusCode)
+            {
+                // Surface the server's structured error (captured / remaining / error)
+                // verbatim. The endpoint returns a JSON body that's specific enough
+                // for admins to diagnose without opening a separate tab.
+                _refundError = $"Refund failed (HTTP {(int)resp.StatusCode}): {await resp.Content.ReadAsStringAsync()}";
+                return;
+            }
+            Snackbar.Add($"Refunded {_refundAmount:C}.", Severity.Success);
+            _refundDialog = false;
+            _order = await Orders.GetAsync(Id);
+        }
+        finally
+        {
+            _refunding = false;
+        }
+    }
+
+    private async Task OnShipmentStatusChanged(long shipmentId, int next)
+    {
+        using var resp = await Shipments.UpdateStatusAsync(shipmentId, new AdminUpdateShipmentStatusRequest(next));
+        if (!resp.IsSuccessStatusCode)
+        {
+            // 400 from server = invalid transition (e.g. Delivered → Pending).
+            // Reload so the dropdown snaps back to the persisted value.
+            Snackbar.Add($"Shipment status change rejected (HTTP {(int)resp.StatusCode}).", Severity.Warning);
+        }
+        else
+        {
+            Snackbar.Add("Shipment status updated.", Severity.Success);
+        }
+        await ReloadShipments();
+    }
+
+    private class NewShipForm
+    {
+        public long WarehouseId { get; set; }
+        public string? TrackingNumber { get; set; }
+    }
+
+    private class NewShipLine
+    {
+        public long OrderItemId { get; set; }
+        public long ProductId { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public int MaxQty { get; set; }
+        public int Qty { get; set; }
+        public bool Include { get; set; }
     }
 
     private async Task OnStatusChanged(int next)

@@ -13,7 +13,6 @@ namespace SimplCommerce.Module.Shipments
         {
             services.AddTransient<INotificationHandler<OrderDetailGot>, OrderDetailGotHandler>();
             services.AddTransient<IShipmentService, ShipmentService>();
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.shipment");
             return services;
         }
     }

@@ -61,6 +61,12 @@ public static class AuthEndpoints
                 .ToDictionary(g => g.Key, g => g.Select(e => e.Description).ToArray()));
         }
 
+        // G23: self-registered users are storefront customers. Without a role they
+        // still pass CustomerOnly (which only checks IsAuthenticated), but features
+        // that query GetRolesAsync (Me, /admin guards, future role-based UI) need
+        // the explicit "customer" mapping. CoreSeedData guarantees the role exists.
+        await userManager.AddToRoleAsync(user, "customer");
+
         return TypedResults.Ok(await tokens.IssueAsync(user));
     }
 

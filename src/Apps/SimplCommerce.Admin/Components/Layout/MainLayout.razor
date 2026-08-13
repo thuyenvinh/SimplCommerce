@@ -1,9 +1,18 @@
 @inherits LayoutComponentBase
+@* No layout-level @rendermode: Blazor refuses RenderFragment 'Body' across the
+   SSR/Interactive boundary. App.razor's <Routes @rendermode="InteractiveServer"/>
+   makes the whole layout subtree interactive instead. *@
 
 <MudThemeProvider IsDarkMode="_isDark" Theme="AdminTheme.Instance" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
+
+@* MudBlazor providers live in App.razor / MudProviders.razor now so popover
+   registration survives across navigations and per-page interactive components
+   always find them. Originally hosted here, but a save handler combining
+   Snackbar.Add + Nav.NavigateTo disposed the layout mid-render of the
+   snackbar's popover and threw "Missing <MudPopoverProvider />". *@
 
 <MudLayout>
     <MudAppBar Elevation="1">
@@ -34,6 +43,7 @@
             </MudNavGroup>
             <MudNavGroup Title="Sales" Icon="@Icons.Material.Filled.Receipt">
                 <MudNavLink Href="/orders" Icon="@Icons.Material.Filled.Receipt">Orders</MudNavLink>
+                <MudNavLink Href="/sales-report" Icon="@Icons.Material.Filled.QueryStats">Sales report</MudNavLink>
             </MudNavGroup>
             <MudNavGroup Title="Customers" Icon="@Icons.Material.Filled.People">
                 <MudNavLink Href="/users" Icon="@Icons.Material.Filled.Person">Users</MudNavLink>
@@ -45,6 +55,7 @@
                 <MudNavLink Href="/reviews" Icon="@Icons.Material.Filled.Reviews">Reviews</MudNavLink>
                 <MudNavLink Href="/comments" Icon="@Icons.Material.Filled.Comment">Comments</MudNavLink>
                 <MudNavLink Href="/contacts" Icon="@Icons.Material.Filled.ContactSupport">Contact inbox</MudNavLink>
+                <MudNavLink Href="/messages" Icon="@Icons.Material.Filled.Forum">Messages</MudNavLink>
             </MudNavGroup>
             <MudNavGroup Title="Pricing" Icon="@Icons.Material.Filled.LocalOffer">
                 <MudNavLink Href="/pricing" Icon="@Icons.Material.Filled.Rule">Rules &amp; coupons</MudNavLink>
@@ -59,6 +70,7 @@
             </MudNavGroup>
             <MudNavGroup Title="Vendors" Icon="@Icons.Material.Filled.Store">
                 <MudNavLink Href="/vendors" Icon="@Icons.Material.Filled.Store">Vendors</MudNavLink>
+                <MudNavLink Href="/vendors/applications" Icon="@Icons.Material.Filled.HowToReg">Applications</MudNavLink>
             </MudNavGroup>
             <MudNavGroup Title="Operations" Icon="@Icons.Material.Filled.Settings">
                 <MudNavLink Href="/warehouses" Icon="@Icons.Material.Filled.Warehouse">Warehouses</MudNavLink>

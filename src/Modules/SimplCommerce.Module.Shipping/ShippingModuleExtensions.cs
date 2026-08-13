@@ -7,7 +7,6 @@ namespace SimplCommerce.Module.Shipping
     {
         public static IServiceCollection AddShippingModule(this IServiceCollection services)
         {
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.shippings");
             return services;
         }
     }

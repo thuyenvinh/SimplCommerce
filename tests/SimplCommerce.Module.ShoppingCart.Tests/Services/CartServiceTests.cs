@@ -4,6 +4,7 @@ using Microsoft.Extensions.Localization;
 using MockQueryable;
 using Moq;
 using SimplCommerce.Infrastructure.Data;
+using SimplCommerce.Module.Catalog.Models;
 using SimplCommerce.Module.Catalog.Services;
 using SimplCommerce.Module.Core.Services;
 using SimplCommerce.Module.Pricing.Services;
@@ -16,6 +17,7 @@ namespace SimplCommerce.Module.ShoppingCart.Tests.Services;
 public class CartServiceTests
 {
     private readonly Mock<IRepository<CartItem>> _repo = new();
+    private readonly Mock<IRepository<Product>> _productRepo = new();
     private readonly Mock<ICouponService> _coupon = new();
     private readonly Mock<IMediaService> _media = new();
     private readonly Mock<ICurrencyService> _currency = new();
@@ -27,7 +29,36 @@ public class CartServiceTests
     {
         _repo.Setup(x => x.Query()).Returns(existingItems.AsQueryable().BuildMock());
         _repo.Setup(x => x.SaveChangesAsync()).Returns(Task.CompletedTask);
-        return new CartService(_repo.Object, _coupon.Object, _media.Object, _config, _currency.Object, _localizerFactory, _pricing.Object);
+        // Default the product graph to two sellable, stock-tracking-disabled products
+        // matching the IDs the legacy tests use (7 and 100) so pre-G16 tests still
+        // pass without each test having to stub the catalog.
+        SetupProduct(
+            MakeProduct(7, isPublished: true, isAllowToOrder: true),
+            MakeProduct(100, isPublished: true, isAllowToOrder: true));
+        return new CartService(_repo.Object, _coupon.Object, _media.Object, _config, _currency.Object, _localizerFactory, _pricing.Object, _productRepo.Object);
+    }
+
+    private void SetupProduct(params Product[] products)
+    {
+        _productRepo.Setup(x => x.Query()).Returns(products.AsQueryable().BuildMock());
+    }
+
+    private static Product MakeProduct(long id, bool isPublished = true, bool isAllowToOrder = true,
+        bool isCallForPricing = false, bool stockTrackingIsEnabled = false, int stockQuantity = 0)
+    {
+        var p = new Product
+        {
+            IsPublished = isPublished,
+            IsAllowToOrder = isAllowToOrder,
+            IsCallForPricing = isCallForPricing,
+            StockTrackingIsEnabled = stockTrackingIsEnabled,
+            StockQuantity = stockQuantity,
+        };
+        // EntityBase exposes Id with a protected setter; reflection is the only way
+        // to seed it in tests without polluting the production surface.
+        typeof(SimplCommerce.Infrastructure.Models.EntityBaseWithTypedId<long>)
+            .GetProperty("Id")!.SetValue(p, id);
+        return p;
     }
 
     [Fact]
@@ -93,6 +124,59 @@ public class CartServiceTests
         result.Success.Should().BeTrue();
         existing.Quantity.Should().Be(3);
         _repo.Verify(x => x.Add(It.IsAny<CartItem>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Unpublished_product_is_rejected()
+    {
+        var sut = Build();
+        SetupProduct(MakeProduct(7, isPublished: false));
+
+        var result = await sut.AddToCart(customerId: 42, productId: 7, quantity: 1);
+
+        result.Success.Should().BeFalse();
+        result.ErrorCode.Should().Be("product-not-orderable");
+        _repo.Verify(x => x.Add(It.IsAny<CartItem>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Call_for_pricing_product_is_rejected()
+    {
+        var sut = Build();
+        SetupProduct(MakeProduct(7, isCallForPricing: true));
+
+        var result = await sut.AddToCart(customerId: 42, productId: 7, quantity: 1);
+
+        result.Success.Should().BeFalse();
+        result.ErrorCode.Should().Be("product-not-orderable");
+    }
+
+    [Fact]
+    public async Task Quantity_exceeding_tracked_stock_is_rejected()
+    {
+        var sut = Build();
+        SetupProduct(MakeProduct(7, stockTrackingIsEnabled: true, stockQuantity: 3));
+
+        var result = await sut.AddToCart(customerId: 42, productId: 7, quantity: 5);
+
+        result.Success.Should().BeFalse();
+        result.ErrorCode.Should().Be("out-of-stock");
+        _repo.Verify(x => x.Add(It.IsAny<CartItem>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Stock_check_sums_existing_cart_quantity()
+    {
+        // already 2 in cart, stock = 3 → adding 2 more (total 4) should be rejected
+        var existing = new CartItem { CustomerId = 42, ProductId = 7, Quantity = 2 };
+        var sut = Build(existing);
+        SetupProduct(MakeProduct(7, stockTrackingIsEnabled: true, stockQuantity: 3));
+
+        var result = await sut.AddToCart(customerId: 42, productId: 7, quantity: 2);
+
+        result.Success.Should().BeFalse();
+        result.ErrorCode.Should().Be("out-of-stock");
+        existing.Quantity.Should().Be(2);
     }
 
     private sealed class StubLocalizerFactory : IStringLocalizerFactory

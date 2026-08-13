@@ -1,0 +1,89 @@
+@*
+    RichTextEditor
+    --------------
+    A deliberately lightweight, NO-JS-interop rich-text editor. By design this is a
+    "markdown-ish textarea with quick-insert buttons": a small formatting toolbar sits
+    above a multiline MudTextField. Toolbar buttons wrap/insert Markdown (or simple HTML
+    for the link button) around the current text. There is no contenteditable surface and
+    no JavaScript — this keeps the build clean (no npm/JS assets) and works fine under
+    Interactive Server. If a true WYSIWYG editor is needed later, swap this component out.
+
+    Two-way binding follows the exact @bind-Value + ValueChanged idiom from SlugInput.razor.
+
+    Usage:
+      <RichTextEditor @bind-Value="_form.Description" Label="Description" Lines="16" />
+*@
+
+<div class="d-flex flex-column" style="gap:4px">
+    <MudToolBar Dense="true" Gutters="false" Class="mud-elevation-0">
+        <MudTooltip Text="Bold">
+            <MudIconButton Icon="@Icons.Material.Filled.FormatBold" Size="Size.Small"
+                           OnClick="@(() => WrapAsync("**", "**", "bold text"))" />
+        </MudTooltip>
+        <MudTooltip Text="Italic">
+            <MudIconButton Icon="@Icons.Material.Filled.FormatItalic" Size="Size.Small"
+                           OnClick="@(() => WrapAsync("_", "_", "italic text"))" />
+        </MudTooltip>
+        <MudTooltip Text="Heading">
+            <MudIconButton Icon="@Icons.Material.Filled.Title" Size="Size.Small"
+                           OnClick="@(() => PrefixLineAsync("## ", "Heading"))" />
+        </MudTooltip>
+        <MudTooltip Text="Bullet list">
+            <MudIconButton Icon="@Icons.Material.Filled.FormatListBulleted" Size="Size.Small"
+                           OnClick="@(() => PrefixLineAsync("- ", "List item"))" />
+        </MudTooltip>
+        <MudTooltip Text="Link">
+            <MudIconButton Icon="@Icons.Material.Filled.Link" Size="Size.Small"
+                           OnClick="@(() => InsertAsync("<a href=\"https://\">link text</a>"))" />
+        </MudTooltip>
+    </MudToolBar>
+
+    <MudTextField T="string" Value="@Value" ValueChanged="OnChanged"
+                  Label="@Label" Lines="@Lines" Variant="Variant.Outlined"
+                  Immediate="true" AutoGrow="false" />
+</div>
+
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public string Label { get; set; } = "Content";
+    [Parameter] public int Lines { get; set; } = 12;
+
+    private Task OnChanged(string? next)
+    {
+        Value = next;
+        return ValueChanged.InvokeAsync(next);
+    }
+
+    // Wrap the whole current value with the given markers (no caret/selection tracking
+    // is possible without JS interop, so we operate on the full value). When empty we
+    // seed a placeholder so the markup is visible and editable.
+    private Task WrapAsync(string open, string close, string placeholder)
+    {
+        var body = string.IsNullOrEmpty(Value) ? placeholder : Value;
+        return SetAsync($"{open}{body}{close}");
+    }
+
+    // Prepend a line-level marker (heading / list item) on a new line.
+    private Task PrefixLineAsync(string prefix, string placeholder)
+    {
+        var existing = Value ?? string.Empty;
+        var line = $"{prefix}{placeholder}";
+        var next = string.IsNullOrEmpty(existing) ? line : $"{existing}\n{line}";
+        return SetAsync(next);
+    }
+
+    // Append an arbitrary snippet to the end of the value.
+    private Task InsertAsync(string snippet)
+    {
+        var existing = Value ?? string.Empty;
+        var next = string.IsNullOrEmpty(existing) ? snippet : $"{existing}{snippet}";
+        return SetAsync(next);
+    }
+
+    private Task SetAsync(string next)
+    {
+        Value = next;
+        return ValueChanged.InvokeAsync(next);
+    }
+}

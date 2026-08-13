@@ -1,0 +1,45 @@
+@*
+    Generic single-entity autocomplete picker wrapping MudAutocomplete<T>.
+    Self-contained — the parent supplies the in-memory Items list.
+
+    Usage:
+
+      <EntityPicker T="BrandDto" Items="_brands" @bind-Value="_selectedBrand"
+                    Label="Brand" ToText="b => b.Name" />
+*@
+@typeparam T
+
+<MudAutocomplete T="T"
+                 Label="@Label"
+                 Value="Value"
+                 ValueChanged="ValueChanged"
+                 SearchFunc="Search"
+                 ToStringFunc="@(item => item is null ? string.Empty : ToText(item))"
+                 Clearable="true"
+                 ResetValueOnEmptyText="true"
+                 CoerceText="true" />
+
+@code {
+    [Parameter] public IReadOnlyList<T>? Items { get; set; }
+    [Parameter] public T? Value { get; set; }
+    [Parameter] public EventCallback<T?> ValueChanged { get; set; }
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public Func<T, string> ToText { get; set; } = item => item?.ToString() ?? string.Empty;
+
+    private Task<IEnumerable<T>> Search(string value, CancellationToken token)
+    {
+        if (Items is null)
+        {
+            return Task.FromResult(Enumerable.Empty<T>());
+        }
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return Task.FromResult(Items.AsEnumerable());
+        }
+
+        var matches = Items.Where(i =>
+            ToText(i).Contains(value, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult(matches);
+    }
+}

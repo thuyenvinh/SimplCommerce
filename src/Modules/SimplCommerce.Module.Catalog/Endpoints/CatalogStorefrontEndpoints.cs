@@ -85,9 +85,12 @@ public static class CatalogStorefrontEndpoints
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
+        // G12: also gate on IsAllowToOrder so listings skip products marked
+        // "Ngừng bán". IsCallForPricing stays visible — those legitimately appear
+        // with a "Contact for price" CTA instead of an add-to-cart button.
         var query = repository.Query()
             .Include(p => p.ThumbnailImage)
-            .Where(p => p.IsPublished && p.IsVisibleIndividually);
+            .Where(p => p.IsPublished && p.IsVisibleIndividually && p.IsAllowToOrder);
 
         if (categoryId.HasValue)
         {
@@ -150,8 +153,10 @@ public static class CatalogStorefrontEndpoints
     private static async Task<Ok<IReadOnlyList<CategoryItem>>> ListCategoriesAsync(
         IRepository<Category> repository)
     {
+        // G11: storefront only sees published categories — admin can stage a
+        // category before launch by leaving IsPublished=false.
         var rows = await repository.Query()
-            .Where(c => !c.IsDeleted)
+            .Where(c => !c.IsDeleted && c.IsPublished)
             .OrderBy(c => c.DisplayOrder).ThenBy(c => c.Name)
             .Select(c => new CategoryItem(c.Id, c.Name, c.Slug, c.ParentId, c.DisplayOrder))
             .ToListAsync();
@@ -163,7 +168,7 @@ public static class CatalogStorefrontEndpoints
         IRepository<Category> repository)
     {
         var category = await repository.Query()
-            .Where(c => !c.IsDeleted && c.Slug == slug)
+            .Where(c => !c.IsDeleted && c.IsPublished && c.Slug == slug)
             .Select(c => new CategoryItem(c.Id, c.Name, c.Slug, c.ParentId, c.DisplayOrder))
             .FirstOrDefaultAsync();
         return category is null ? TypedResults.NotFound() : TypedResults.Ok(category);
@@ -173,7 +178,7 @@ public static class CatalogStorefrontEndpoints
         IRepository<Brand> repository)
     {
         var rows = await repository.Query()
-            .Where(b => !b.IsDeleted)
+            .Where(b => !b.IsDeleted && b.IsPublished)
             .OrderBy(b => b.Name)
             .Select(b => new BrandItem(b.Id, b.Name, b.Slug))
             .ToListAsync();
@@ -185,7 +190,7 @@ public static class CatalogStorefrontEndpoints
         IRepository<Brand> repository)
     {
         var brand = await repository.Query()
-            .Where(b => !b.IsDeleted && b.Slug == slug)
+            .Where(b => !b.IsDeleted && b.IsPublished && b.Slug == slug)
             .Select(b => new BrandItem(b.Id, b.Name, b.Slug))
             .FirstOrDefaultAsync();
         return brand is null ? TypedResults.NotFound() : TypedResults.Ok(brand);

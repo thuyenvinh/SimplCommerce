@@ -16,8 +16,9 @@ namespace SimplCommerce.Module.Orders
             services.AddTransient<INotificationHandler<OrderChanged>, OrderChangedCreateOrderHistoryHandler>();
             services.AddTransient<INotificationHandler<OrderCreated>, OrderCreatedCreateOrderHistoryHandler>();
             services.AddTransient<INotificationHandler<OrderCreated>, OrderCreatedClearCartHandler>();
-            // services.AddTransient<INotificationHandler<AfterOrderCreated>, AfterOrderCreatedSendEmailHanlder>();
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.orders");
+            // W3-G09: re-enabled after OrderEmailService stopped needing
+            // IRazorViewRenderer (which was never wired in the minimal-API host).
+            services.AddTransient<INotificationHandler<AfterOrderCreated>, AfterOrderCreatedSendEmailHanlder>();
             return services;
         }
     }

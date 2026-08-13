@@ -13,6 +13,7 @@ using SimplCommerce.Infrastructure.Data;
 using SimplCommerce.Module.Checkouts.Areas.Checkouts.ViewModels;
 using SimplCommerce.Module.Checkouts.Models;
 using SimplCommerce.Module.Checkouts.Services;
+using SimplCommerce.Module.Core.Models;
 using SimplCommerce.Module.Orders.Models;
 using SimplCommerce.Module.Orders.Services;
 using SimplCommerce.Module.Payments.Models;
@@ -131,11 +132,42 @@ public static class CheckoutStorefrontEndpoints
         CheckoutAddressRequest req,
         IRepositoryWithTypedId<Checkout, Guid> checkoutRepo,
         ICheckoutService checkoutService,
+        IRepositoryWithTypedId<Country, string> countryRepo,
+        IRepository<StateOrProvince> stateRepo,
+        IRepository<District> districtRepo,
         ClaimsPrincipal principal)
     {
         if (!TryGetUserId(principal, out var userId)) return Results.Unauthorized();
         var checkout = await checkoutRepo.Query().FirstOrDefaultAsync(x => x.Id == id);
         if (checkout is null || checkout.CreatedById != userId) return Results.NotFound();
+
+        // G12: validate the geo selection BEFORE persisting shipping data. Without these
+        // checks an arbitrary CountryId / StateOrProvinceId pair sneaks through, then
+        // OrderService.CreateOrder later joins on the missing ids and either returns
+        // unhelpful 500s or silently writes addresses against deleted/non-existent rows.
+        // The three-way check enforces both existence + parent-child consistency:
+        //   • Country must exist + be shipping-enabled
+        //   • StateOrProvince must exist AND belong to the chosen country
+        //   • District (when provided) must belong to the chosen state
+        var country = await countryRepo.Query().FirstOrDefaultAsync(c => c.Id == req.CountryId);
+        if (country is null || !country.IsShippingEnabled)
+        {
+            return Results.BadRequest(new { error = "Country is not available for shipping.", field = nameof(req.CountryId) });
+        }
+        var state = await stateRepo.Query().FirstOrDefaultAsync(s => s.Id == req.StateOrProvinceId);
+        if (state is null || state.CountryId != country.Id)
+        {
+            return Results.BadRequest(new { error = "State/province doesn't belong to the selected country.", field = nameof(req.StateOrProvinceId) });
+        }
+        if (req.DistrictId is { } districtId)
+        {
+            var districtBelongs = await districtRepo.Query()
+                .AnyAsync(d => d.Id == districtId && d.StateOrProvinceId == state.Id);
+            if (!districtBelongs)
+            {
+                return Results.BadRequest(new { error = "District doesn't belong to the selected state.", field = nameof(req.DistrictId) });
+            }
+        }
 
         var delivery = new DeliveryInformationVm
         {

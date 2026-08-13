@@ -1,0 +1,139 @@
+@page "/messages"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminMessagesApi Messages
+@inject ISnackbar Snackbar
+
+<PageTitle>Messages — Admin</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Messages</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="4">
+        <MudPaper Class="pa-2" Style="max-height: 70vh; overflow-y: auto;">
+            @if (_threads is null)
+            {
+                <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="ma-4" />
+            }
+            else if (_threads.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info" Class="ma-2">No conversations yet.</MudAlert>
+            }
+            else
+            {
+                <MudList T="AdminMessageThreadSummary" Dense="true">
+                    @foreach (var t in _threads)
+                    {
+                        <MudListItem T="AdminMessageThreadSummary" OnClick="@(() => OpenThread(t))"
+                                     Class="@(t.CounterpartUserId == _activeCustomerId ? "mud-selected-item" : "")">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudText Typo="Typo.body2" Style="flex:1">
+                                    <strong>@(t.CounterpartName ?? $"Customer #{t.CounterpartUserId}")</strong>
+                                    <br /><MudText Typo="Typo.caption">@t.LastSnippet</MudText>
+                                </MudText>
+                                @if (t.UnreadCount > 0)
+                                {
+                                    <MudBadge Content="t.UnreadCount" Color="Color.Primary" Overlap="false" />
+                                }
+                            </MudStack>
+                        </MudListItem>
+                        <MudDivider />
+                    }
+                </MudList>
+            }
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="8">
+        <MudPaper Class="pa-4" Style="min-height: 70vh; display:flex; flex-direction:column;">
+            @if (_activeCustomerId is null)
+            {
+                <MudAlert Severity="Severity.Info">Select a conversation to read + reply.</MudAlert>
+            }
+            else
+            {
+                <MudText Typo="Typo.h6" Class="mb-3">@(_activeName ?? $"Customer #{_activeCustomerId}")</MudText>
+                <div style="flex:1; overflow-y:auto; max-height: 55vh;">
+                    @if (_thread is null)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else
+                    {
+                        @foreach (var m in _thread)
+                        {
+                            var mine = m.SenderKind != 1; // Vendor/Admin messages align right
+                            <div style="@($"display:flex; margin:6px 0; justify-content:{(mine ? "flex-end" : "flex-start")};")">
+                                <MudPaper Class="pa-2" Elevation="1"
+                                          Style="@($"max-width:70%; background:{(mine ? "#e3f2fd" : "#f5f5f5")};")">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @SenderLabel(m.SenderKind) — @m.CreatedOn.LocalDateTime.ToString("g")
+                                    </MudText>
+                                    <MudText Typo="Typo.body2">@m.Body</MudText>
+                                </MudPaper>
+                            </div>
+                        }
+                    }
+                </div>
+                <MudStack Row="true" AlignItems="AlignItems.End" Class="mt-3">
+                    <MudTextField @bind-Value="_reply" Label="Reply" Lines="2" Class="flex-grow-1" Immediate="true" />
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SendReply"
+                               Disabled="@(_sending || string.IsNullOrWhiteSpace(_reply))">
+                        @(_sending ? "…" : "Send")
+                    </MudButton>
+                </MudStack>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private IReadOnlyList<AdminMessageThreadSummary>? _threads;
+    private IReadOnlyList<AdminMessageItem>? _thread;
+    private long? _activeCustomerId;
+    private string? _activeName;
+    private string? _reply;
+    private bool _sending;
+
+    protected override async Task OnInitializedAsync() => await ReloadThreads();
+
+    private async Task ReloadThreads()
+    {
+        _threads = await Messages.ListThreadsAsync();
+        StateHasChanged();
+    }
+
+    private async Task OpenThread(AdminMessageThreadSummary t)
+    {
+        _activeCustomerId = t.CounterpartUserId;
+        _activeName = t.CounterpartName;
+        _thread = null;
+        StateHasChanged();
+        // GET marks incoming customer messages as read server-side, so refresh
+        // the thread list afterwards to clear the unread badge.
+        _thread = await Messages.GetThreadAsync(t.CounterpartUserId);
+        await ReloadThreads();
+    }
+
+    private async Task SendReply()
+    {
+        if (_activeCustomerId is not { } cid || string.IsNullOrWhiteSpace(_reply)) return;
+        _sending = true;
+        try
+        {
+            using var resp = await Messages.ReplyAsync(cid, new AdminSendMessageRequest(_reply!, null));
+            if (!resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add($"Send failed (HTTP {(int)resp.StatusCode}).", Severity.Error);
+                return;
+            }
+            _reply = null;
+            _thread = await Messages.GetThreadAsync(cid);
+        }
+        finally { _sending = false; }
+    }
+
+    private static string SenderLabel(int kind) => kind switch
+    {
+        1 => "Customer", 5 => "Vendor", 10 => "Admin", _ => "?",
+    };
+}

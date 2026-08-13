@@ -63,6 +63,13 @@ builder.Services.AddHttpClient<IWishlistApi, WishlistApi>(c => c.BaseAddress = n
     .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
 builder.Services.AddHttpClient<ICmsApi, CmsApi>(c => c.BaseAddress = new Uri(apiBase));
 builder.Services.AddHttpClient<INewsApi, NewsApi>(c => c.BaseAddress = new Uri(apiBase));
+// Wave 19: marketplace storefront clients. Vendors list/detail/products are
+// anonymous but apply + messaging are CustomerOnly, so both carry the bearer
+// handler (harmless on the public GETs).
+builder.Services.AddHttpClient<IVendorsApi, VendorsApi>(c => c.BaseAddress = new Uri(apiBase))
+    .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
+builder.Services.AddHttpClient<IMessagesApi, MessagesApi>(c => c.BaseAddress = new Uri(apiBase))
+    .AddHttpMessageHandler<ApiAuthDelegatingHandler>();
 
 builder.Services.AddScoped<CookieAuthStateService>();
 

@@ -1,8 +1,6 @@
-using System.Data.Common;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SimplCommerce.Infrastructure.Modules;
 using SimplCommerce.Module.Core.Data;
@@ -33,6 +31,17 @@ public class SimplApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     {
         await _sql.StartAsync();
 
+        // Aspire's AddSqlServerDbContext("SimplCommerce") reads the connection string
+        // at registration time inside Program.cs — BEFORE WebApplicationFactory's
+        // ConfigureAppConfiguration callbacks run — so an in-memory config source is
+        // applied too late and Aspire captures a null connection string. Environment
+        // variables ARE read by WebApplication.CreateBuilder immediately, so set them
+        // before the host is built (first .Services access below). Empty redis/blobs
+        // tell Aspire to disable those components.
+        Environment.SetEnvironmentVariable("ConnectionStrings__SimplCommerce", _sql.GetConnectionString());
+        Environment.SetEnvironmentVariable("ConnectionStrings__redis", string.Empty);
+        Environment.SetEnvironmentVariable("ConnectionStrings__blobs", string.Empty);
+
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SimplDbContext>();
         await db.Database.MigrateAsync();
@@ -40,45 +49,26 @@ public class SimplApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public new async Task DisposeAsync()
     {
+        Environment.SetEnvironmentVariable("ConnectionStrings__SimplCommerce", null);
+        Environment.SetEnvironmentVariable("ConnectionStrings__redis", null);
+        Environment.SetEnvironmentVariable("ConnectionStrings__blobs", null);
         await _sql.DisposeAsync();
         await base.DisposeAsync();
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // Keep a production-like environment. NOT Development: that flips on the DI
+        // container's ValidateOnBuild, which eagerly validates every registration in
+        // this large modular app (many conditional/IEnumerable handler registrations
+        // aren't resolvable as roots) — stricter than production and out of scope to
+        // satisfy here. Health endpoints are dev-only by design, so the smoke test
+        // hits an always-mapped anonymous endpoint instead.
         builder.UseEnvironment("Testing");
 
-        builder.ConfigureAppConfiguration((_, config) =>
-        {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:SimplCommerce"] = _sql.GetConnectionString(),
-                ["ConnectionStrings:redis"] = string.Empty,
-                ["ConnectionStrings:blobs"] = string.Empty,
-            });
-        });
-
-        builder.ConfigureServices(services =>
-        {
-            ModuleManifestLoader.LoadAllBundled();
-
-            var dbDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<SimplDbContext>));
-            if (dbDescriptor is not null)
-            {
-                services.Remove(dbDescriptor);
-            }
-            var connectionDescriptors = services
-                .Where(d => d.ServiceType == typeof(DbConnection))
-                .ToList();
-            foreach (var cd in connectionDescriptors)
-            {
-                services.Remove(cd);
-            }
-
-            services.AddDbContext<SimplDbContext>(options =>
-                options.UseSqlServer(_sql.GetConnectionString(),
-                    sql => sql.MigrationsAssembly("SimplCommerce.Migrations")));
-        });
+        // SimplDbContext.OnModelCreating walks GlobalConfiguration.Modules for entity
+        // discovery; seed the manifest (idempotent — Program.cs also calls it).
+        builder.ConfigureServices(_ => ModuleManifestLoader.LoadAllBundled());
     }
 }
 

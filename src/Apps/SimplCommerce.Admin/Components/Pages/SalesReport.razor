@@ -1,0 +1,80 @@
+@page "/sales-report"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminOrdersApi Orders
+@inject ISnackbar Snack
+
+<PageTitle>Sales report — Admin</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Sales report</MudText>
+
+<MudPaper Class="pa-4">
+    <MudStack Row="true" AlignItems="AlignItems.End" Class="mb-4" Spacing="2">
+        <MudDatePicker @bind-Date="_from" Label="From" Editable="true" />
+        <MudDatePicker @bind-Date="_to" Label="To" Editable="true" />
+        <MudButton OnClick="Reload" Variant="Variant.Filled" Color="Color.Primary">Apply</MudButton>
+        <MudSpacer />
+        @if (_report?.Totals is { } t)
+        {
+            <MudText Typo="Typo.h6">@t.OrderCount orders · @t.Revenue.ToString("C")</MudText>
+        }
+    </MudStack>
+
+    @if (_report is null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (_report.Rows.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">No paid orders in that window.</MudAlert>
+    }
+    else
+    {
+        <MudChart ChartType="ChartType.Line"
+                  ChartSeries="_series"
+                  XAxisLabels="_xAxisLabels"
+                  Width="100%" Height="320px" />
+
+        <MudTable T="AdminSalesReportRow" Items="_report.Rows" Dense="true" Hover="true" Class="mt-4">
+            <HeaderContent>
+                <MudTh>Day</MudTh><MudTh>Orders</MudTh><MudTh>Revenue</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Day.ToString("yyyy-MM-dd")</MudTd>
+                <MudTd>@context.OrderCount</MudTd>
+                <MudTd>@context.Revenue.ToString("C")</MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private DateTime? _from = DateTime.UtcNow.AddDays(-30).Date;
+    private DateTime? _to = DateTime.UtcNow.Date;
+    private AdminSalesReport? _report;
+
+    private List<ChartSeries> _series = new();
+    private string[] _xAxisLabels = Array.Empty<string>();
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        _report = await Orders.GetSalesReportAsync(
+            _from.HasValue ? new DateTimeOffset(_from.Value) : null,
+            _to.HasValue ? new DateTimeOffset(_to.Value) : null);
+
+        if (_report?.Rows is { Count: > 0 } rows)
+        {
+            _xAxisLabels = rows.Select(r => r.Day.ToString("MM-dd")).ToArray();
+            _series = new()
+            {
+                new ChartSeries { Name = "Revenue", Data = rows.Select(r => (double)r.Revenue).ToArray() }
+            };
+        }
+        else
+        {
+            _series = new();
+            _xAxisLabels = Array.Empty<string>();
+        }
+        StateHasChanged();
+    }
+}

@@ -7,7 +7,6 @@ namespace SimplCommerce.Module.PaymentCoD
     {
         public static IServiceCollection AddPaymentCoDModule(this IServiceCollection services)
         {
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.paymentCoD");
             return services;
         }
     }

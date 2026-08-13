@@ -1,0 +1,73 @@
+@*
+    Slug field that auto-generates from a source value (typically the entity's
+    Name). Once the user has typed in the slug manually, auto-generation stops
+    so a custom slug isn't overwritten on every keystroke.
+
+    Usage:
+
+      <MudTextField @bind-Value="_form.Name" Label="Name" />
+      <SlugInput @bind-Value="_form.Slug" Source="_form.Name" />
+*@
+
+@implements IDisposable
+
+<MudTextField T="string" Value="@Value" ValueChanged="OnChanged"
+              Label="@Label" HelperText="@Helper" Required="@Required"
+              Immediate="true" />
+
+@code {
+    [Parameter] public string Value { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string Source { get; set; } = string.Empty;
+    [Parameter] public string Label { get; set; } = "Slug";
+    [Parameter] public string Helper { get; set; } = "URL-friendly identifier (auto from name until you type)";
+    [Parameter] public bool Required { get; set; } = true;
+
+    private bool _userEdited;
+    private string _lastSource = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        if (!_userEdited && Source != _lastSource)
+        {
+            _lastSource = Source;
+            var slug = Slugify(Source);
+            if (!string.Equals(slug, Value, StringComparison.Ordinal))
+            {
+                Value = slug;
+                _ = ValueChanged.InvokeAsync(slug);
+            }
+        }
+    }
+
+    private Task OnChanged(string next)
+    {
+        _userEdited = !string.IsNullOrWhiteSpace(next) && next != Slugify(Source);
+        Value = next;
+        return ValueChanged.InvokeAsync(next);
+    }
+
+    public void Dispose() { }
+
+    private static string Slugify(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return string.Empty;
+        var lower = raw.Trim().ToLowerInvariant();
+        var sb = new System.Text.StringBuilder(lower.Length);
+        var lastDash = false;
+        foreach (var c in lower)
+        {
+            if (char.IsLetterOrDigit(c))
+            {
+                sb.Append(c);
+                lastDash = false;
+            }
+            else if (!lastDash && sb.Length > 0)
+            {
+                sb.Append('-');
+                lastDash = true;
+            }
+        }
+        return sb.ToString().TrimEnd('-');
+    }
+}

@@ -9,7 +9,6 @@ namespace SimplCommerce.Module.Comments
         public static IServiceCollection AddCommentsModule(this IServiceCollection services)
         {
             services.AddTransient<ICommentRepository, CommentRepository>();
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.comments");
             return services;
         }
     }

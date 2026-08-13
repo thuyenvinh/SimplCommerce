@@ -1,0 +1,270 @@
+@page "/vendors/applications"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminVendorsApi Vendors
+@inject ISnackbar Snackbar
+
+<PageTitle>Vendor applications — Admin</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Vendor applications</MudText>
+    <MudSpacer />
+    <MudSelect T="int?" Value="_statusFilter" Label="Status" Dense="true"
+               Variant="Variant.Outlined" Style="min-width:180px;" Clearable="true"
+               ValueChanged="OnFilterChanged">
+        <MudSelectItem T="int?" Value="@((int?)1)">Pending</MudSelectItem>
+        <MudSelectItem T="int?" Value="@((int?)5)">Approved</MudSelectItem>
+        <MudSelectItem T="int?" Value="@((int?)10)">Rejected</MudSelectItem>
+    </MudSelect>
+</MudStack>
+
+@if (_page is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_page.Items.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">No applications match the current filter.</MudAlert>
+}
+else
+{
+    <MudTable T="AdminVendorApplicationItem" Items="_page.Items" Dense="true" Hover="true" Striped="true">
+        <HeaderContent>
+            <MudTh>ID</MudTh><MudTh>Business</MudTh><MudTh>Applicant</MudTh>
+            <MudTh>Status</MudTh><MudTh>Submitted</MudTh><MudTh>Decision</MudTh><MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.Id</MudTd>
+            <MudTd>
+                <MudText Typo="Typo.body2"><strong>@context.BusinessName</strong></MudText>
+                <MudText Typo="Typo.caption">/@context.Slug</MudText>
+            </MudTd>
+            <MudTd>
+                <MudText Typo="Typo.body2">@context.ApplicantEmail</MudText>
+                <MudText Typo="Typo.caption">#@context.ApplicantUserId</MudText>
+            </MudTd>
+            <MudTd>
+                <MudChip T="string" Color="@StatusColor(context.Status)" Size="Size.Small">@StatusLabel(context.Status)</MudChip>
+            </MudTd>
+            <MudTd>@context.CreatedOn.LocalDateTime.ToString("g")</MudTd>
+            <MudTd>
+                @if (context.DecidedOn is { } d)
+                {
+                    <MudText Typo="Typo.caption">@d.LocalDateTime.ToString("g")</MudText>
+                    @if (!string.IsNullOrWhiteSpace(context.DecisionNote))
+                    {
+                        <MudText Typo="Typo.caption">@context.DecisionNote</MudText>
+                    }
+                }
+                else { <span>—</span> }
+            </MudTd>
+            <MudTd>
+                <MudButton Size="Size.Small" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Description"
+                           OnClick="@(() => OpenDocuments(context))" Class="mr-1">Docs</MudButton>
+                @if (context.Status == 1)
+                {
+                    <MudButton Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined"
+                               OnClick="@(() => OpenDecision(context, approve: true))" Class="mr-1">Approve</MudButton>
+                    <MudButton Size="Size.Small" Color="Color.Error" Variant="Variant.Outlined"
+                               OnClick="@(() => OpenDecision(context, approve: false))">Reject</MudButton>
+                }
+                else if (context.CreatedVendorId is { } vid)
+                {
+                    <MudButton Size="Size.Small" Variant="Variant.Text" Href="@($"/vendors/{vid}/payouts")">Payouts</MudButton>
+                }
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+<MudDialog @bind-Visible="_dialog" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>@(_approve ? "Approve" : "Reject") application #@(_target?.Id)</TitleContent>
+    <DialogContent>
+        @if (_target is not null)
+        {
+            <MudText Typo="Typo.body2" Class="mb-2">
+                <strong>@_target.BusinessName</strong> (/@_target.Slug)<br/>
+                @_target.ApplicantEmail
+            </MudText>
+            @if (!string.IsNullOrWhiteSpace(_target.Description))
+            {
+                <MudText Typo="Typo.body2" Class="mt-2">@_target.Description</MudText>
+            }
+            <MudTextField @bind-Value="_decisionNote" Label="Decision note (optional, visible to applicant)"
+                          Lines="3" Class="mt-3" />
+            @if (_approve)
+            {
+                <MudAlert Severity="Severity.Info" Class="mt-3">
+                    Approval creates a Vendor row, stamps it on the applicant's user
+                    record, and grants the <em>vendor</em> role. The applicant becomes
+                    able to log in to the admin app immediately.
+                </MudAlert>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _dialog = false)">Cancel</MudButton>
+        <MudButton Color="@(_approve ? Color.Success : Color.Error)" Variant="Variant.Filled"
+                   OnClick="SubmitDecision" Disabled="_submitting">
+            @(_submitting ? "Saving…" : _approve ? "Approve" : "Reject")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<MudDialog @bind-Visible="_docsDialog" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })">
+    <TitleContent>KYC documents — @(_docsTarget?.BusinessName)</TitleContent>
+    <DialogContent>
+        @if (_docs is null)
+        {
+            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+        }
+        else if (_docs.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info">Applicant hasn't uploaded any documents.</MudAlert>
+        }
+        else
+        {
+            <MudTable T="AdminVendorDocumentItem" Items="_docs" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>Type</MudTh><MudTh>Status</MudTh><MudTh>Uploaded</MudTh>
+                    <MudTh>File</MudTh><MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@DocTypeLabel(context.DocumentType)</MudTd>
+                    <MudTd><MudChip T="string" Size="Size.Small" Color="@DocStatusColor(context.Status)">@DocStatusLabel(context.Status)</MudChip></MudTd>
+                    <MudTd>@context.CreatedOn.LocalDateTime.ToString("g")</MudTd>
+                    <MudTd><MudLink Href="@context.Url" Target="_blank">Open</MudLink></MudTd>
+                    <MudTd>
+                        @if (context.Status == 1)
+                        {
+                            <MudButton Size="Size.Small" Color="Color.Success" Variant="Variant.Text"
+                                       OnClick="@(() => SetDocStatus(context.Id, 5))">Verify</MudButton>
+                            <MudButton Size="Size.Small" Color="Color.Error" Variant="Variant.Text"
+                                       OnClick="@(() => SetDocStatus(context.Id, 10))">Reject</MudButton>
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _docsDialog = false)">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private AdminVendorApplicationsPage? _page;
+    private int? _statusFilter = 1; // default: pending
+    private bool _dialog;
+    private bool _approve;
+    private bool _submitting;
+    private AdminVendorApplicationItem? _target;
+    private string? _decisionNote;
+
+    // Wave 18: KYC document review
+    private bool _docsDialog;
+    private AdminVendorApplicationItem? _docsTarget;
+    private IReadOnlyList<AdminVendorDocumentItem>? _docs;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        _page = null;
+        StateHasChanged();
+        _page = await Vendors.ListApplicationsAsync(_statusFilter, page: 1, pageSize: 50);
+        StateHasChanged();
+    }
+
+    private async Task OnFilterChanged(int? value)
+    {
+        _statusFilter = value;
+        await Reload();
+    }
+
+    private void OpenDecision(AdminVendorApplicationItem item, bool approve)
+    {
+        _target = item;
+        _approve = approve;
+        _decisionNote = null;
+        _dialog = true;
+    }
+
+    private async Task SubmitDecision()
+    {
+        if (_target is null) return;
+        _submitting = true;
+        try
+        {
+            var req = new AdminVendorApplicationDecision(_decisionNote);
+            using var resp = _approve
+                ? await Vendors.ApproveApplicationAsync(_target.Id, req)
+                : await Vendors.RejectApplicationAsync(_target.Id, req);
+            if (!resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add($"{(_approve ? "Approve" : "Reject")} failed (HTTP {(int)resp.StatusCode}): {await resp.Content.ReadAsStringAsync()}", Severity.Error);
+                return;
+            }
+            Snackbar.Add(_approve ? "Application approved." : "Application rejected.", Severity.Success);
+            _dialog = false;
+            await Reload();
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private async Task OpenDocuments(AdminVendorApplicationItem item)
+    {
+        _docsTarget = item;
+        _docs = null;
+        _docsDialog = true;
+        _docs = await Vendors.ListApplicationDocumentsAsync(item.Id);
+        StateHasChanged();
+    }
+
+    private async Task SetDocStatus(long docId, int newStatus)
+    {
+        using var resp = await Vendors.UpdateDocumentStatusAsync(docId, new AdminDocumentStatusUpdateRequest(newStatus, null));
+        if (!resp.IsSuccessStatusCode)
+        {
+            Snackbar.Add($"Update failed (HTTP {(int)resp.StatusCode}).", Severity.Error);
+            return;
+        }
+        Snackbar.Add(newStatus == 5 ? "Document verified." : "Document rejected.", Severity.Success);
+        if (_docsTarget is not null) _docs = await Vendors.ListApplicationDocumentsAsync(_docsTarget.Id);
+        StateHasChanged();
+    }
+
+    private static string DocTypeLabel(int t) => t switch
+    {
+        1 => "Business registration", 5 => "Tax ID", 10 => "Identity proof",
+        15 => "Bank statement", 20 => "Address proof", 90 => "Other", _ => t.ToString(),
+    };
+
+    private static string DocStatusLabel(int s) => s switch
+    {
+        1 => "Submitted", 5 => "Verified", 10 => "Rejected", _ => s.ToString(),
+    };
+
+    private static Color DocStatusColor(int s) => s switch
+    {
+        1 => Color.Warning, 5 => Color.Success, 10 => Color.Error, _ => Color.Default,
+    };
+
+    private static Color StatusColor(int s) => s switch
+    {
+        1 => Color.Warning,
+        5 => Color.Success,
+        10 => Color.Default,
+        _ => Color.Default,
+    };
+
+    private static string StatusLabel(int s) => s switch
+    {
+        1 => "Pending",
+        5 => "Approved",
+        10 => "Rejected",
+        _ => s.ToString(),
+    };
+}

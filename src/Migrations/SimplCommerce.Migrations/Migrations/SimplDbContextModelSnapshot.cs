@@ -830,6 +830,9 @@ namespace SimplCommerce.Migrations.Migrations
                     b.Property<DateTimeOffset>("LatestUpdatedOn")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<long?>("OrderCreatedId")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("OrderNote")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
@@ -873,6 +876,12 @@ namespace SimplCommerce.Migrations.Migrations
                     b.Property<DateTimeOffset>("CreatedOn")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<decimal?>("LockedPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTimeOffset?>("LockedPriceOn")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<long>("ProductId")
                         .HasColumnType("bigint");
 
@@ -886,6 +895,46 @@ namespace SimplCommerce.Migrations.Migrations
                     b.HasIndex("ProductId");
 
                     b.ToTable("Checkouts_CheckoutItem", (string)null);
+                });
+
+            modelBuilder.Entity("SimplCommerce.Module.Cms.Models.EmailTemplate", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("BodyHtml")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("CreatedOn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTimeOffset>("LatestUpdatedOn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Cms_EmailTemplate", (string)null);
                 });
 
             modelBuilder.Entity("SimplCommerce.Module.Cms.Models.Menu", b =>
@@ -1975,6 +2024,9 @@ namespace SimplCommerce.Migrations.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
+                    b.Property<decimal>("CommissionPercent")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<DateTimeOffset>("CreatedOn")
                         .HasColumnType("datetimeoffset");
 
@@ -1993,13 +2045,28 @@ namespace SimplCommerce.Migrations.Migrations
                     b.Property<DateTimeOffset>("LatestUpdatedOn")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("MomoPartnerCode")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<decimal>("ShippingFlatFee")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<string>("Slug")
                         .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("StripeAccountId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("VnpayMerchantId")
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
@@ -2465,6 +2532,9 @@ namespace SimplCommerce.Migrations.Migrations
                     b.Property<long>("BillingAddressId")
                         .HasColumnType("bigint");
 
+                    b.Property<decimal>("CommissionAmount")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<string>("CouponCode")
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
@@ -2534,6 +2604,9 @@ namespace SimplCommerce.Migrations.Migrations
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<long?>("VendorId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("VendorPayoutId")
                         .HasColumnType("bigint");
 
                     b.HasKey("Id");
@@ -2716,6 +2789,12 @@ namespace SimplCommerce.Migrations.Migrations
                     b.Property<string>("PaymentMethod")
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
+
+                    b.Property<decimal?>("RefundedAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTimeOffset?>("RefundedOn")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
@@ -3205,6 +3284,9 @@ namespace SimplCommerce.Migrations.Migrations
                     b.Property<long>("OrderId")
                         .HasColumnType("bigint");
 
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
                     b.Property<string>("TrackingNumber")
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
@@ -3457,6 +3539,232 @@ namespace SimplCommerce.Migrations.Migrations
                     b.HasIndex("TaxClassId");
 
                     b.ToTable("Tax_TaxRate", (string)null);
+                });
+
+            modelBuilder.Entity("SimplCommerce.Module.Vendors.Models.VendorApplication", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("ApplicantUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("BusinessName")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ContactEmail")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ContactPhone")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset>("CreatedOn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("CreatedVendorId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("DecidedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("DecidedOn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DecisionNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("LatestUpdatedOn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("RegistrationNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicantUserId");
+
+                    b.ToTable("Vendors_VendorApplication", (string)null);
+                });
+
+            modelBuilder.Entity("SimplCommerce.Module.Vendors.Models.VendorDocument", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AdminNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTimeOffset>("CreatedOn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("DocumentType")
+                        .HasColumnType("int");
+
+                    b.Property<long>("MediaId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<long>("UploadedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("VendorApplicationId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("VendorId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("VerifiedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("VerifiedOn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MediaId");
+
+                    b.HasIndex("UploadedByUserId");
+
+                    b.HasIndex("VendorApplicationId");
+
+                    b.HasIndex("VendorId");
+
+                    b.HasIndex("VerifiedByUserId");
+
+                    b.ToTable("Vendors_VendorDocument", (string)null);
+                });
+
+            modelBuilder.Entity("SimplCommerce.Module.Vendors.Models.VendorMessage", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateTimeOffset>("CreatedOn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CustomerUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("FromUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("OrderId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("ReadAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("SenderKind")
+                        .HasColumnType("int");
+
+                    b.Property<long>("VendorId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerUserId");
+
+                    b.HasIndex("FromUserId");
+
+                    b.HasIndex("VendorId");
+
+                    b.ToTable("Vendors_VendorMessage", (string)null);
+                });
+
+            modelBuilder.Entity("SimplCommerce.Module.Vendors.Models.VendorPayout", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("CommissionAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTimeOffset?>("CompletedOn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CreatedOn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ExternalTransferReference")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<decimal>("GrossAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("NetAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("OrderCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProviderResponse")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateTimeOffset?>("SentOn")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<long>("VendorId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("VendorId");
+
+                    b.ToTable("Vendors_VendorPayout", (string)null);
                 });
 
             modelBuilder.Entity("SimplCommerce.Module.WishList.Models.WishList", b =>
@@ -4581,6 +4889,103 @@ namespace SimplCommerce.Migrations.Migrations
                     b.Navigation("StateOrProvince");
 
                     b.Navigation("TaxClass");
+                });
+
+            modelBuilder.Entity("SimplCommerce.Module.Vendors.Models.VendorApplication", b =>
+                {
+                    b.HasOne("SimplCommerce.Module.Core.Models.User", "ApplicantUser")
+                        .WithMany()
+                        .HasForeignKey("ApplicantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ApplicantUser");
+                });
+
+            modelBuilder.Entity("SimplCommerce.Module.Vendors.Models.VendorDocument", b =>
+                {
+                    b.HasOne("SimplCommerce.Module.Core.Models.Media", "Media")
+                        .WithMany()
+                        .HasForeignKey("MediaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SimplCommerce.Module.Core.Models.User", "UploadedByUser")
+                        .WithMany()
+                        .HasForeignKey("UploadedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SimplCommerce.Module.Vendors.Models.VendorApplication", "VendorApplication")
+                        .WithMany()
+                        .HasForeignKey("VendorApplicationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SimplCommerce.Module.Core.Models.Vendor", "Vendor")
+                        .WithMany()
+                        .HasForeignKey("VendorId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SimplCommerce.Module.Core.Models.User", "VerifiedByUser")
+                        .WithMany()
+                        .HasForeignKey("VerifiedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Media");
+
+                    b.Navigation("UploadedByUser");
+
+                    b.Navigation("Vendor");
+
+                    b.Navigation("VendorApplication");
+
+                    b.Navigation("VerifiedByUser");
+                });
+
+            modelBuilder.Entity("SimplCommerce.Module.Vendors.Models.VendorMessage", b =>
+                {
+                    b.HasOne("SimplCommerce.Module.Core.Models.User", "CustomerUser")
+                        .WithMany()
+                        .HasForeignKey("CustomerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SimplCommerce.Module.Core.Models.User", "FromUser")
+                        .WithMany()
+                        .HasForeignKey("FromUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SimplCommerce.Module.Core.Models.Vendor", "Vendor")
+                        .WithMany()
+                        .HasForeignKey("VendorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CustomerUser");
+
+                    b.Navigation("FromUser");
+
+                    b.Navigation("Vendor");
+                });
+
+            modelBuilder.Entity("SimplCommerce.Module.Vendors.Models.VendorPayout", b =>
+                {
+                    b.HasOne("SimplCommerce.Module.Core.Models.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SimplCommerce.Module.Core.Models.Vendor", "Vendor")
+                        .WithMany()
+                        .HasForeignKey("VendorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Vendor");
                 });
 
             modelBuilder.Entity("SimplCommerce.Module.WishList.Models.WishList", b =>

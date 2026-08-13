@@ -1,0 +1,219 @@
+@page "/vendors/{VendorId:long}/payouts"
+@rendermode RenderMode.InteractiveServer
+@inject IAdminVendorsApi Vendors
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>Vendor payouts — Admin</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Nav.NavigateTo("/vendors"))" aria-label="Back to vendors" />
+    <MudText Typo="Typo.h4">Payouts — @(_balance?.VendorName ?? $"Vendor #{VendorId}")</MudText>
+    <MudSpacer />
+    <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Payments"
+               OnClick="OpenCreateDialog"
+               Disabled="@(_balance is null || _balance.EligibleOrderCount == 0)">
+        Create payout
+    </MudButton>
+</MudStack>
+
+@if (!_loaded)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_balance is null)
+{
+    <MudAlert Severity="Severity.Warning">Vendor #@VendorId not found (or has no balance record).</MudAlert>
+}
+else
+{
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="4">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Pending net</MudText>
+                <MudText Typo="Typo.h4">@((_balance.PendingPayoutGross - _balance.PendingCommission).ToString("C"))</MudText>
+                <MudText Typo="Typo.caption">@_balance.EligibleOrderCount completed order(s) awaiting payout</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Pending gross</MudText>
+                <MudText Typo="Typo.h4">@_balance.PendingPayoutGross.ToString("C")</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Platform commission</MudText>
+                <MudText Typo="Typo.h4">@_balance.PendingCommission.ToString("C")</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudPaper Class="pa-4">
+        <MudText Typo="Typo.h6" Class="mb-2">Payout history</MudText>
+        @if (_payouts is null)
+        {
+            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+        }
+        else if (_payouts.Items.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info">No payouts recorded yet.</MudAlert>
+        }
+        else
+        {
+            <MudTable T="AdminVendorPayoutItem" Items="_payouts.Items" Dense="true" Hover="true" Striped="true">
+                <HeaderContent>
+                    <MudTh>ID</MudTh><MudTh>Created</MudTh><MudTh>Method</MudTh>
+                    <MudTh>Gross</MudTh><MudTh>Commission</MudTh><MudTh>Net</MudTh>
+                    <MudTh>Orders</MudTh><MudTh>Status</MudTh><MudTh>Reference</MudTh><MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Id</MudTd>
+                    <MudTd>@context.CreatedOn.LocalDateTime.ToString("g")</MudTd>
+                    <MudTd>@MethodLabel(context.Method)</MudTd>
+                    <MudTd>@context.GrossAmount.ToString("C")</MudTd>
+                    <MudTd>@context.CommissionAmount.ToString("C")</MudTd>
+                    <MudTd>@context.NetAmount.ToString("C")</MudTd>
+                    <MudTd>@context.OrderCount</MudTd>
+                    <MudTd><MudChip T="string" Size="Size.Small" Color="@StatusColor(context.Status)">@StatusLabel(context.Status)</MudChip></MudTd>
+                    <MudTd>@context.ExternalTransferReference</MudTd>
+                    <MudTd>
+                        @foreach (var next in NextStatuses(context.Status))
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Text" Color="@StatusColor(next)"
+                                       OnClick="@(() => UpdateStatus(context.Id, next))">
+                                @StatusLabel(next)
+                            </MudButton>
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudPaper>
+}
+
+<MudDialog @bind-Visible="_createDialog" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>Create payout</TitleContent>
+    <DialogContent>
+        @if (_balance is not null)
+        {
+            <MudText Typo="Typo.body2" Class="mb-3">
+                Settles all @_balance.EligibleOrderCount completed order(s) not yet paid out —
+                net <strong>@((_balance.PendingPayoutGross - _balance.PendingCommission).ToString("C"))</strong>
+                after @_balance.PendingCommission.ToString("C") commission.
+            </MudText>
+        }
+        <MudSelect T="int" @bind-Value="_newMethod" Label="Method" Dense="true">
+            <MudSelectItem T="int" Value="1">Manual (bank transfer / cash)</MudSelectItem>
+            <MudSelectItem T="int" Value="5">Stripe Connect</MudSelectItem>
+            <MudSelectItem T="int" Value="10">VNPay vendor</MudSelectItem>
+            <MudSelectItem T="int" Value="15">MoMo vendor</MudSelectItem>
+        </MudSelect>
+        <MudTextField @bind-Value="_newReference" Label="External transfer reference (optional)" Class="mt-3" />
+        <MudTextField @bind-Value="_newNote" Label="Note (optional)" Lines="2" Class="mt-3" />
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-3">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _createDialog = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SubmitCreate" Disabled="_busy">
+            @(_busy ? "Submitting…" : "Create")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public long VendorId { get; set; }
+
+    private AdminVendorBalanceSummary? _balance;
+    private AdminVendorPayoutsPage? _payouts;
+    private bool _loaded;
+    private bool _createDialog;
+    private bool _busy;
+    private int _newMethod = 1;
+    private string? _newReference;
+    private string? _newNote;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        _balance = await Vendors.GetBalanceAsync(VendorId);
+        if (_balance is not null)
+        {
+            _payouts = await Vendors.ListPayoutsAsync(VendorId, page: 1, pageSize: 50);
+        }
+        _loaded = true;
+        StateHasChanged();
+    }
+
+    private void OpenCreateDialog()
+    {
+        _newMethod = 1;
+        _newReference = null;
+        _newNote = null;
+        _error = null;
+        _createDialog = true;
+    }
+
+    private async Task SubmitCreate()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var req = new AdminCreatePayoutRequest(_newReference, _newNote, _newMethod);
+            using var resp = await Vendors.CreatePayoutAsync(VendorId, req);
+            if (!resp.IsSuccessStatusCode)
+            {
+                _error = $"Create failed (HTTP {(int)resp.StatusCode}): {await resp.Content.ReadAsStringAsync()}";
+                return;
+            }
+            Snackbar.Add("Payout created.", Severity.Success);
+            _createDialog = false;
+            await Reload();
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task UpdateStatus(long payoutId, int newStatus)
+    {
+        using var resp = await Vendors.UpdatePayoutStatusAsync(payoutId, new AdminUpdatePayoutStatusRequest(newStatus, null, null));
+        if (!resp.IsSuccessStatusCode)
+        {
+            Snackbar.Add($"Status change rejected (HTTP {(int)resp.StatusCode}).", Severity.Warning);
+        }
+        else
+        {
+            Snackbar.Add("Payout status updated.", Severity.Success);
+        }
+        await Reload();
+    }
+
+    // Mirrors PayoutStatus enum transitions enforced server-side (Wave 11).
+    private static int[] NextStatuses(int status) => status switch
+    {
+        1 => new[] { 5, 15 },   // Pending → Sent / Failed
+        5 => new[] { 10, 15 },  // Sent → Completed / Failed
+        15 => new[] { 1 },      // Failed → Pending (retry)
+        _ => System.Array.Empty<int>(),
+    };
+
+    private static string MethodLabel(int m) => m switch
+    {
+        1 => "Manual", 5 => "Stripe", 10 => "VNPay", 15 => "MoMo", _ => m.ToString(),
+    };
+
+    private static string StatusLabel(int s) => s switch
+    {
+        1 => "Pending", 5 => "Sent", 10 => "Completed", 15 => "Failed", _ => s.ToString(),
+    };
+
+    private static Color StatusColor(int s) => s switch
+    {
+        1 => Color.Warning, 5 => Color.Info, 10 => Color.Success, 15 => Color.Error, _ => Color.Default,
+    };
+}

@@ -105,6 +105,11 @@ namespace SimplCommerce.Module.Inventory.Tests
             _stockRepoMock.Setup(x => x.Query())
                 .Returns(stocksMock);
             _stockRepoMock.Setup(x => x.AddRange(It.IsAny<IEnumerable<Stock>>()));
+            // W3-G11: UpdateStock now opens a transaction. The mock only needs to
+            // return a disposable handle — verification of commit semantics belongs
+            // in an integration test, not a unit test.
+            _stockRepoMock.Setup(x => x.BeginTransaction())
+                .Returns(Mock.Of<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction>());
 
             _productRepoMock = new Mock<IRepository<Product>>();
             var products = new Product[productsCount];

@@ -18,13 +18,18 @@ public class HealthAndWebhookTests
     public HealthAndWebhookTests(SimplApiFactory factory) => _factory = factory;
 
     [Fact]
-    public async Task Health_ready_returns_healthy()
+    public async Task Host_is_up_anonymous_catalog_endpoint_returns_2xx()
     {
+        // Liveness smoke: the dedicated /health endpoint is dev-only by design
+        // (ServiceDefaults guards it behind IsDevelopment for security), so we prove
+        // the host booted + the request pipeline serves by hitting an always-mapped
+        // anonymous storefront endpoint.
         using var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/health");
+        var response = await client.GetAsync("/api/storefront/catalog/categories");
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.IsSuccessStatusCode,
+            $"Expected 2xx but got {(int)response.StatusCode} {response.StatusCode}.");
     }
 
     [Fact]

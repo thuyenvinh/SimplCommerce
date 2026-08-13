@@ -86,6 +86,17 @@ namespace SimplCommerce.Module.Orders.Models
 
         public decimal PaymentFeeAmount { get; set; }
 
+        // Wave 8: platform commission accrued on this (sub-)order. Always zero on
+        // master orders (they have no VendorId) and on plain platform-owned orders;
+        // populated only on vendor sub-orders, computed at CreateOrder time from
+        // (sub-order subtotal * vendor.CommissionPercent / 100).
+        public decimal CommissionAmount { get; set; }
+
+        // Marks that the platform has paid this sub-order's vendor portion out.
+        // VendorPayout records the actual transfer + groups multiple orders into
+        // one payout for reporting.
+        public long? VendorPayoutId { get; set; }
+
         public IList<Order> Children { get; protected set; } = new List<Order>();
 
         public void AddOrderItem(OrderItem item)

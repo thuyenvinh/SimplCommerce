@@ -7,7 +7,6 @@ namespace SimplCommerce.Module.PaymentMomo
     {
         public static IServiceCollection AddPaymentMomoModule(this IServiceCollection services)
         {
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.paymentMomo");
             return services;
         }
     }

@@ -9,7 +9,6 @@ namespace SimplCommerce.Module.Tax
         public static IServiceCollection AddTaxModule(this IServiceCollection services)
         {
             services.AddTransient<ITaxService, TaxService>();
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.tax");
             return services;
         }
     }

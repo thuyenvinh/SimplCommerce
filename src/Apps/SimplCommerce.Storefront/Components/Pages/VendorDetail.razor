@@ -1,0 +1,83 @@
+@page "/vendors/{Slug}"
+@rendermode RenderMode.InteractiveAuto
+@inject IVendorsApi Vendors
+@inject NavigationManager Nav
+
+<PageTitle>@(_vendor?.Name ?? "Shop") — SimplCommerce</PageTitle>
+
+@if (_notFound)
+{
+    <MudAlert Severity="Severity.Warning">This shop doesn't exist or is closed.</MudAlert>
+}
+else if (_vendor is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
+        <MudText Typo="Typo.h4">@_vendor.Name</MudText>
+        <MudSpacer />
+        <AuthorizeView>
+            <Authorized>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Chat"
+                           Href="/account/messages">Message shop</MudButton>
+            </Authorized>
+        </AuthorizeView>
+    </MudStack>
+    @if (!string.IsNullOrWhiteSpace(_vendor.Description))
+    {
+        <MudText Typo="Typo.body1" Class="mb-4">@_vendor.Description</MudText>
+    }
+
+    <MudText Typo="Typo.h6" Class="mb-2">Products</MudText>
+    @if (_products is null)
+    {
+        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+    }
+    else if (_products.Items.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">This shop hasn't listed any products yet.</MudAlert>
+    }
+    else
+    {
+        <MudGrid>
+            @foreach (var p in _products.Items)
+            {
+                <MudItem xs="12" sm="6" md="4" lg="3">
+                    <MudCard>
+                        <MudCardMedia Image="@(p.ThumbnailUrl ?? "/images/placeholder.png")" Height="180" />
+                        <MudCardContent>
+                            <MudLink Href="@($"/product/{p.Slug}")">
+                                <MudText Typo="Typo.subtitle1">@p.Name</MudText>
+                            </MudLink>
+                            @if (p.IsCallForPricing)
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Contact for price</MudText>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.h6" Color="Color.Primary">@p.Price.ToString("C")</MudText>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+}
+
+@code {
+    [Parameter] public string Slug { get; set; } = string.Empty;
+    private StorefrontVendorDetail? _vendor;
+    private StorefrontVendorProductsPage? _products;
+    private bool _notFound;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _vendor = await Vendors.GetBySlugAsync(Slug);
+        if (_vendor is null) { _notFound = true; return; }
+        _notFound = false;
+        _products = await Vendors.GetProductsAsync(Slug, page: 1, pageSize: 24);
+    }
+}

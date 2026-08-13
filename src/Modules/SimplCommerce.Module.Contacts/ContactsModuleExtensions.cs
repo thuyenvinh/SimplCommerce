@@ -7,7 +7,6 @@ namespace SimplCommerce.Module.Contacts
     {
         public static IServiceCollection AddContactsModule(this IServiceCollection services)
         {
-            GlobalConfiguration.RegisterAngularModule("simplAdmin.contacts");
             return services;
         }
     }

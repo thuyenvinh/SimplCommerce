@@ -10,7 +10,10 @@ namespace SimplCommerce.Module.Comments.Models
     {
         public Comment()
         {
-            Status = CommentStatus.Approved;
+            // G21: new comments require moderation. Auto-approving on insert
+            // means anything posted by anonymous/customer goes live immediately
+            // and the admin moderation queue stays empty.
+            Status = CommentStatus.Pending;
             CreatedOn = DateTimeOffset.Now;
         }
 

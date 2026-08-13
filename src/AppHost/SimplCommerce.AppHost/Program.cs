@@ -38,13 +38,4 @@ builder.AddProject<Projects.SimplCommerce_Admin>("admin")
     .WithReference(seq)
     .WaitFor(api);
 
-builder.AddProject<Projects.SimplCommerce_WebHost>("webhost")
-    .WithReference(simplDb)
-    .WithReference(redis)
-    .WithReference(blobs)
-    .WithReference(mail)
-    .WithReference(seq)
-    .WithReference(api)
-    .WaitFor(sql);
-
 builder.Build().Run();

@@ -1,31 +1,31 @@
-﻿using System;
-using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.EntityFrameworkCore;
 using SimplCommerce.Infrastructure.Data;
-using SimplCommerce.Infrastructure.Web;
 using SimplCommerce.Module.Catalog.Models;
-using SimplCommerce.Module.Core.Models;
 using SimplCommerce.Module.Core.Services;
 using SimplCommerce.Module.Inventory.Models;
 
 namespace SimplCommerce.Module.Inventory.Services
 {
+    // W3-G09: see OrderEmailService — Razor view rendering replaced with an inline
+    // HTML builder so the service has no dependency on IRazorViewRenderer (which is
+    // not registered in the minimal-API host's DI graph).
     public class StockSubscriptionService : IStockSubscriptionService
     {
         private readonly IRepository<ProductBackInStockSubscription> _productBackInStockSubscriptionRepository;
         private readonly IRepository<Product> _productRepository;
         private readonly IEmailSender _emailSender;
-        private readonly IRazorViewRenderer _viewRender;
 
-        public StockSubscriptionService(IRepository<ProductBackInStockSubscription> backInStockSubscriptionRepository, IEmailSender emailSender, IRazorViewRenderer viewRender, IRepository<Product> productRepository)
+        public StockSubscriptionService(
+            IRepository<ProductBackInStockSubscription> backInStockSubscriptionRepository,
+            IEmailSender emailSender,
+            IRepository<Product> productRepository)
         {
             _productBackInStockSubscriptionRepository = backInStockSubscriptionRepository;
             _emailSender = emailSender;
-            _viewRender = viewRender;
             _productRepository = productRepository;
         }
 
@@ -36,19 +36,27 @@ namespace SimplCommerce.Module.Inventory.Services
                 .Where(o => o.ProductId == productId)
                 .ToListAsync();
 
+            if (subscriptions.Count == 0)
+            {
+                return;
+            }
+
             var product = await _productRepository
                 .Query()
                 .Where(o => o.Id == productId)
-                .Include(o => o.ThumbnailImage)
                 .FirstOrDefaultAsync();
 
-            var emailBody = await _viewRender.RenderViewToStringAsync("/Areas/Inventory/Views/EmailTemplates/ProductBackInStockEmail.cshtml", product);
-            var emailSubject = $"Back in stock";
-            
+            if (product is null)
+            {
+                return;
+            }
+
+            var subject = "Back in stock";
+            var body = BuildBackInStockHtml(product);
+
             foreach (var subscription in subscriptions)
             {
-                await _emailSender.SendEmailAsync(subscription.CustomerEmail, emailSubject, emailBody, true);
-                
+                await _emailSender.SendEmailAsync(subscription.CustomerEmail, subject, body, isHtml: true);
                 _productBackInStockSubscriptionRepository.Remove(subscription);
             }
 
@@ -66,6 +74,18 @@ namespace SimplCommerce.Module.Inventory.Services
             _productBackInStockSubscriptionRepository.Add(subscription);
 
             await _productBackInStockSubscriptionRepository.SaveChangesAsync();
+        }
+
+        internal static string BuildBackInStockHtml(Product product)
+        {
+            var name = WebUtility.HtmlEncode(product.Name ?? string.Empty);
+            var sb = new StringBuilder();
+            sb.Append("<!doctype html><html><body style=\"font-family:Arial,sans-serif;\">");
+            sb.Append($"<h2>{name} is back in stock</h2>");
+            sb.Append($"<p>Good news — <strong>{name}</strong> is available again. ");
+            sb.Append("Order soon before it sells out.</p>");
+            sb.Append("</body></html>");
+            return sb.ToString();
         }
     }
 }
